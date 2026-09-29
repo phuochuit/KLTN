@@ -1,0 +1,15 @@
+spring-web/target/
+spring-web/data/
+desktop-winform/bin/
+desktop-winform/obj/
+.dotnet-cli-home/
+tools/apache-maven-*/
+tools/apache-maven-*.zip
+tools/dotnet/
+tools/dotnet-install.ps1
+anpr-service/.venv/
+anpr-service/.venv.incompatible.*/
+anpr-service/*.pt
+anpr-service/.EasyOCR/
+anpr-service/.ultralytics/
+*.log

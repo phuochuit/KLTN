@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-ParkingWebApplication<parking-web>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "vn.edu.parking.ParkingWebApplication",
+            "projectName": "parking-web",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

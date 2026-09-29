@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Sơ đồ bãi xe</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+
+<body>
+    <header th:replace="~{fragments :: header}"></header>
+    <main>
+        <h1>Sơ đồ và cấu hình vị trí đỗ</h1>
+        <p class="notice" th:if="${message}" th:text="${message}"></p>
+        <form class="card toolbar" method="post" th:action="@{/slots}"><label>Mã vị trí<input name="slotCode" required
+                    placeholder="A51"></label><label>Khu vực<input name="zoneName" value="Khu A"></label><label>Xe được
+                cấp riêng<select name="assignedVehicleId">
+                    <option value="">-- Vị trí chung --</option>
+                    <option th:each="v:${vehicles}" th:value="${v.id}"
+                        th:text="${v.plateNumber + ' - ' + v.effectiveOwnerName}"></option>
+                </select></label><button>Lưu vị trí</button></form>
+        <div class="slot-legend"><span class="slot available">Trống</span><span class="slot reserved">Đã cấp, đang
+                trống</span><span class="slot occupied">Đang đỗ đúng xe</span><span class="slot mismatch">Đỗ sai vị
+                trí</span></div>
+        <div class="slot-grid">
+            <div class="slot" th:each="s:${slots}"
+                th:classappend="${s.currentSession != null ? (s.assignedVehicle != null && s.assignedVehicle.plateNumber.equalsIgnoreCase(s.currentSession.entryPlate) ? ' occupied' : ' mismatch') : (s.assignedVehicle == null ? ' available' : ' reserved')}">
+                <strong th:text="${s.slotCode}"></strong><small
+                    th:text="${s.currentSession != null ? s.currentSession.entryPlate : (s.assignedVehicle != null ? 'Cấp: ' + s.assignedVehicle.plateNumber : 'Trống')}"></small>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Thẻ và gói gửi xe</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
+<body><header th:replace="~{fragments :: header}"></header><main>
+<h1>Thẻ và gói gửi xe</h1>
+<p class="notice" th:if="${message}" th:text="${message}"></p>
+<form class="card toolbar" method="post" th:action="@{/cards}">
+    <label>Mã thẻ<input name="cardCode" required placeholder="CARD003"></label>
+    <label>Xe đã đăng ký<select name="vehicleId" required><option th:each="v:${vehicles}" th:value="${v.id}" th:selected="${selectedVehicleId != null && selectedVehicleId == v.id}" th:text="${v.plateNumber + ' - ' + v.effectiveOwnerName + ' - ' + v.vehicleType.displayName}"></option></select></label>
+    <label>Hình thức<select name="passType"><option th:each="p:${passTypes}" th:value="${p}" th:text="${p.displayName}"></option></select></label>
+    <label>Ngày bắt đầu<input name="startDate" type="date" th:value="${today}"></label>
+    <label>Số ngày<input name="durationDays" type="number" value="30" min="1" max="366"></label>
+    <label>Trạng thái<select name="status"><option th:each="s:${statuses}" th:value="${s}" th:text="${s.displayName}"></option></select></label>
+    <button>Tạo / gia hạn thẻ</button>
+</form>
+<div class="card help">Chọn <strong>Vé lượt</strong> để thu phí mỗi lần ra. Chọn <strong>Gói 30 ngày</strong> để thu phí một lần khi tạo/gia hạn; các lượt ra trong thời hạn có phí 0 đ.</div>
+<h2>Danh sách thẻ</h2>
+<table><thead><tr><th>Mã thẻ</th><th>Biển số</th><th>Chủ xe</th><th>Hình thức</th><th>Hiệu lực</th><th>Giá gói</th><th>Trạng thái</th></tr></thead>
+<tbody><tr th:each="c:${cards}"><td><strong th:text="${c.cardCode}"></strong></td><td th:text="${c.vehicle?.plateNumber}"></td><td th:text="${c.vehicle?.effectiveOwnerName}"></td><td th:text="${c.passType.displayName}"></td><td th:text="${c.passType.name() == 'MONTHLY' ? (#temporals.format(c.validFrom,'dd/MM/yyyy') + ' - ' + #temporals.format(c.validUntil,'dd/MM/yyyy')) : 'Theo lượt'}"></td><td th:text="${#numbers.formatDecimal(c.subscriptionFee,0,'COMMA',0,'POINT') + ' đ'}"></td><td th:text="${c.status.displayName}" th:class="${c.status.name() == 'ACTIVE' ? 'status-active' : 'status-blocked'}"></td></tr></tbody></table>
+<h2>Lịch sử thu tiền gói</h2>
+<table><thead><tr><th>Thời gian thu</th><th>Thẻ</th><th>Biển số</th><th>Kỳ hạn</th><th>Số tiền</th></tr></thead>
+<tbody><tr th:each="p:${payments}"><td th:text="${#temporals.format(p.paidAt,'dd/MM/yyyy HH:mm')}"></td><td th:text="${p.parkingCard.cardCode}"></td><td th:text="${p.parkingCard.vehicle.plateNumber}"></td><td th:text="${#temporals.format(p.periodStart,'dd/MM/yyyy') + ' - ' + #temporals.format(p.periodEnd,'dd/MM/yyyy')}"></td><td th:text="${#numbers.formatDecimal(p.amount,0,'COMMA',0,'POINT') + ' đ'}"></td></tr><tr th:if="${#lists.isEmpty(payments)}"><td colspan="5" class="muted">Chưa có giao dịch gói tháng.</td></tr></tbody></table>
+</main></body></html>

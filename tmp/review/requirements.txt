@@ -1,0 +1,83 @@
+
+===== PDF PAGE 1 =====
+KHOA CÔNG NGHỆ THÔNG TIN CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+BỘ MÔN KỸ THUẬT PHẦN MỀM Độc lập - Tự do - Hạnh phúc
+Tp. Hồ Chí Minh, ngày 22 tháng 08 năm 2025
+QUY ĐỊNH HÀM LƯỢNG
+KHÓA LUẬN CỬ NHÂN VÀ KHÓA LUẬN KỸ SƯ
+NGÀNH CNTT
+I. THÔNG TIN CHUNG
+1. Khóa luận cử nhân
+➢ Tên học phần: Khóa luận cử nhân Mã học phần: 0101102008
+➢ Số tín chỉ: 04 (0,4)
+➢ Thời gian thực hiện: 12 tuần Số lượng SV thực hiện: 03 sv
+2. Khóa luận kỹ sư
+➢ Tên học phần: Khóa luận kỹ sư Mã học phần: 0101102012
+➢ Số tín chỉ: 14 (0,14)
+➢ Thời gian thực hiện: 14 tuần Số lượng SV thực hiện: 03 sv
+II. YÊU CẦU VỀ NỘI DUNG
+1. Khóa luận cử nhân
+a) Định hướng ứng dụng: Đề tài tập trung vào việc xây dựng một ứng dụng hoàn
+chỉnh giải quyết vấn đề thiết thực theo yêu cầu thực tế. Trong đề tài định hướng ứng
+dụng cần phải thỏa tối thiểu các yêu cầu:
+- Ứng dụng có tối thiệu 3 nghiệp vụ thực tế trong đó có 1 nghiệp vụ có tính phức
+tạp và đặc trưng
+- Ứng dụng phải được hiện thực hóa trên ít nhất 2 nền tảng (di động, web, desktop
+application) và phải đồng bộ với nhau.
+Các nhiệm vụ đề tài, sinh viên cần phải đạt được:
+- Khảo sát được hiện trạng của bài toán cần giải quyết: về cơ cấu tổ chức, hiện
+trạng hệ thống, đánh giá hiện trạng và đưa ra giải pháp thực tế.
+- Xác định được mục tiêu, yêu cầu của đề tài
+- Mô tả chi tiết, đầy đủ, chính xác các quy trình của hệ thống cần xây dựng bằng
+ngôn ngữ tự nhiên và trình bày các biểu mẫu liên quan.
+
+===== PDF PAGE 2 =====
+- Phân tích hệ thống theo đúng qui trình xây dựng phần mềm dựa trên các sơ đồ
+Sơ đồ usecase nghiệp vụ, sơ đồ usecase hệ thống, sơ đồ lớp mức phân tích.
+- Thiết kế hệ thống bằng sơ đồ lớp mức thiết kế, mô hình quan hệ và các chức
+năng của hệ thống.
+- Phân tách chức năng trên 2 nền tảng hợp lý.
+- Cài đặt đầy đủ các chức năng theo đúng mô mình đã thiết kế.
+o Giao diện phù hợp với chức năng
+o Hoàn chỉnh các chức năng danh mục (thêm, xóa, sửa)
+o Hoàn chỉnh các chức năng nghiệp vụ
+o Xây dựng chức năng báo cáo thống kê, kết xuất báo cáo.
+- Hoàn chỉnh báo cáo theo đúng mẫu, đúng thời gian quy định
+b) Định hướng nghiên cứu: Đề tài tập trung vào nghiên cứu, đề xuất, cải tiến phương
+pháp giải quyết bài toán xã hội quan tâm.
+− Xác định rõ bài toán cần giải quyết: nội dung, yêu cầu, đối tượng, phạm vi
+− Khảo sát được các công trình liên quan tới bài toán cần giải quyết: tập trung vào
+các phương pháp mới nhất trong và ngoài nước và đánh giá hiệu quả của các
+phương pháp này.
+− Lựa chọn một phương pháp hoặc một hướng nghiên cứu cụ thể cho bài toán
+(phương pháp mới được công bố trong 5 năm gần đây).
+− Làm rõ được các khái niệm, tính chất, đặc trưng của thuật toán đã lựa chọn: Giải
+thích và cho ví dụ minh họa
+− Có sự đóng góp để nâng cao chất lượng của thuật toán (nên có bài báo từ cấp Khoa
+trở lên)
+− Tiến hành cài đặt và thực nghiệm thuật toán trước và sau khi cải tiến và một số
+thuật toán cùng loại đã khảo sát
+− Triển khai đánh giá: bằng lý thuyết hoặc bằng thực nghiệm
+− Phân tích, giải thích kết quả thu được
+− Có ứng dụng minh họa được kết quả thuật toán trong thực tế.
+2. Khóa luận kỹ sư:
+a) Định hướng ứng dụng: Đề tài tập trung vào việc xây dựng một hệ thống ứng dụng
+hoàn chỉnh có thể triển khai được vào thực tế. Đề tài phải thỏa tất cả các yêu cầu như
+trong đề tài cử nhân và các yêu cầu bổ sung sau:
+- Có tối thiểu 04 nghiệp vụ.
+
+===== PDF PAGE 3 =====
+- Có tính bảo mật cao
+- Ràng buộc dữ liệu hoàn chỉnh
+- Giao diện tối ưu cho người sử dụng
+- Có khả năng linh hoạt, mở rộng
+- Có tích hợp chức năng thông minh để nâng cao hiệu quả của hệ thống (tích hợp
+chức năng hỗ trợ của AI).
+- Hỗ trợ chức năng cảnh báo, dự đoán xu hướng cho người quản lý.
+b) Định hướng nghiên cứu: Đạt đầy đủ các yêu cầu của đề tài định hướng nghiên
+cứu của khóa luận cử nhân và thêm một số yêu cầu sau:
+− Có đóng góp cải tiến chất lượng, hiệu quả của thuật toán, mô hình với hiệu quả cao
+− Xây dựng một ứng dụng thực tế hoàn chỉnh, ứng dụng bài toán đang xử lý để nâng
+cao chất lượng của ứng dụng
+Bộ môn Kỹ thuật phần mềm
+Vũ Văn Vinh

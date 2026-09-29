@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Hộ gia đình và cư dân</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
+<body><header th:replace="~{fragments :: header}"></header><main>
+<h1>Hộ gia đình và thông tin cư dân</h1>
+<p class="notice" th:if="${message}" th:text="${message}"></p>
+<div class="card help"><strong>Quy tắc:</strong> tạo hộ/căn hộ trước, sau đó khai báo đầy đủ từng thành viên. Ô hạn mức để trống sẽ dùng mặc định hệ thống: <strong th:text="${policy.defaultMaxTwoWheelers + ' xe hai bánh và ' + policy.defaultMaxCars + ' ô tô'}"></strong>.</div>
+
+<h2>1. Tạo hoặc cập nhật hộ</h2>
+<form class="card form-grid" method="post" th:action="@{/households}">
+    <label>Mã hộ<input name="householdCode" required placeholder="HH-A1-1205"></label>
+    <label>Căn hộ/phòng<input name="apartmentNumber" required placeholder="A1-1205"></label>
+    <label>Tòa/block<input name="buildingName" placeholder="A1"></label>
+    <label>Điện thoại liên hệ<input name="contactPhone" placeholder="0901234567"></label>
+    <label>Giới hạn xe hai bánh riêng<input name="maxTwoWheelers" type="number" min="0" placeholder="Theo mặc định"></label>
+    <label>Giới hạn ô tô riêng<input name="maxCars" type="number" min="0" placeholder="Theo mặc định"></label>
+    <div class="form-actions"><button>Lưu hộ gia đình</button></div>
+</form>
+
+<h2>2. Thêm hoặc cập nhật thành viên</h2>
+<div class="card edit-picker"><label>Chọn người cần chỉnh sửa<select id="memberToEdit"><option value="">-- Thêm người mới --</option><option th:each="m:${members}" th:value="${m.id}" th:text="${m.fullName + ' - ' + m.household.apartmentNumber}"></option></select></label><button type="button" id="newMember">Xóa form / thêm mới</button><span class="muted">Khi chọn một người, toàn bộ thông tin hiện tại sẽ được nạp vào form bên dưới.</span></div>
+<form id="memberForm" class="card form-grid" method="post" enctype="multipart/form-data" th:action="@{/members}">
+    <input type="hidden" name="memberId" id="memberId">
+    <label>Hộ gia đình<select name="householdId" required><option value="">-- Chọn hộ --</option><option th:each="h:${households}" th:value="${h.id}" th:text="${h.householdCode + ' - ' + h.apartmentNumber}"></option></select></label>
+    <label>Họ và tên<input name="fullName" required placeholder="Nguyễn Văn An"></label>
+    <label>Số CCCD<input id="citizenId" name="citizenId" inputmode="numeric" placeholder="012345678901"></label>
+    <label>Số CMND cũ<input id="oldCitizenId" name="oldCitizenId" inputmode="numeric"></label>
+    <label>Ngày sinh<input name="dateOfBirth" type="date"></label>
+    <label>Giới tính<select name="gender"><option value="">-- Chọn --</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label>
+    <label>Quan hệ với chủ hộ<input name="relationshipToHead" placeholder="Chủ hộ / Vợ / Chồng / Con"></label>
+    <label>Số điện thoại<input name="phone" placeholder="0901234567"></label>
+    <label>Email<input name="email" type="email" placeholder="email@example.com"></label>
+    <label class="span-2">Địa chỉ thường trú<input name="permanentAddress"></label>
+    <label>Ngày cấp CCCD<input name="cccdIssueDate" type="date"></label>
+    <label>Nơi cấp CCCD<input name="cccdIssuePlace"></label>
+    <fieldset class="span-2"><legend>Quét QR trên CCCD</legend><input id="cccdQrFile" type="file" accept="image/*" capture="environment"><button id="scanQr" type="button">Quét từ ảnh đã chọn</button><button id="openQrCamera" type="button">Mở camera quét QR</button><button id="captureQr" type="button" hidden>Chụp và đọc QR</button><video id="qrVideo" autoplay playsinline hidden style="width:100%;max-height:220px"></video><canvas id="qrCanvas" hidden></canvas><input id="cccdQrRaw" name="cccdQrRaw" type="hidden"><small id="qrStatus">Chọn ảnh QR rõ nét hoặc mở camera và đưa mặt sau CCCD vào khung hình.</small></fieldset>
+    <fieldset class="span-2"><legend>Ảnh khuôn mặt đăng ký (bắt buộc)</legend><input name="registrationFaceImage" id="faceUpload" type="file" accept="image/*"><video id="faceVideo" autoplay playsinline hidden style="width:100%;max-height:220px"></video><canvas id="faceCanvas" hidden></canvas><img id="facePreview" alt="Ảnh đăng ký" style="display:none;width:100%;max-height:220px;object-fit:contain"><input id="registrationFaceCapture" name="registrationFaceCapture" type="hidden"><button id="openCamera" type="button">Mở camera</button><button id="captureFace" type="button" hidden>Chụp ảnh</button></fieldset>
+    <div class="form-actions"><button id="saveMemberButton">Thêm thành viên</button></div>
+</form>
+
+<h2>Danh sách hộ</h2>
+<div class="table-scroll"><table><thead><tr><th>Mã hộ</th><th>Căn hộ</th><th>Tòa/block</th><th>Liên hệ</th><th>Hạn mức xe hai bánh</th><th>Hạn mức ô tô</th></tr></thead><tbody>
+<tr th:each="h:${households}"><td><strong th:text="${h.householdCode}"></strong></td><td th:text="${h.apartmentNumber}"></td><td th:text="${h.buildingName ?: '-'}"></td><td th:text="${h.contactPhone ?: '-'}"></td><td th:text="${h.maxTwoWheelers == null ? 'Mặc định ' + policy.defaultMaxTwoWheelers : h.maxTwoWheelers}"></td><td th:text="${h.maxCars == null ? 'Mặc định ' + policy.defaultMaxCars : h.maxCars}"></td></tr>
+</tbody></table></div>
+
+<h2>Danh sách thành viên</h2>
+<div class="table-scroll"><table><thead><tr><th>Họ tên</th><th>Hộ/căn hộ</th><th>CCCD</th><th>Ngày sinh</th><th>Quan hệ</th><th>Điện thoại</th><th>Ảnh đối chiếu</th><th>Thao tác</th></tr></thead><tbody>
+<tr th:each="m:${members}"><td><strong th:text="${m.fullName}"></strong></td><td th:text="${m.household.householdCode + ' / ' + m.household.apartmentNumber}"></td><td th:text="${m.citizenId ?: '-'}"></td><td th:text="${m.dateOfBirth == null ? '-' : #temporals.format(m.dateOfBirth,'dd/MM/yyyy')}"></td><td th:text="${m.relationshipToHead ?: '-'}"></td><td th:text="${m.phone ?: '-'}"></td><td><img th:if="${!#strings.isEmpty(m.registrationFaceImagePath)}" th:src="${m.registrationFaceImagePath}" alt="Ảnh đăng ký" style="width:72px;height:72px;object-fit:cover;border-radius:6px"><span th:if="${#strings.isEmpty(m.registrationFaceImagePath)}">Thiếu ảnh đăng ký</span></td><td><button type="button" class="edit-member" th:attr="data-id=${m.id}">Chỉnh sửa</button></td></tr>
+</tbody></table></div>
+</main><script>
+const q=id=>document.getElementById(id); let stream,qrStream;
+q('openCamera').onclick=async()=>{try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});q('faceVideo').srcObject=stream;q('faceVideo').hidden=false;q('captureFace').hidden=false;}catch(e){alert('Không mở được camera: '+e.message)}};
+q('captureFace').onclick=()=>{const v=q('faceVideo'),c=q('faceCanvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);const data=c.toDataURL('image/jpeg',.9);q('registrationFaceCapture').value=data;q('facePreview').src=data;q('facePreview').style.display='block';v.hidden=true;if(stream)stream.getTracks().forEach(t=>t.stop());};
+q('faceUpload').onchange=e=>{if(e.target.files[0]){q('registrationFaceCapture').value='';q('facePreview').src=URL.createObjectURL(e.target.files[0]);q('facePreview').style.display='block';}};
+const parseDate=s=>s&&s.length===8?s.slice(4)+'-'+s.slice(2,4)+'-'+s.slice(0,2):'';
+async function scanQrBlob(blob){q('qrStatus').textContent='Đang đọc QR...';try{const form=new FormData();form.append('file',blob,'cccd-qr.jpg');const response=await fetch('/api/cccd/scan-qr',{method:'POST',body:form});const data=await response.json();if(!response.ok)throw new Error(data.message||'Không đọc được QR');q('cccdQrRaw').value=data.raw||'';q('citizenId').value=data.citizenId||'';q('oldCitizenId').value=data.oldCitizenId||'';document.querySelector('[name=fullName]').value=data.fullName||'';document.querySelector('[name=dateOfBirth]').value=data.dateOfBirth||'';document.querySelector('[name=gender]').value=data.gender||'';document.querySelector('[name=permanentAddress]').value=data.permanentAddress||'';document.querySelector('[name=cccdIssueDate]').value=data.cccdIssueDate||'';q('qrStatus').textContent=data.message;}catch(e){q('qrStatus').textContent='Không đọc được QR: '+e.message;}}
+q('scanQr').onclick=()=>{const f=q('cccdQrFile').files[0];if(!f)return alert('Hãy chọn ảnh có mã QR trên CCCD');scanQrBlob(f);};
+q('openQrCamera').onclick=async()=>{try{qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});q('qrVideo').srcObject=qrStream;q('qrVideo').hidden=false;q('captureQr').hidden=false;q('qrStatus').textContent='Đưa mã QR vào giữa khung, giữ thẳng và tránh phản sáng.';}catch(e){q('qrStatus').textContent='Không mở được camera: '+e.message;}};
+q('captureQr').onclick=()=>{const v=q('qrVideo'),c=q('qrCanvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);c.toBlob(blob=>{if(blob)scanQrBlob(blob);},'image/jpeg',.95);if(qrStream)qrStream.getTracks().forEach(t=>t.stop());v.hidden=true;q('captureQr').hidden=true;};
+const memberForm=q('memberForm'),memberPicker=q('memberToEdit');
+async function loadMember(id){if(!id)return resetMember();try{const response=await fetch('/admin-data/members/'+id);const data=await response.json();if(!response.ok)throw new Error(data.message||'Không tải được thành viên');for(const name of ['householdId','fullName','citizenId','oldCitizenId','dateOfBirth','gender','relationshipToHead','phone','email','permanentAddress','cccdIssueDate','cccdIssuePlace','cccdQrRaw']){const input=memberForm.elements[name];if(input)input.value=data[name]??'';}q('memberId').value=data.id;q('saveMemberButton').textContent='Lưu thay đổi thành viên';if(data.registrationFaceImagePath){q('facePreview').src=data.registrationFaceImagePath;q('facePreview').style.display='block';}memberForm.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){alert('Không thể tải thông tin: '+e.message);}}
+function resetMember(){memberForm.reset();q('memberId').value='';q('registrationFaceCapture').value='';q('facePreview').style.display='none';q('saveMemberButton').textContent='Thêm thành viên';memberPicker.value='';}
+memberPicker.onchange=()=>loadMember(memberPicker.value);q('newMember').onclick=resetMember;document.querySelectorAll('.edit-member').forEach(b=>b.onclick=()=>{memberPicker.value=b.dataset.id;loadMember(b.dataset.id);});
+</script></body></html>

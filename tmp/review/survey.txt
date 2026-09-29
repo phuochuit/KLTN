@@ -1,0 +1,14 @@
+P0: KHẢO SÁT QL BÃI ĐỖ XE Ở CHUNG CƯ LANDMARK’
+P1: Bạn đang ở chung cư Landmark tòa nào block mấy?
+P2: Tổng diện tích để ở của gia đình bạn là bao nhiêu mét vuông?
+P3: Hiện tại gia đình của bạn có bao nhiêu người?
+P4: Có những quy định gì về việc gửi xẻ ở bãi xe chung cư
+P5: - Một gia đình được gửi tối đa bao nhiêu chiếc xe?
+P6: - Đối với hộ gia đình ở trong chung cư thì tiền gửi xe tính trong phí dịch vụ hay là tính riêng?
+P7: - Chung cư có quy định về việc 1 ngày xe của 1 cá nhân trong hộ gia đình được ra vào tối đa bao nhiêu lần không? Nếu có thì khi vượt mức tối đa sẽ được tính phí như thế nào và phần phí đó được cộng vào đâu?
+P8: - Nếu là phí gửi xe được đóng theo tháng thì khi ra vào bạn sẽ đưa vé hay thẻ để nhân viên quét?
+P9: - Nhà xe có quy định gì về việc 1 gia đình có thể để thêm bao nhiêu xe cho khách khi tới chơi nhà không? Ví dụ: Có 1 vài chung cư quy định là 1 gia đình có thể gửi thêm tối đa 3 chiếc xe khi có khách đến nhà.
+P10: Ở bãi gửi xe của bạn dùng gì để xác minh xe ra vào? (Ví dụ: quét khuôn mặt + biển số…)
+P11: Chung cư bạn có quy định về giá vé cho các thời gian khác nhau hoặc phân khối khác nhau cho từng loại xe không?
+P12: - Giá gửi xe của khách vãng lai khi gửi xe ở bãi xe chung cư.
+P13: + Ví dụ: Vé xe 50cc khác giá 150cc và giá vé của xe ô tô, mô tô có khác gì không… hoặc giá vé từ 7h sáng đến 14h chiều giá khác với giá vé từ 17h trở đi. 

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Đăng ký phương tiện</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
+<body><header th:replace="~{fragments :: header}"></header><main>
+<h1>Đăng ký phương tiện và quyền sử dụng</h1>
+<p class="notice" th:if="${message}" th:text="${message}"></p>
+<div class="card help"><strong>Đối chiếu ANPR:</strong> biển số nhận diện tại cổng được chuẩn hóa rồi so với biển số đăng ký ở đây. Nhãn hiệu, màu, loại nhiên liệu, số chỗ và giấy đăng ký là bằng chứng bổ sung khi biển số bị mờ hoặc nghi ngờ.</div>
+<div class="card edit-picker"><label>Chọn phương tiện cần chỉnh sửa<select id="vehicleToEdit"><option value="">-- Đăng ký xe mới --</option><option th:each="v:${vehicles}" th:value="${v.id}" th:text="${v.plateNumber + ' - ' + v.effectiveOwnerName}"></option></select></label><button type="button" id="newVehicle">Xóa form / đăng ký mới</button><span class="muted">Chọn xe để nạp toàn bộ thông tin và danh sách người được phép sử dụng.</span></div>
+<form id="vehicleForm" class="card form-grid" method="post" th:action="@{/vehicles}">
+    <input type="hidden" name="vehicleId" id="vehicleId">
+    <label>Hộ gia đình<select name="householdId" required><option value="">-- Chọn hộ --</option><option th:each="h:${households}" th:value="${h.id}" th:text="${h.householdCode + ' - ' + h.apartmentNumber}"></option></select></label>
+    <label>Chủ đăng ký<select name="registeredOwnerId" required><option value="">-- Chọn thành viên --</option><option th:each="m:${members}" th:value="${m.id}" th:text="${m.fullName + ' - ' + m.household.householdCode}"></option></select></label>
+    <label>Biển số<input name="plateNumber" required placeholder="29A0-061.31"></label>
+    <label>Số giấy đăng ký xe<input name="registrationNumber" required></label>
+    <label>Loại xe<select name="vehicleType"><option th:each="t:${types}" th:value="${t}" th:text="${t.displayName}"></option></select></label>
+    <label>Loại nhiên liệu<select name="fuelType"><option th:each="f:${fuelTypes}" th:value="${f}" th:text="${f.displayName}"></option></select></label>
+    <label>Hãng xe<input name="brand" required placeholder="Honda / VinFast"></label>
+    <label>Dòng xe<input name="modelName" required placeholder="Vision / VF 8"></label>
+    <label>Màu xe<input name="color" required placeholder="Đen"></label>
+    <label>Năm sản xuất<input name="manufactureYear" type="number" min="1900" max="2100"></label>
+    <label>Số khung<input name="chassisNumber" required></label>
+    <label>Số máy<input name="engineNumber" required></label>
+    <label>Số chỗ<input name="seatCount" type="number" min="1" max="99"></label>
+    <label>Dung tích xi-lanh (cc)<input name="cylinderCapacityCc" type="number" min="0"></label>
+    <label class="span-2">Đường dẫn ảnh giấy đăng ký xe<input name="registrationImagePath" required placeholder="uploads/vehicle-registration/..."></label>
+    <fieldset class="span-all"><legend>Thành viên được phép sử dụng xe</legend><label class="check-option" th:each="m:${members}"><input type="checkbox" name="authorizedMemberIds" th:value="${m.id}"><span th:text="${m.fullName + ' (' + m.household.householdCode + ')'}"></span></label><p class="muted">Chủ đăng ký luôn được thêm tự động. Hệ thống chỉ chấp nhận người thuộc cùng hộ.</p></fieldset>
+    <div class="form-actions"><button id="saveVehicleButton">Đăng ký phương tiện</button></div>
+</form>
+<h2>Danh sách phương tiện</h2>
+<div class="table-scroll"><table><thead><tr><th>Biển số</th><th>Hộ/căn hộ</th><th>Chủ đăng ký</th><th>Người được phép lấy xe</th><th>Loại</th><th>Thông tin đối chiếu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+<tbody><tr th:each="v:${vehicles}"><td><strong th:text="${v.plateNumber}"></strong></td><td th:text="${v.household == null ? v.apartmentNumber : v.household.householdCode + ' / ' + v.household.apartmentNumber}"></td><td th:text="${v.effectiveOwnerName}"></td><td th:text="${#strings.isEmpty(v.authorizedMemberNames) ? v.effectiveOwnerName : v.authorizedMemberNames}"></td><td th:text="${v.vehicleType.displayName + ' / ' + v.fuelType.displayName}"></td><td th:text="${(#strings.isEmpty(v.brand) ? '' : v.brand + ' ') + (#strings.isEmpty(v.modelName) ? '' : v.modelName + ' ') + (#strings.isEmpty(v.color) ? '' : '- ' + v.color)}"></td><td class="status-active" th:text="${v.active ? 'Hoạt động' : 'Ngừng'}"></td><td><button type="button" class="edit-vehicle" th:attr="data-id=${v.id}">Chỉnh sửa</button></td></tr></tbody></table></div>
+</main><script>
+const form=document.getElementById('vehicleForm'),picker=document.getElementById('vehicleToEdit');
+async function loadVehicle(id){if(!id)return resetVehicle();try{const response=await fetch('/admin-data/vehicles/'+id),data=await response.json();if(!response.ok)throw new Error(data.message||'Không tải được phương tiện');for(const name of ['householdId','registeredOwnerId','plateNumber','registrationNumber','vehicleType','fuelType','brand','modelName','color','manufactureYear','chassisNumber','engineNumber','seatCount','cylinderCapacityCc','registrationImagePath']){const input=form.elements[name];if(input)input.value=data[name]??'';}form.elements.vehicleId.value=data.id;const allowed=new Set((data.authorizedMemberIds||[]).map(String));form.querySelectorAll('input[name=authorizedMemberIds]').forEach(c=>c.checked=allowed.has(c.value));document.getElementById('saveVehicleButton').textContent='Lưu thay đổi phương tiện';form.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){alert('Không thể tải thông tin: '+e.message);}}
+function resetVehicle(){form.reset();form.elements.vehicleId.value='';document.getElementById('saveVehicleButton').textContent='Đăng ký phương tiện';picker.value='';}
+picker.onchange=()=>loadVehicle(picker.value);document.getElementById('newVehicle').onclick=resetVehicle;document.querySelectorAll('.edit-vehicle').forEach(b=>b.onclick=()=>{picker.value=b.dataset.id;loadVehicle(b.dataset.id);});
+</script></body></html>

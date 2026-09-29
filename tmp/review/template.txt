@@ -1,0 +1,72 @@
+P0: ĐỀ CƯƠNG CHI TIẾT
+P1: KHÓA LUẬN CỬ NHÂN NGÀNH CNTT NĂM HỌC 2026 – 2027
+P2: ĐỊNH HƯỚNG ỨNG DỤNG
+P4: Mã đề tài:
+P5: Tên đề tài: 
+P6: Thông tin GVHD:
+P7: Họ tên giảng viên: 	
+P8: Điện thoại: 	
+P9: Email: 	
+P10: Nhóm sinh viên thực hiện đề tài
+P11: 		 MSSV:	Lớp: 	
+P12: 		 MSSV:	Lớp: 	
+P13: 		 MSSV:	Lớp: 	
+P14: Mục tiêu: (Nêu chi tiết mục tiêu nội dung của đề tài: mục tiêu về khảo sát hệ thống, phân tích hệ thống, thiết kế hệ thống, xây dựng và cài đặt, báo cáo…; Trình bày mục tiêu về tinh thần, thái độ làm việc cá nhân, làm việc nhóm và tự học. 
+P15: Lưu ý: Sinh viên phải xây dựng được một ứng dụng hoàn chỉnh trên 02 nền tảng từ (web, winform, mobile), có tối thiểu 4 nghiệp vụ thực tế và có 1-2 nghiệp vụ phức tạp.
+P16: VD: Khảo sát được hiện trạng thực tế của…
+P17: VD: Xây dựng, mô hình hóa được các nghiệp vụ…
+P18: Yêu cầu
+P19: Các nội dung cụ thể cần thực hiện: Trình bày rõ các yêu cầu cần phải làm được của đề tài
+P20: Yêu cầu 1
+P21: Yêu cầu 2
+P22: …..
+P23: Môi trường thực hiện
+P24: Yêu cầu về Ngôn ngữ
+P25: Yêu cầu về hệ quản trị
+P26: Yêu cầu khác
+P27: Thời gian thực hiện: 12 tuần (từ ngày ........ tới ngày ..........)
+P28: Thang điểm
+P29: Thời gian và các công việc trong tuần:
+P30: Tài liệu tham khảo
+P31: Trình bày các tài liệu tham khảo của đề tài gồm sách, bài báo, website, phần mềm, …
+P32: Tên tác giả, “Tên sách”, NXB, năm xuất bản.
+P33: Tên tác giả, “Tên sách 2”, NXB, năm xuất bản.
+P34: Một số yêu cầu khác
+P35: Số lượng SV tối đa thực hiện đề tài: 3 sinh viên.
+P36: Có khả năng và tư duy lập trình, đọc hiểu tiếng Anh,…
+P37: Gặp giảng viên hướng dẫn ít nhất 1 lần/tuần, thực hiện đề tài theo sự phân công của giảng viên hướng dẫn. Trước mỗi buổi báo cáo, sinh viên phải tích hợp những nội dung được phân công vào chung trong một tài liệu/ phần mềm.
+P38: 	Tp.HCM, ngày … tháng.....năm 202
+P39: 	Trưởng bộ môn	Giảng viên hướng dẫn
+P40: 	(ký và ghi rõ họ tên)	(ký và ghi rõ họ tên)
+
+===== TABLE 0 15x4 =====
+R0: STT | Nội dung | CLO | Điểm
+R1:  | Khảo sát nghiệp vụ, mô hình hóa nghiệp vụ  / Xác định lý do, mục tiêu đề tài / Khảo sát hiện trạng: Cơ cấu tổ chức, Qui trình, biểu mẫu | CLO1.1 |  / 0.25 / 0.5
+R2:  | Lập kế hoạch và phân công thực hiện công việc | CLO6 | 0.25
+R3:  | Phân tích hệ thống / Lập sơ đồ Use-Case nghiệp vụ và đặc tả. / Lập sơ đồ Use-Case hệ thống và đặc tả. / Sơ đồ lớp phân tích | CLO1.2 |  / 0.25 / 0.25 / 0.25
+R4:  | Thiết kế hệ thống / Sơ đồ lớp thiết kế / Mô hình dữ liệu | CLO2.1 /  |  / 0.25 / 0.25
+R5:  | Thiết kế giao diện | CLO2.2 | 0.5
+R6:  | Xây dựng API hệ thống / Phân tích các chức năng trên các nền tảng | CLO1.1 | 0.25 / 0.25
+R7:  | Xây dựng các chức năng cơ bản của ứng dụng: đăng nhập, đăng xuất, đổi mật khẩu, phân quyền người dùng.  / Cài đặt chức năng theo yêu cầu của bài toán / Chức năng 01: / Yêu cầu 1 / Yêu cầu 2 / … / Chức năng 02 / Yêu cầu 1 / Yêu cầu 2 / … / Chức năng N / Yêu cầu 1 / Yêu cầu 2 / … | CLO3 /  | 0.5 /  / 3.5 /  / (chia nhỏ thanh điểm, tối đa 0.5 điểm) /  / 
+R8:  | Kiểm thử và triển khai hệ thống | CLO4 | 0.75
+R9:  | Nội dung kiến thức trình bày trong quyển báo cáo | CLO5.1 | 0.5
+R10:  | Hình thức, định dạng quyển báo cáo | CLO5.1 | 0.5
+R11:  | Thái độ, tác phong làm việc  | CLO6 | 0.5
+R12:  | Phong cách báo cáo, Slide. | CLO5.2 | 0.5
+R13:  | Cộng điểm khuyến khích cho nhóm sinh viên tham gia thực hiện NCKH liên quan nội dung đề tài (tổng điểm chung không vượt quá 10 điểm) / Thi SV NCKH đạt giải cấp Khoa hoặc có bài báo đăng hội thảo cấp Khoa. / Thi SV NCKH đạt giải cấp Trường hoặc có bài báo đăng tạp chí khoa học cấp Trường trở lên | CLO3 | 1.0 /  /  / 0.5 /  / 1.0
+R14: Tổng cộng | Tổng cộng |  | 10.0
+
+===== TABLE 1 13x2 =====
+R0: Tuần | Nội dung công việc
+R1:  | Yêu cầu công việc cần thực hiện tuần 01
+R2:  | Yêu cầu công việc cần thực hiện tuần 02
+R3:  | 
+R4:  | 
+R5:  | 
+R6:  | 
+R7:  | 
+R8:  | 
+R9:  | 
+R10:  | 
+R11:  | 
+R12:  | Hoàn chỉnh báo cáo. / Thiết kế bài báo cáo trên PowerPoint. / Nộp báo cáo.

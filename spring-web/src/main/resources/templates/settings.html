@@ -1,0 +1,4 @@
+<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Hạn mức phương tiện</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body><header th:replace="~{fragments :: header}"></header><main><h1>Hạn mức phương tiện</h1><p class="notice" th:if="${message}" th:text="${message}"></p>
+<div class="card help">Đây là giới hạn mặc định cho mỗi hộ. Admin có thể đặt hạn mức riêng từng hộ tại trang <strong>Hộ gia đình</strong>. Giá trị 0 nghĩa là không cho đăng ký nhóm xe đó.</div>
+<form class="card toolbar" method="post" th:action="@{/settings}"><label>Số xe hai bánh tối đa/hộ<input name="defaultMaxTwoWheelers" type="number" min="0" required th:value="${policy.defaultMaxTwoWheelers}"></label><label>Số ô tô tối đa/hộ<input name="defaultMaxCars" type="number" min="0" required th:value="${policy.defaultMaxCars}"></label><button>Lưu hạn mức</button></form>
+</main></body></html>

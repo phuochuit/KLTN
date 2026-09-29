@@ -1,0 +1,986 @@
+{
+  "sha256": "c1b157aacc738281beb45f0d7e04ef02d472c340c926933d679688b2b70ed745",
+  "size": 3483823,
+  "sections": 1,
+  "paragraphs": [
+    {
+      "i": 0,
+      "text": "ĐỀ CƯƠNG CHI TIẾT",
+      "style": "Normal",
+      "align": "CENTER (1)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 1,
+      "text": "KHÓA LUẬN CỬ NHÂN NGÀNH CNTT NĂM HỌC 2026 – 2027",
+      "style": "Normal",
+      "align": "CENTER (1)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 12
+    },
+    {
+      "i": 2,
+      "text": "ĐỊNH HƯỚNG ỨNG DỤNG",
+      "style": "Normal",
+      "align": "CENTER (1)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 3,
+      "text": "",
+      "style": "Normal",
+      "align": "None",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": null,
+      "size": null,
+      "bold": null,
+      "italic": null,
+      "runs": 0
+    },
+    {
+      "i": 4,
+      "text": "Mã đề tài:",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 5,
+      "text": "Tên đề tài: ",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 6,
+      "text": "Thông tin GVHD:",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 2
+    },
+    {
+      "i": 7,
+      "text": "Họ tên giảng viên: \t",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 2
+    },
+    {
+      "i": 8,
+      "text": "Điện thoại: \t",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 2
+    },
+    {
+      "i": 9,
+      "text": "Email: \t",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 2
+    },
+    {
+      "i": 10,
+      "text": "Nhóm sinh viên thực hiện đề tài",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 11,
+      "text": "\t\t MSSV:\tLớp: \t",
+      "style": "List Paragraph",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "364490",
+      "first": "-184150",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 8
+    },
+    {
+      "i": 12,
+      "text": "\t\t MSSV:\tLớp: \t",
+      "style": "List Paragraph",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "364490",
+      "first": "-184150",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 10
+    },
+    {
+      "i": 13,
+      "text": "\t\t MSSV:\tLớp: \t",
+      "style": "List Paragraph",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "364490",
+      "first": "-184150",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 8
+    },
+    {
+      "i": 14,
+      "text": "Mục tiêu: (Nêu chi tiết mục tiêu nội dung của đề tài: mục tiêu về khảo sát hệ thống, phân tích hệ thống, thiết kế hệ thống, xây dựng và cài đặt, báo cáo…; Trình bày mục tiêu về tinh thần, thái độ làm việc cá nhân, làm việc nhóm và tự học. ",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 5
+    },
+    {
+      "i": 15,
+      "text": "Lưu ý: Sinh viên phải xây dựng được một ứng dụng hoàn chỉnh trên 02 nền tảng từ (web, winform, mobile), có tối thiểu 4 nghiệp vụ thực tế và có 1-2 nghiệp vụ phức tạp.",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "228600",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": true,
+      "runs": 15
+    },
+    {
+      "i": 16,
+      "text": "VD: Khảo sát được hiện trạng thực tế của…",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 17,
+      "text": "VD: Xây dựng, mô hình hóa được các nghiệp vụ…",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 18,
+      "text": "Yêu cầu",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 19,
+      "text": "Các nội dung cụ thể cần thực hiện: Trình bày rõ các yêu cầu cần phải làm được của đề tài",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "-226695",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 3
+    },
+    {
+      "i": 20,
+      "text": "Yêu cầu 1",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 21,
+      "text": "Yêu cầu 2",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 22,
+      "text": "…..",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 2
+    },
+    {
+      "i": 23,
+      "text": "Môi trường thực hiện",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 24,
+      "text": "Yêu cầu về Ngôn ngữ",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 25,
+      "text": "Yêu cầu về hệ quản trị",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 26,
+      "text": "Yêu cầu khác",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 27,
+      "text": "Thời gian thực hiện: 12 tuần (từ ngày ........ tới ngày ..........)",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 11
+    },
+    {
+      "i": 28,
+      "text": "Thang điểm",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "76200",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 29,
+      "text": "Thời gian và các công việc trong tuần:",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "76200",
+      "after": "76200",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 2
+    },
+    {
+      "i": 30,
+      "text": "Tài liệu tham khảo",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "76200",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 31,
+      "text": "Trình bày các tài liệu tham khảo của đề tài gồm sách, bài báo, website, phần mềm, …",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "76200",
+      "after": "38100",
+      "line": "1.15",
+      "left": "228600",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": true,
+      "runs": 2
+    },
+    {
+      "i": 32,
+      "text": "Tên tác giả, “Tên sách”, NXB, năm xuất bản.",
+      "style": "List Paragraph",
+      "align": "JUSTIFY (3)",
+      "before": "76200",
+      "after": "38100",
+      "line": "1.15",
+      "left": "180340",
+      "first": "0",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 4
+    },
+    {
+      "i": 33,
+      "text": "Tên tác giả, “Tên sách 2”, NXB, năm xuất bản.",
+      "style": "List Paragraph",
+      "align": "JUSTIFY (3)",
+      "before": "76200",
+      "after": "38100",
+      "line": "1.15",
+      "left": "180340",
+      "first": "0",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 3
+    },
+    {
+      "i": 34,
+      "text": "Một số yêu cầu khác",
+      "style": "List Paragraph",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": true,
+      "italic": null,
+      "runs": 1
+    },
+    {
+      "i": 35,
+      "text": "Số lượng SV tối đa thực hiện đề tài: 3 sinh viên.",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "0",
+      "first": "-1905",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 4
+    },
+    {
+      "i": 36,
+      "text": "Có khả năng và tư duy lập trình, đọc hiểu tiếng Anh,…",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "0",
+      "first": "-1905",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 2
+    },
+    {
+      "i": 37,
+      "text": "Gặp giảng viên hướng dẫn ít nhất 1 lần/tuần, thực hiện đề tài theo sự phân công của giảng viên hướng dẫn. Trước mỗi buổi báo cáo, sinh viên phải tích hợp những nội dung được phân công vào chung trong một tài liệu/ phần mềm.",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "152400",
+      "line": "1.15",
+      "left": "180340",
+      "first": "-182245",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 10
+    },
+    {
+      "i": 38,
+      "text": "\tTp.HCM, ngày … tháng.....năm 202",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 5
+    },
+    {
+      "i": 39,
+      "text": "\tTrưởng bộ môn\tGiảng viên hướng dẫn",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": null,
+      "runs": 6
+    },
+    {
+      "i": 40,
+      "text": "\t(ký và ghi rõ họ tên)\t(ký và ghi rõ họ tên)",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": "Times New Roman",
+      "size": "165100",
+      "bold": null,
+      "italic": true,
+      "runs": 3
+    },
+    {
+      "i": 41,
+      "text": "",
+      "style": "Normal",
+      "align": "JUSTIFY (3)",
+      "before": "38100",
+      "after": "38100",
+      "line": "1.15",
+      "left": "None",
+      "first": "None",
+      "font": null,
+      "size": null,
+      "bold": null,
+      "italic": null,
+      "runs": 0
+    }
+  ],
+  "tables": [
+    {
+      "i": 0,
+      "rows": 15,
+      "cols": 4,
+      "style": "Normal Table",
+      "cells": [
+        [
+          "STT",
+          "Nội dung",
+          "CLO",
+          "Điểm"
+        ],
+        [
+          "",
+          "Khảo sát nghiệp vụ, mô hình hóa nghiệp vụ \nXác định lý do, mục tiêu đề tài\nKhảo sát hiện trạng: Cơ cấu tổ chức, Qui trình, biểu mẫu",
+          "CLO1.1",
+          "\n0.25\n0.5"
+        ],
+        [
+          "",
+          "Lập kế hoạch và phân công thực hiện công việc",
+          "CLO6",
+          "0.25"
+        ],
+        [
+          "",
+          "Phân tích hệ thống\nLập sơ đồ Use-Case nghiệp vụ và đặc tả.\nLập sơ đồ Use-Case hệ thống và đặc tả.\nSơ đồ lớp phân tích",
+          "CLO1.2",
+          "\n0.25\n0.25\n0.25"
+        ],
+        [
+          "",
+          "Thiết kế hệ thống\nSơ đồ lớp thiết kế\nMô hình dữ liệu",
+          "CLO2.1\n",
+          "\n0.25\n0.25"
+        ],
+        [
+          "",
+          "Thiết kế giao diện",
+          "CLO2.2",
+          "0.5"
+        ],
+        [
+          "",
+          "Xây dựng API hệ thống\nPhân tích các chức năng trên các nền tảng",
+          "CLO1.1",
+          "0.25\n0.25"
+        ],
+        [
+          "",
+          "Xây dựng các chức năng cơ bản của ứng dụng: đăng nhập, đăng xuất, đổi mật khẩu, phân quyền người dùng. \nCài đặt chức năng theo yêu cầu của bài toán\nChức năng 01:\nYêu cầu 1\nYêu cầu 2\n…\nChức năng 02\nYêu cầu 1\nYêu cầu 2\n…\nChức năng N\nYêu cầu 1\nYêu cầu 2\n…",
+          "CLO3\n",
+          "0.5\n\n3.5\n\n(chia nhỏ thanh điểm, tối đa 0.5 điểm)\n\n"
+        ],
+        [
+          "",
+          "Kiểm thử và triển khai hệ thống",
+          "CLO4",
+          "0.75"
+        ],
+        [
+          "",
+          "Nội dung kiến thức trình bày trong quyển báo cáo",
+          "CLO5.1",
+          "0.5"
+        ],
+        [
+          "",
+          "Hình thức, định dạng quyển báo cáo",
+          "CLO5.1",
+          "0.5"
+        ],
+        [
+          "",
+          "Thái độ, tác phong làm việc ",
+          "CLO6",
+          "0.5"
+        ],
+        [
+          "",
+          "Phong cách báo cáo, Slide.",
+          "CLO5.2",
+          "0.5"
+        ],
+        [
+          "",
+          "Cộng điểm khuyến khích cho nhóm sinh viên tham gia thực hiện NCKH liên quan nội dung đề tài (tổng điểm chung không vượt quá 10 điểm)\nThi SV NCKH đạt giải cấp Khoa hoặc có bài báo đăng hội thảo cấp Khoa.\nThi SV NCKH đạt giải cấp Trường hoặc có bài báo đăng tạp chí khoa học cấp Trường trở lên",
+          "CLO3",
+          "1.0\n\n\n0.5\n\n1.0"
+        ],
+        [
+          "Tổng cộng",
+          "Tổng cộng",
+          "",
+          "10.0"
+        ]
+      ]
+    },
+    {
+      "i": 1,
+      "rows": 13,
+      "cols": 2,
+      "style": null,
+      "cells": [
+        [
+          "Tuần",
+          "Nội dung công việc"
+        ],
+        [
+          "",
+          "Yêu cầu công việc cần thực hiện tuần 01"
+        ],
+        [
+          "",
+          "Yêu cầu công việc cần thực hiện tuần 02"
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          ""
+        ],
+        [
+          "",
+          "Hoàn chỉnh báo cáo.\nThiết kế bài báo cáo trên PowerPoint.\nNộp báo cáo."
+        ]
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "name": "[Content_Types].xml",
+      "size": 2250,
+      "crc": 1517987194
+    },
+    {
+      "name": "_rels/.rels",
+      "size": 590,
+      "crc": 3071971614
+    },
+    {
+      "name": "word/document.xml",
+      "size": 171401,
+      "crc": 295599654
+    },
+    {
+      "name": "word/_rels/document.xml.rels",
+      "size": 1614,
+      "crc": 2248134445
+    },
+    {
+      "name": "word/footnotes.xml",
+      "size": 3090,
+      "crc": 3455284297
+    },
+    {
+      "name": "word/endnotes.xml",
+      "size": 3084,
+      "crc": 3716351965
+    },
+    {
+      "name": "word/header1.xml",
+      "size": 7096,
+      "crc": 1123647235
+    },
+    {
+      "name": "word/footer1.xml",
+      "size": 5907,
+      "crc": 1447427018
+    },
+    {
+      "name": "word/_rels/header1.xml.rels",
+      "size": 289,
+      "crc": 3188598442
+    },
+    {
+      "name": "word/media/image1.png",
+      "size": 12604,
+      "crc": 318531433
+    },
+    {
+      "name": "word/fonts/font1.odttf",
+      "size": 919260,
+      "crc": 3775681194
+    },
+    {
+      "name": "word/fonts/font2.odttf",
+      "size": 849284,
+      "crc": 3942703338
+    },
+    {
+      "name": "word/fonts/font3.odttf",
+      "size": 919260,
+      "crc": 467593430
+    },
+    {
+      "name": "word/fonts/font4.odttf",
+      "size": 219712,
+      "crc": 3436747222
+    },
+    {
+      "name": "word/fonts/font5.odttf",
+      "size": 208444,
+      "crc": 4212628693
+    },
+    {
+      "name": "word/fonts/font6.odttf",
+      "size": 1650632,
+      "crc": 1775996300
+    },
+    {
+      "name": "word/fonts/font7.odttf",
+      "size": 1542676,
+      "crc": 1935135257
+    },
+    {
+      "name": "word/theme/theme1.xml",
+      "size": 7643,
+      "crc": 2225232417
+    },
+    {
+      "name": "word/settings.xml",
+      "size": 12184,
+      "crc": 2452326944
+    },
+    {
+      "name": "customXml/item1.xml",
+      "size": 306,
+      "crc": 1130846143
+    },
+    {
+      "name": "customXml/itemProps1.xml",
+      "size": 341,
+      "crc": 3140140440
+    },
+    {
+      "name": "word/numbering.xml",
+      "size": 29672,
+      "crc": 3054507520
+    },
+    {
+      "name": "word/styles.xml",
+      "size": 37479,
+      "crc": 2891450384
+    },
+    {
+      "name": "word/webSettings.xml",
+      "size": 1477,
+      "crc": 3856490400
+    },
+    {
+      "name": "word/fontTable.xml",
+      "size": 3858,
+      "crc": 255897053
+    },
+    {
+      "name": "docProps/core.xml",
+      "size": 869,
+      "crc": 2799727149
+    },
+    {
+      "name": "docProps/app.xml",
+      "size": 1019,
+      "crc": 63765868
+    },
+    {
+      "name": "customXml/_rels/item1.xml.rels",
+      "size": 296,
+      "crc": 2050572148
+    },
+    {
+      "name": "word/_rels/fontTable.xml.rels",
+      "size": 1081,
+      "crc": 3853540127
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo đối chiếu 3 ảnh khuôn mặt</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <div>
+        <p class="eyebrow">DEMO ĐỘC LẬP · XỬ LÝ CỤC BỘ</p>
+        <h1>Đối chiếu 3 ảnh khuôn mặt</h1>
+        <p class="subtitle">YuNet phát hiện khuôn mặt · SFace tạo vector và tính độ tương đồng</p>
+      </div>
+      <div id="health" class="health waiting">Đang kiểm tra mô hình…</div>
+    </header>
+
+    <section class="notice">
+      <strong>Phạm vi:</strong> demo này kiểm tra độ tương đồng từ ba ảnh tĩnh. Nó chưa kiểm tra người thật
+      (liveness), vì vậy không được dùng kết quả để tự động mở barrier trong môi trường thực tế.
+    </section>
+
+    <form id="compare-form">
+      <section class="image-grid">
+        <article class="image-card">
+          <div class="step">1</div>
+          <h2>Ảnh CCCD</h2>
+          <p>Ảnh tham chiếu danh tính lúc đăng ký.</p>
+          <label class="picker">
+            <input id="cccd" name="cccd" type="file" accept="image/*" required>
+            <img id="preview-cccd" alt="Xem trước ảnh CCCD">
+            <span>Chọn ảnh CCCD</span>
+          </label>
+          <div id="quality-cccd" class="quality"></div>
+        </article>
+
+        <article class="image-card">
+          <div class="step">2</div>
+          <h2>Ảnh đăng ký</h2>
+          <p>Ảnh chuẩn được chụp khi tạo hồ sơ.</p>
+          <label class="picker">
+            <input id="registration" name="registration" type="file" accept="image/*" required>
+            <img id="preview-registration" alt="Xem trước ảnh đăng ký">
+            <span>Chọn ảnh đăng ký</span>
+          </label>
+          <div id="quality-registration" class="quality"></div>
+        </article>
+
+        <article class="image-card realtime-card">
+          <div class="step">3</div>
+          <h2>Ảnh realtime</h2>
+          <p>Chọn ảnh mới hoặc chụp bằng camera thiết bị.</p>
+          <label class="picker">
+            <input id="realtime" name="realtime" type="file" accept="image/*" capture="user" required>
+            <img id="preview-realtime" alt="Xem trước ảnh realtime">
+            <span>Chụp/chọn ảnh realtime</span>
+          </label>
+          <div id="quality-realtime" class="quality"></div>
+        </article>
+      </section>
+
+      <div class="actions">
+        <button id="submit-button" type="submit">Bắt đầu đối chiếu</button>
+        <button id="reset-button" class="secondary" type="reset">Làm lại</button>
+        <span id="loading" hidden>Đang phát hiện và so sánh khuôn mặt…</span>
+      </div>
+    </form>
+
+    <section id="result" class="result" hidden>
+      <div class="decision-row">
+        <div id="decision-icon" class="decision-icon">?</div>
+        <div>
+          <p class="eyebrow">KẾT QUẢ THỬ NGHIỆM</p>
+          <h2 id="decision-title">Chưa có kết quả</h2>
+          <p id="decision-message"></p>
+        </div>
+      </div>
+      <div id="scores" class="score-grid"></div>
+      <p id="threshold-note" class="threshold-note"></p>
+    </section>
+
+    <section id="error-box" class="error-box" hidden></section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+
