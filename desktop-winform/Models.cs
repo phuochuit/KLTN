@@ -60,9 +60,44 @@ public record ParkingSlotResponse(
     [property: JsonPropertyName("id")] long Id,
     [property: JsonPropertyName("slotCode")] string SlotCode,
     [property: JsonPropertyName("zoneName")] string ZoneName,
-    [property: JsonPropertyName("assignedPlate")] string AssignedPlate,
-    [property: JsonPropertyName("occupiedPlate")] string OccupiedPlate,
-    [property: JsonPropertyName("status")] string Status);
+    [property: JsonPropertyName("floor")] string? Floor,
+    [property: JsonPropertyName("slotType")] string? SlotType,
+    [property: JsonPropertyName("allowedVehicleType")] string? AllowedVehicleType,
+    [property: JsonPropertyName("statusOverride")] string? StatusOverride,
+    [property: JsonPropertyName("assignedPlate")] string? AssignedPlate,
+    [property: JsonPropertyName("assignedOwnerName")] string? AssignedOwnerName,
+    [property: JsonPropertyName("assignedOwnerPhone")] string? AssignedOwnerPhone,
+    [property: JsonPropertyName("assignedApartment")] string? AssignedApartment,
+    [property: JsonPropertyName("occupiedPlate")] string? OccupiedPlate,
+    [property: JsonPropertyName("occupiedEntryTime")] DateTime? OccupiedEntryTime,
+    [property: JsonPropertyName("borrowedPlate")] string? BorrowedPlate,
+    [property: JsonPropertyName("borrowedUntil")] DateTime? BorrowedUntil,
+    [property: JsonPropertyName("borrowNotes")] string? BorrowNotes,
+    [property: JsonPropertyName("overdue")] bool Overdue,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("statusDescription")] string? StatusDescription);
+
+public record SlotAssignRequest([property: JsonPropertyName("vehicleId")] long? VehicleId);
+public record SlotBorrowRequest(
+    [property: JsonPropertyName("borrowedPlate")] string BorrowedPlate,
+    [property: JsonPropertyName("hours")] int Hours,
+    [property: JsonPropertyName("borrowNotes")] string? BorrowNotes);
+public record SlotStatusRequest([property: JsonPropertyName("statusOverride")] string StatusOverride);
+public record DispatchSessionRequest([property: JsonPropertyName("sessionId")] long SessionId);
+
+public record UnassignedSessionResponse(
+    [property: JsonPropertyName("sessionId")] long SessionId,
+    [property: JsonPropertyName("plateNumber")] string PlateNumber,
+    [property: JsonPropertyName("vehicleType")] string VehicleType,
+    [property: JsonPropertyName("entryTime")] string EntryTime,
+    [property: JsonPropertyName("ownerName")] string OwnerName);
+
+public record UnassignedVehicleResponse(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("plateNumber")] string PlateNumber,
+    [property: JsonPropertyName("ownerName")] string OwnerName,
+    [property: JsonPropertyName("apartmentNumber")] string ApartmentNumber,
+    [property: JsonPropertyName("vehicleType")] string VehicleType);
 
 public record BoundingBox(
     [property: JsonPropertyName("x")] int X,

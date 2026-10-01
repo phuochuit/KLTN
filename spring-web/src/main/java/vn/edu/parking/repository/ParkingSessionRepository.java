@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface ParkingSessionRepository extends JpaRepository<ParkingSession, Long> {
     Optional<ParkingSession> findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(String plate, SessionStatus status);
+    Optional<ParkingSession> findFirstByParkingCard_CardCodeIgnoreCaseAndStatusOrderByEntryTimeDesc(String cardCode, SessionStatus status);
     boolean existsByEntryPlateIgnoreCaseAndStatus(String plate, SessionStatus status);
     List<ParkingSession> findAllByOrderByEntryTimeDesc();
     List<ParkingSession> findByStatusOrderByEntryTimeDesc(SessionStatus status);

@@ -104,10 +104,69 @@ public class DemoDataConfig {
                 }
             }
             if (slots.count() == 0) {
-                for (int i = 1; i <= 50; i++) {
+                var allVehicles = vehicles.findAll();
+                Vehicle carDemo = allVehicles.stream().filter(v -> v.getVehicleType().isCar()).findFirst().orElse(null);
+
+                // Tầng hầm B1 - Khu A (Ô tô cư dân: A01 -> A15)
+                for (int i = 1; i <= 15; i++) {
                     ParkingSlot slot = new ParkingSlot();
-                    slot.setSlotCode("A" + i);
-                    slot.setZoneName(i <= 25 ? "Khu A - trái" : "Khu A - phải");
+                    slot.setSlotCode(String.format("A%02d", i));
+                    slot.setFloor("Tầng hầm B1");
+                    slot.setZoneName("Khu A - Ô tô cư dân");
+                    slot.setSlotType(SlotType.RESIDENT_RESERVED);
+                    slot.setAllowedVehicleType(VehicleType.CAR);
+                    if (i == 1 && carDemo != null) {
+                        slot.setAssignedVehicle(carDemo);
+                    } else if (i == 2) {
+                        // Demo tính năng đỗ nhờ cho hàng xóm
+                        slot.setBorrowedPlate("59X199999");
+                        slot.setBorrowedUntil(java.time.LocalDateTime.now().plusHours(3));
+                        slot.setBorrowNotes("Hàng xóm để nhờ tạm thời theo lịch hẹn");
+                    }
+                    slots.save(slot);
+                }
+
+                // Tầng hầm B1 - Khu B (Ô tô khách vãng lai: B01 -> B10)
+                for (int i = 1; i <= 10; i++) {
+                    ParkingSlot slot = new ParkingSlot();
+                    slot.setSlotCode(String.format("B%02d", i));
+                    slot.setFloor("Tầng hầm B1");
+                    slot.setZoneName("Khu B - Ô tô vãng lai");
+                    slot.setSlotType(SlotType.VISITOR_FLEXIBLE);
+                    slot.setAllowedVehicleType(VehicleType.CAR);
+                    slots.save(slot);
+                }
+
+                // Tầng hầm B1 - Khu C (Xe máy cư dân: C01 -> C15)
+                for (int i = 1; i <= 15; i++) {
+                    ParkingSlot slot = new ParkingSlot();
+                    slot.setSlotCode(String.format("C%02d", i));
+                    slot.setFloor("Tầng hầm B1");
+                    slot.setZoneName("Khu C - Xe máy cư dân");
+                    slot.setSlotType(SlotType.RESIDENT_RESERVED);
+                    slot.setAllowedVehicleType(VehicleType.MOTORBIKE);
+                    slots.save(slot);
+                }
+
+                // Tầng hầm B2 - Khu D (Ô tô mở rộng: D01 -> D10)
+                for (int i = 1; i <= 10; i++) {
+                    ParkingSlot slot = new ParkingSlot();
+                    slot.setSlotCode(String.format("D%02d", i));
+                    slot.setFloor("Tầng hầm B2");
+                    slot.setZoneName("Khu D - Ô tô");
+                    slot.setSlotType(SlotType.RESIDENT_RESERVED);
+                    slot.setAllowedVehicleType(VehicleType.CAR);
+                    slots.save(slot);
+                }
+
+                // Tầng hầm B2 - Khu E (Xe máy vãng lai: E01 -> E10)
+                for (int i = 1; i <= 10; i++) {
+                    ParkingSlot slot = new ParkingSlot();
+                    slot.setSlotCode(String.format("E%02d", i));
+                    slot.setFloor("Tầng hầm B2");
+                    slot.setZoneName("Khu E - Xe máy vãng lai");
+                    slot.setSlotType(SlotType.VISITOR_FLEXIBLE);
+                    slot.setAllowedVehicleType(VehicleType.MOTORBIKE);
                     slots.save(slot);
                 }
             }

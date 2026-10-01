@@ -316,7 +316,30 @@ public sealed class MainForm : Form
 
     private async Task CaptureGuestAsync(){try{ConfigureApis();var r=await _anprApi.CaptureCameraAsync();_entryGuestFaceBase64="data:image/jpeg;base64,"+r.RealtimeImageBase64;ShowCapturedFace(r);_result.Text="Ảnh khách lúc vào đã chụp và sẽ lưu tạm cùng lượt xe.";}catch(Exception ex){ShowError(ex);}}
     private void ShowCapturedFace(FaceVerificationResponse r){if(string.IsNullOrWhiteSpace(r.RealtimeImageBase64))return;using var ms=new MemoryStream(Convert.FromBase64String(r.RealtimeImageBase64));using var img=Image.FromStream(ms);_preview.Image?.Dispose();_preview.Image=new Bitmap(img);}
-    private async Task RefreshMapAsync(){try{_mapPanel.Controls.Clear();foreach(var item in await _parkingApi.GetSlotsAsync()){var slot=new SlotControl();slot.Update(item);_mapPanel.Controls.Add(slot);}}catch{}}
+    private async Task RefreshMapAsync()
+    {
+        try
+        {
+            _mapPanel.SuspendLayout();
+            _mapPanel.Controls.Clear();
+            foreach (var item in await _parkingApi.GetSlotsAsync())
+            {
+                var slot = new SlotControl();
+                slot.Update(item);
+                slot.SlotClicked += async (_, s) =>
+                {
+                    using var dlg = new SlotDetailDialog(_parkingApi, s);
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        await RefreshMapAsync();
+                    }
+                };
+                _mapPanel.Controls.Add(slot);
+            }
+            _mapPanel.ResumeLayout();
+        }
+        catch { }
+    }
     private void SetBarrier(bool open,string reason){_barrierOpen=open;_barrierState.Text=open?"BARRIER: ĐANG MỞ":"BARRIER: ĐANG ĐÓNG";_barrierState.ForeColor=open?Color.SeaGreen:Color.Firebrick;_barrierState.AccessibleDescription=reason;}
     private async void AutoOpenBarrier(string reason){SetBarrier(true,reason);await Task.Delay(5000);if(_barrierOpen)SetBarrier(false,"Tự đóng sau 5 giây");}
     private void ConfigureApis() { _parkingApi.BaseUrl = _parkingUrl.Text.Trim(); _anprApi.BaseUrl = _anprUrl.Text.Trim(); }
