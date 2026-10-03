@@ -471,12 +471,8 @@ public class AdminController {
             .filter(v -> v.isActive() && !assignedVehicleIds.contains(v.getId()))
             .toList();
 
-        Set<Long> occupiedSessionIds = allSlots.stream()
-            .filter(s -> s.getCurrentSession() != null)
-            .map(s -> s.getCurrentSession().getId())
-            .collect(Collectors.toSet());
         List<ParkingSession> unassignedSessions = sessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN).stream()
-            .filter(s -> !occupiedSessionIds.contains(s.getId()))
+            .limit(30)
             .toList();
 
         model.addAttribute("slots", slotResponses);
@@ -552,16 +548,26 @@ public class AdminController {
     String changeSlotStatus(@RequestParam Long slotId,
                             @RequestParam String statusOverride,
                             RedirectAttributes redirect) {
-        SlotStatusOverride override = SlotStatusOverride.valueOf(statusOverride.toUpperCase());
-        parkingService.setSlotStatusOverride(slotId, override);
-        redirect.addFlashAttribute("message", "Đã chuyển trạng thái ô sang: " + override.getDisplayName());
+        try {
+            SlotStatusOverride override = SlotStatusOverride.valueOf(statusOverride.toUpperCase());
+            parkingService.setSlotStatusOverride(slotId, override);
+            redirect.addFlashAttribute("message", "Đã chuyển trạng thái ô sang: " + override.getDisplayName());
+        } catch (IllegalStateException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        } catch (Exception e) {
+            redirect.addFlashAttribute("error", "Lỗi: " + e.getMessage());
+        }
         return "redirect:/slots";
     }
 
     @PostMapping("/slots/release")
     String releaseSlot(@RequestParam Long slotId, RedirectAttributes redirect) {
-        parkingService.releaseSlot(slotId);
-        redirect.addFlashAttribute("message", "Đã giải phóng ô đỗ về trạng thái trống");
+        try {
+            parkingService.releaseSlot(slotId);
+            redirect.addFlashAttribute("message", "Đã giải phóng ô đỗ về trạng thái trống");
+        } catch (Exception e) {
+            redirect.addFlashAttribute("error", "Lỗi: " + e.getMessage());
+        }
         return "redirect:/slots";
     }
 
@@ -569,8 +575,14 @@ public class AdminController {
     String dispatchSession(@RequestParam Long slotId,
                            @RequestParam Long sessionId,
                            RedirectAttributes redirect) {
-        parkingService.dispatchSessionToSlot(slotId, sessionId);
-        redirect.addFlashAttribute("message", "Đã điều phối xe vào ô thành công");
+        try {
+            parkingService.dispatchSessionToSlot(slotId, sessionId);
+            redirect.addFlashAttribute("message", "Đã điều phối xe vào ô thành công");
+        } catch (IllegalStateException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        } catch (Exception e) {
+            redirect.addFlashAttribute("error", "Lỗi: " + e.getMessage());
+        }
         return "redirect:/slots";
     }
 

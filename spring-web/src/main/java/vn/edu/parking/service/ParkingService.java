@@ -192,6 +192,9 @@ public class ParkingService {
     public void setSlotStatusOverride(Long slotId, SlotStatusOverride statusOverride) {
         ParkingSlot slot = slots.findById(slotId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ô đỗ ID " + slotId));
+        if (statusOverride == SlotStatusOverride.BLOCKED && slot.getCurrentSession() != null) {
+            throw new IllegalStateException("Không thể cấm đỗ ô đang có xe đỗ. Vui lòng giải phóng xe ra trước.");
+        }
         slot.setStatusOverride(statusOverride != null ? statusOverride : SlotStatusOverride.NORMAL);
         slots.save(slot);
     }
@@ -214,6 +217,13 @@ public class ParkingService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy ô đỗ ID " + slotId));
         ParkingSession session = sessions.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lượt gửi ID " + sessionId));
+
+        if (slot.getStatusOverride() == SlotStatusOverride.BLOCKED) {
+            throw new IllegalStateException("Không thể điều phối xe vào ô đang cấm đỗ / bảo trì.");
+        }
+        if (slot.getCurrentSession() != null && !slot.getCurrentSession().getId().equals(sessionId)) {
+            throw new IllegalStateException("Ô này đang có xe đỗ, không thể điều phối xe khác vào.");
+        }
 
         slots.findFirstByCurrentSessionId(sessionId).ifPresent(oldSlot -> {
             if (!oldSlot.getId().equals(slotId)) {
@@ -354,20 +364,20 @@ public class ParkingService {
         var candidate = slots.findByActiveTrueOrderBySlotCodeAsc().stream()
             .filter(s -> s.getCurrentSession() == null)
             .filter(s -> s.getStatusOverride() != SlotStatusOverride.BLOCKED)
+            .filter(s -> s.getAssignedVehicle() == null) // Đảm bảo ô chưa gán cho cư dân
             .filter(s -> {
                 if (session.getVehicle() == null) {
-                    return s.getSlotType() == SlotType.VISITOR_FLEXIBLE || s.getAssignedVehicle() == null;
+                    return s.getSlotType() == SlotType.VISITOR_FLEXIBLE;
                 }
-                return s.getAssignedVehicle() == null;
+                return true;
             })
             .filter(s -> s.getAllowedVehicleType() == null || s.getAllowedVehicleType().isCar() == isCar)
             .findFirst();
 
-        candidate.or(() -> slots.findFirstByCurrentSessionIsNullAndActiveTrueOrderBySlotCodeAsc())
-            .ifPresent(item -> {
-                item.setCurrentSession(session);
-                slots.save(item);
-            });
+        candidate.ifPresent(item -> {
+            item.setCurrentSession(session);
+            slots.save(item);
+        });
     }
 
     private ParkingSession findOpenSession(String plate, String cardCode) {

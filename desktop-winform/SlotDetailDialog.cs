@@ -5,16 +5,16 @@ public sealed class SlotDetailDialog : Form
     private readonly ParkingApiClient _api;
     private readonly ParkingSlotResponse _slot;
 
-    private readonly ComboBox _cboResidentVehicles = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 380 };
-    private readonly ComboBox _cboRecentSessions = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 380 };
+    private readonly ComboBox _cboResidentVehicles = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 480 };
+    private readonly ComboBox _cboRecentSessions = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 480 };
 
-    private readonly TextBox _txtBorrowPlate = new() { Width = 180, CharacterCasing = CharacterCasing.Upper };
-    private readonly ComboBox _cboBorrowHours = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
-    private readonly TextBox _txtBorrowNotes = new() { Width = 380 };
+    private readonly TextBox _txtBorrowPlate = new() { Width = 200, CharacterCasing = CharacterCasing.Upper, Font = new Font("Segoe UI", 10f, FontStyle.Bold) };
+    private readonly ComboBox _cboBorrowHours = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140 };
+    private readonly TextBox _txtBorrowNotes = new() { Width = 480 };
 
-    private readonly Label _lblInfoAssigned = new() { AutoSize = true, Font = new Font("Segoe UI", 9.5f) };
-    private readonly Label _lblInfoOccupied = new() { AutoSize = true, Font = new Font("Segoe UI", 9.5f) };
-    private readonly Label _lblInfoBorrowed = new() { AutoSize = true, Font = new Font("Segoe UI", 9.5f) };
+    private readonly Label _lblInfoAssigned = new() { AutoSize = true, Font = new Font("Segoe UI", 10f), ForeColor = Color.FromArgb(30, 41, 59), Margin = new Padding(0, 6, 0, 8) };
+    private readonly Label _lblInfoOccupied = new() { AutoSize = true, Font = new Font("Segoe UI", 10f), ForeColor = Color.FromArgb(30, 41, 59), Margin = new Padding(0, 0, 0, 8) };
+    private readonly Label _lblInfoBorrowed = new() { AutoSize = true, Font = new Font("Segoe UI", 10f), ForeColor = Color.FromArgb(30, 41, 59), Margin = new Padding(0, 0, 0, 4) };
 
     public SlotDetailDialog(ParkingApiClient api, ParkingSlotResponse slot)
     {
@@ -22,7 +22,7 @@ public sealed class SlotDetailDialog : Form
         _slot = slot;
 
         Text = $"Chi tiết & Điều phối vị trí {_slot.SlotCode}";
-        Size = new Size(620, 680);
+        Size = new Size(680, 720);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -43,7 +43,7 @@ public sealed class SlotDetailDialog : Form
             Padding = new Padding(16)
         };
         mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
-        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 120));
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 195));
         mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         // 1. Header
@@ -68,9 +68,22 @@ public sealed class SlotDetailDialog : Form
         header.Controls.Add(title);
         mainLayout.Controls.Add(header, 0, 0);
 
-        // 2. Info Summary Box
-        var infoBox = new GroupBox { Text = "Thông tin thực tế ô đỗ", Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9f, FontStyle.Bold), Padding = new Padding(10) };
-        var infoFlow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        // 2. Info Summary Box (Rộng rãi, thoáng mắt, không bị scroll hay cắt chữ)
+        var infoBox = new GroupBox
+        {
+            Text = "Thông tin thực tế ô đỗ",
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(23, 54, 93),
+            Padding = new Padding(14, 10, 14, 10)
+        };
+        var infoFlow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = false
+        };
 
         _lblInfoAssigned.Text = !string.IsNullOrWhiteSpace(_slot.AssignedPlate)
             ? $"• Xe cấp cố định: {_slot.AssignedPlate} (Chủ xe: {_slot.AssignedOwnerName ?? "-"} | Căn: {_slot.AssignedApartment ?? "-"} | SĐT: {_slot.AssignedOwnerPhone ?? "-"})"
@@ -233,7 +246,7 @@ public sealed class SlotDetailDialog : Form
             _cboRecentSessions.Items.Add("-- Chọn xe vừa vào trạm --");
             foreach (var s in recentSessions)
             {
-                _cboRecentSessions.Items.Add(new ComboBoxItem(s.SessionId, $"{s.PlateNumber} ({s.OwnerName}) - {s.EntryTime}"));
+                _cboRecentSessions.Items.Add(new ComboBoxItem(s.SessionId, $"{s.PlateNumber} | {s.OwnerName}"));
             }
             _cboRecentSessions.SelectedIndex = 0;
 
