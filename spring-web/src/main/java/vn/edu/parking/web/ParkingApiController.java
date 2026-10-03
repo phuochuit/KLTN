@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import vn.edu.parking.domain.SessionStatus;
 import vn.edu.parking.domain.PassType;
 import vn.edu.parking.domain.SlotStatusOverride;
+import vn.edu.parking.domain.ParkingSlot;
 import vn.edu.parking.repository.ParkingSessionRepository;
 import vn.edu.parking.repository.ParkingCardRepository;
 import vn.edu.parking.repository.VehicleRepository;
@@ -146,20 +147,27 @@ public class ParkingApiController {
 
     @GetMapping("/recent-unassigned")
     public List<Map<String, Object>> recentUnassigned() {
-        Set<Long> occupiedSessionIds = slots.findByActiveTrueOrderBySlotCodeAsc().stream()
+        Map<Long, String> sessionSlotMap = slots.findByActiveTrueOrderBySlotCodeAsc().stream()
             .filter(s -> s.getCurrentSession() != null)
-            .map(s -> s.getCurrentSession().getId())
-            .collect(Collectors.toSet());
+            .collect(Collectors.toMap(
+                s -> s.getCurrentSession().getId(),
+                ParkingSlot::getSlotCode,
+                (oldVal, newVal) -> oldVal
+            ));
 
         return sessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN).stream()
-            .filter(s -> !occupiedSessionIds.contains(s.getId()))
-            .map(s -> Map.<String, Object>of(
-                "sessionId", s.getId(),
-                "plateNumber", s.getEntryPlate(),
-                "vehicleType", s.getDetectedVehicleType().name(),
-                "entryTime", s.getEntryTime().toString(),
-                "ownerName", s.getVehicle() == null ? "Khách vãng lai" : s.getVehicle().getEffectiveOwnerName()
-            )).toList();
+            .limit(30)
+            .map(s -> {
+                String currentSlot = sessionSlotMap.get(s.getId());
+                String slotInfo = currentSlot != null ? " (Đang ở ô " + currentSlot + ")" : " (Chưa có ô)";
+                return Map.<String, Object>of(
+                    "sessionId", s.getId(),
+                    "plateNumber", s.getEntryPlate(),
+                    "vehicleType", s.getDetectedVehicleType().name(),
+                    "entryTime", s.getEntryTime().toString(),
+                    "ownerName", (s.getVehicle() == null ? "Khách vãng lai" : s.getVehicle().getEffectiveOwnerName()) + slotInfo
+                );
+            }).toList();
     }
 
     @GetMapping("/vehicles-unassigned")

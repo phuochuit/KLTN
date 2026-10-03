@@ -13,6 +13,8 @@ public sealed class ParkingMapForm : Form
 
     private List<ParkingSlotResponse> _allSlots = new();
 
+    private readonly Action _mapUpdatedHandler;
+
     public ParkingMapForm(ParkingApiClient api)
     {
         _api = api;
@@ -22,6 +24,18 @@ public sealed class ParkingMapForm : Form
 
         BuildUi();
         Shown += async (_, _) => await ReloadAsync();
+        _panel.Resize += (_, _) => ResizeSlots(_panel);
+
+        _mapUpdatedHandler = () => {
+            if (!this.IsDisposed && this.IsHandleCreated)
+            {
+                this.Invoke((MethodInvoker)async delegate {
+                    try { await ReloadAsync(); } catch { }
+                });
+            }
+        };
+        MainForm.OnSharedMapUpdated += _mapUpdatedHandler;
+        this.FormClosed += (_, _) => MainForm.OnSharedMapUpdated -= _mapUpdatedHandler;
     }
 
     private void BuildUi()
@@ -138,12 +152,35 @@ public sealed class ParkingMapForm : Form
                 using var dlg = new SlotDetailDialog(_api, s);
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
-                    await ReloadAsync();
+                    MainForm.NotifyMapUpdated();
                 }
             };
             _panel.Controls.Add(control);
         }
 
+        ResizeSlots(_panel);
         _panel.ResumeLayout();
+    }
+
+    private void ResizeSlots(FlowLayoutPanel panel)
+    {
+        if (panel.Controls.Count == 0) return;
+        int padding = 12; 
+        int minWidth = 140;
+        int availableWidth = panel.ClientSize.Width - panel.Padding.Left - panel.Padding.Right;
+        if (availableWidth <= 0) return;
+
+        int cols = Math.Max(1, availableWidth / (minWidth + padding));
+        int targetWidth = (availableWidth / cols) - padding - 4; 
+
+        panel.SuspendLayout();
+        foreach (Control c in panel.Controls)
+        {
+            if (c is SlotControl sc)
+            {
+                sc.Width = targetWidth;
+            }
+        }
+        panel.ResumeLayout();
     }
 }

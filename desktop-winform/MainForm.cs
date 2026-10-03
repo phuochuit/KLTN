@@ -4,6 +4,13 @@ namespace ParkingGateDesktop;
 
 public sealed class MainForm : Form
 {
+    public static event Action? OnSharedMapUpdated;
+
+    public static void NotifyMapUpdated()
+    {
+        OnSharedMapUpdated?.Invoke();
+    }
+
     private readonly ParkingApiClient _parkingApi = new();
     private readonly AnprApiClient _anprApi = new();
     private readonly TextBox _parkingUrl = new() { Text = "http://localhost:8080", Width = 190 };
@@ -38,6 +45,17 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
+        _mapPanel.Resize += (_, _) => ResizeSlots(_mapPanel);
+
+        OnSharedMapUpdated += () => {
+            if (!this.IsDisposed && this.IsHandleCreated)
+            {
+                this.Invoke((MethodInvoker)async delegate {
+                    try { await RefreshMapAsync(); } catch { }
+                });
+            }
+        };
+
         Text = "Trạm gác - Parking ANPR";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1120, 720);
@@ -53,6 +71,8 @@ public sealed class MainForm : Form
         root.Controls.Add(BuildHeader(), 0, 0);
         root.Controls.Add(BuildBody(), 0, 1);
         root.Controls.Add(_manual, 0, 2);
+
+        this.Shown += async (_, _) => await CheckServicesAsync();
     }
 
     private Control BuildHeader()
@@ -196,7 +216,7 @@ public sealed class MainForm : Form
             var response = await _parkingApi.EntryAsync(Request(_entryPlate.Text, _entryCard.Text));
             ShowParkingResult(response);
             if(!response.Warning || _manual.Checked) AutoOpenBarrier("Xe vào đã được xác nhận");
-            await RefreshMapAsync();
+            NotifyMapUpdated();
             _exitPlate.Text = response.PlateNumber;
             _exitCard.Text = response.CardCode;
             _entryGuestFaceBase64 = "";
@@ -273,7 +293,7 @@ public sealed class MainForm : Form
             var response = await _parkingApi.ConfirmExitAsync(Request(_exitPlate.Text, _exitCard.Text));
             ShowParkingResult(response);
             if(!response.Warning || _manual.Checked) AutoOpenBarrier("Xe ra đã được xác nhận");
-            await RefreshMapAsync();
+            NotifyMapUpdated();
             _lastPreview = null;
 
             if (!response.Warning || _manual.Checked)
@@ -316,7 +336,7 @@ public sealed class MainForm : Form
 
     private async Task CaptureGuestAsync(){try{ConfigureApis();var r=await _anprApi.CaptureCameraAsync();_entryGuestFaceBase64="data:image/jpeg;base64,"+r.RealtimeImageBase64;ShowCapturedFace(r);_result.Text="Ảnh khách lúc vào đã chụp và sẽ lưu tạm cùng lượt xe.";}catch(Exception ex){ShowError(ex);}}
     private void ShowCapturedFace(FaceVerificationResponse r){if(string.IsNullOrWhiteSpace(r.RealtimeImageBase64))return;using var ms=new MemoryStream(Convert.FromBase64String(r.RealtimeImageBase64));using var img=Image.FromStream(ms);_preview.Image?.Dispose();_preview.Image=new Bitmap(img);}
-    private async Task RefreshMapAsync()
+        private async Task RefreshMapAsync()
     {
         try
         {
@@ -331,14 +351,37 @@ public sealed class MainForm : Form
                     using var dlg = new SlotDetailDialog(_parkingApi, s);
                     if (dlg.ShowDialog(this) == DialogResult.OK)
                     {
-                        await RefreshMapAsync();
+                        NotifyMapUpdated();
                     }
                 };
                 _mapPanel.Controls.Add(slot);
             }
+            ResizeSlots(_mapPanel);
             _mapPanel.ResumeLayout();
         }
         catch { }
+    }
+
+    private void ResizeSlots(FlowLayoutPanel panel)
+    {
+        if (panel.Controls.Count == 0) return;
+        int padding = 12; 
+        int minWidth = 140;
+        int availableWidth = panel.ClientSize.Width - panel.Padding.Left - panel.Padding.Right;
+        if (availableWidth <= 0) return;
+
+        int cols = Math.Max(1, availableWidth / (minWidth + padding));
+        int targetWidth = (availableWidth / cols) - padding - 4; 
+
+        panel.SuspendLayout();
+        foreach (Control c in panel.Controls)
+        {
+            if (c is SlotControl sc)
+            {
+                sc.Width = targetWidth;
+            }
+        }
+        panel.ResumeLayout();
     }
     private void SetBarrier(bool open,string reason){_barrierOpen=open;_barrierState.Text=open?"BARRIER: ĐANG MỞ":"BARRIER: ĐANG ĐÓNG";_barrierState.ForeColor=open?Color.SeaGreen:Color.Firebrick;_barrierState.AccessibleDescription=reason;}
     private async void AutoOpenBarrier(string reason){SetBarrier(true,reason);await Task.Delay(5000);if(_barrierOpen)SetBarrier(false,"Tự đóng sau 5 giây");}
