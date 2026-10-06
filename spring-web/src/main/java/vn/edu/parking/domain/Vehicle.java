@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "vehicles", uniqueConstraints = @UniqueConstraint(columnNames = "plate_number"))
@@ -42,6 +43,13 @@ public class Vehicle {
     @Column(length = 500)
     private String registrationImagePath;
     private boolean active = true;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void initializeCreatedAt() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -87,6 +95,8 @@ public class Vehicle {
     public void setRegistrationImagePath(String registrationImagePath) { this.registrationImagePath = registrationImagePath; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public String getEffectiveOwnerName() {
         return registeredOwner == null ? ownerName : registeredOwner.getFullName();
     }

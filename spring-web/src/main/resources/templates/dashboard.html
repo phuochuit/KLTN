@@ -1,5 +1,228 @@
-<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Dashboard</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body>
+<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Dashboard</title><link rel="stylesheet" th:href="@{/css/app.css}"><style>
+.filter-card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:20px; }
+.filter-row { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
+.filter-row label { display:flex; flex-direction:column; gap:4px; font-weight:600; font-size:13px; color:var(--navy); }
+.filter-row select,.filter-row input { padding:8px 10px; border:1px solid #bac7d7; border-radius:6px; font-size:13px; }
+.filter-row button { background:var(--blue); color:#fff; border:0; padding:9px 16px; border-radius:6px; font-weight:600; cursor:pointer; }
+.stats-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+.stats-item .label { font-size:12px; color:#687588; font-weight:600; }
+.stats-item .value { font-size:22px; font-weight:700; color:var(--blue); margin-top:2px; }
+.stats-item .value.green { color:var(--green); }
+.revenue-row { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:12px; }
+.revenue-item { background:#f8fafc; border-radius:8px; padding:12px; }
+.revenue-item .label { font-size:12px; color:#687588; font-weight:600; }
+.revenue-item .value { font-size:20px; font-weight:700; color:var(--blue); margin-top:2px; }
+.revenue-item .value.green { color:var(--green); }
+.chart { display:flex; align-items:flex-end; gap:6px; height:200px; padding:16px 8px 28px; border-bottom:2px solid var(--border); }
+.chart-bar-wrapper { flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; cursor:pointer; }
+.chart-bar { width:100%; max-width:46px; background:linear-gradient(180deg,var(--blue),#5ba3d9); border-radius:5px 5px 0 0; transition:all .2s; min-height:3px; position:relative; }
+.chart-bar:hover { background:linear-gradient(180deg,#235c91,var(--blue)); }
+.chart-bar.active { background:linear-gradient(180deg,var(--navy),var(--blue)); }
+.chart-bar-label { position:absolute; top:-20px; left:50%; transform:translateX(-50%); font-size:10px; font-weight:600; color:var(--navy); white-space:nowrap; }
+.chart-month { margin-top:6px; font-size:11px; color:#687588; font-weight:600; }
+.chart-month.active { color:var(--navy); }
+.tooltip { position:fixed; background:var(--navy); color:#fff; padding:8px 12px; border-radius:6px; font-size:12px; pointer-events:none; z-index:1000; display:none; white-space:nowrap; }
+.detail-panel { margin-top:20px; display:none; }
+.detail-panel.show { display:block; }
+.detail-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.detail-title { font-size:16px; font-weight:700; color:var(--navy); }
+.detail-total { font-size:20px; font-weight:700; color:var(--green); }
+</style></head><body>
 <header th:replace="~{fragments :: header}"></header><main><h1>Dashboard vận hành</h1>
-<div class="grid grid-five"><div class="card"><span class="muted">Hộ gia đình</span><div class="metric" th:text="${householdCount}">0</div></div><div class="card"><span class="muted">Xe đăng ký</span><div class="metric" th:text="${vehicleCount}">0</div></div><div class="card"><span class="muted">Xe đang trong bãi</span><div class="metric" th:text="${openCount}">0</div></div><div class="card"><span class="muted">Doanh thu hôm nay</span><div class="metric"><span th:text="${#numbers.formatDecimal(todayRevenue,0,'COMMA',0,'POINT')}">0</span> đ</div></div><div class="card"><span class="muted">Doanh thu tháng</span><div class="metric"><span th:text="${#numbers.formatDecimal(monthRevenue,0,'COMMA',0,'POINT')}">0</span> đ</div></div></div>
+
+<div class="filter-card">
+  <div class="filter-row">
+    <label>Loại
+      <select id="filterType" onchange="onFilterTypeChange()">
+        <option value="month">Theo tháng</option>
+        <option value="year">Theo năm</option>
+        <option value="range">Theo khoảng ngày</option>
+      </select>
+    </label>
+    <label id="labelMonth">Tháng
+      <select id="filterMonth"></select>
+    </label>
+    <label id="labelYear">Năm
+      <select id="filterYear"></select>
+    </label>
+    <label id="labelFrom" style="display:none">Từ ngày
+      <input type="date" id="filterFrom" />
+    </label>
+    <label id="labelTo" style="display:none">Đến ngày
+      <input type="date" id="filterTo" />
+    </label>
+    <button onclick="applyFilter()">Áp dụng</button>
+  </div>
+  <div class="stats-grid">
+    <div class="stats-item"><div class="label">Hộ gia đình</div><div class="value" id="statHouseholds" th:text="${householdCount}">0</div></div>
+    <div class="stats-item"><div class="label">Xe đăng ký</div><div class="value" id="statVehicles" th:text="${vehicleCount}">0</div></div>
+    <div class="stats-item"><div class="label">Xe trong bãi</div><div class="value" id="statOpen" th:text="${openCount}">0</div></div>
+    <div class="stats-item"><div class="label">Doanh thu hôm nay</div><div class="value" id="statToday">0 đ</div></div>
+    <div class="stats-item"><div class="label">Doanh thu tháng</div><div class="value" id="statMonth">0 đ</div></div>
+  </div>
+  <div class="revenue-row">
+    <div class="revenue-item"><div class="label">Vé lượt</div><div class="value" id="sumVisit">0 đ</div></div>
+    <div class="revenue-item"><div class="label">Gói tháng</div><div class="value" id="sumSubscription">0 đ</div></div>
+    <div class="revenue-item"><div class="label">Tổng doanh thu</div><div class="value green" id="sumTotal">0 đ</div></div>
+  </div>
+</div>
+
+<div class="card detail-panel" id="detailPanel">
+  <div class="detail-header">
+    <span class="detail-title" id="detailTitle">Chi tiết giao dịch</span>
+    <span class="detail-total" id="detailTotal">0 đ</span>
+  </div>
+  <div class="table-scroll">
+    <table><thead><tr><th>Thời gian</th><th>Loại</th><th>Biển số / Thẻ</th><th>Số tiền</th></tr></thead>
+    <tbody id="detailBody"></tbody></table>
+  </div>
+</div>
+
+<div class="card chart-container">
+  <h2 style="margin-top:0">Doanh thu theo tháng (12 tháng gần nhất)</h2>
+  <div class="chart" id="revenueChart"></div>
+</div>
+
 <div class="card"><h2>Lượt xe gần đây</h2><table><thead><tr><th>ID</th><th>Biển số</th><th>Vào</th><th>Ra</th><th>Trạng thái</th><th>Phí lượt</th></tr></thead><tbody><tr th:each="s:${recentSessions}"><td th:text="${s.id}"></td><td th:text="${s.entryPlate}"></td><td th:text="${#temporals.format(s.entryTime,'dd/MM/yyyy HH:mm')}"></td><td th:text="${s.exitTime == null ? '-' : #temporals.format(s.exitTime,'dd/MM/yyyy HH:mm')}"></td><td th:text="${s.status.displayName}" th:class="${s.status.name() == 'OPEN' ? 'status-open' : 'status-completed'}"></td><td th:text="${#numbers.formatDecimal(s.fee,0,'COMMA',0,'POINT') + ' đ'}"></td></tr><tr th:if="${#lists.isEmpty(recentSessions)}"><td colspan="6" class="muted">Chưa có lượt xe.</td></tr></tbody></table></div>
-</main></body></html>
+</main>
+<div class="tooltip" id="chartTooltip"></div>
+<script>
+function fmtNum(v) {
+  const n = Number(v);
+  return (isFinite(n) && !isNaN(n)) ? n : 0;
+}
+function fmtDate(d) {
+  if (!d) return '-';
+  try { return new Date(d).toLocaleString('vi-VN'); } catch(e) { return d; }
+}
+function fmtMoney(v) { return fmtNum(v).toLocaleString('vi-VN') + ' đ'; }
+
+(function() {
+  const typeSel = document.getElementById('filterType');
+  const labelMonth = document.getElementById('labelMonth');
+  const labelYear = document.getElementById('labelYear');
+  const labelFrom = document.getElementById('labelFrom');
+  const labelTo = document.getElementById('labelTo');
+  const monthSel = document.getElementById('filterMonth');
+  const yearSel = document.getElementById('filterYear');
+  const now = new Date();
+  for (let i = 1; i <= 12; i++) {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = 'Tháng ' + i;
+    monthSel.appendChild(opt);
+  }
+  monthSel.value = now.getMonth() + 1;
+  for (let y = now.getFullYear(); y >= now.getFullYear() - 5; y--) {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    yearSel.appendChild(opt);
+  }
+  yearSel.value = now.getFullYear();
+  document.getElementById('filterFrom').value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  document.getElementById('filterTo').value = now.toISOString().split('T')[0];
+  window.onFilterTypeChange = function() {
+    const t = typeSel.value;
+    labelMonth.style.display = t === 'month' ? '' : 'none';
+    labelYear.style.display = (t === 'month' || t === 'year') ? '' : 'none';
+    labelFrom.style.display = t === 'range' ? '' : 'none';
+    labelTo.style.display = t === 'range' ? '' : 'none';
+  };
+  window.applyFilter = function() {
+    const t = typeSel.value;
+    let url = '/api/parking/revenue/filter?type=' + t;
+    if (t === 'month') url += '&year=' + yearSel.value + '&month=' + monthSel.value;
+    else if (t === 'year') url += '&year=' + yearSel.value;
+    else if (t === 'range') url += '&from=' + document.getElementById('filterFrom').value + '&to=' + document.getElementById('filterTo').value;
+    fetch(url).then(r => r.json()).then(data => {
+      document.getElementById('sumVisit').textContent = fmtMoney(data.visitRevenue);
+      document.getElementById('sumSubscription').textContent = fmtMoney(data.subscriptionRevenue);
+      document.getElementById('sumTotal').textContent = fmtMoney(data.totalRevenue);
+      renderStats(data);
+      const panel = document.getElementById('detailPanel');
+      panel.classList.add('show');
+      document.getElementById('detailTitle').textContent = data.label || 'Chi tiết giao dịch';
+      document.getElementById('detailTotal').textContent = fmtMoney(data.totalRevenue);
+      const rows = [];
+      (data.sessions || []).forEach(s => {
+        rows.push('<tr><td>' + fmtDate(s.exitTime) + '</td><td>Vé lượt</td><td>' + (s.entryPlate || '-') + '</td><td>' + fmtMoney(s.fee) + '</td></tr>');
+      });
+      (data.payments || []).forEach(p => {
+        rows.push('<tr><td>' + fmtDate(p.paidAt) + '</td><td>Gói tháng</td><td>' + (p.parkingCard ? p.parkingCard.cardCode : '-') + '</td><td>' + fmtMoney(p.amount) + '</td></tr>');
+      });
+      document.getElementById('detailBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="4" class="muted">Không có giao dịch.</td></tr>';
+    }).catch(e => console.error(e));
+  };
+  window.renderStats = function(stats) {
+    document.getElementById('statHouseholds').textContent = fmtNum(stats.householdCount);
+    document.getElementById('statVehicles').textContent = fmtNum(stats.vehicleCount);
+    document.getElementById('statOpen').textContent = fmtNum(stats.openCount);
+    document.getElementById('statToday').textContent = fmtMoney(stats.todayRevenue);
+    document.getElementById('statMonth').textContent = fmtMoney(stats.monthRevenue);
+  };
+  onFilterTypeChange();
+  applyFilter();
+})();
+
+(async function() {
+  const chart = document.getElementById('revenueChart');
+  const tooltip = document.getElementById('chartTooltip');
+  let monthlyData = [];
+  try {
+    const resp = await fetch('/api/parking/revenue/monthly');
+    monthlyData = await resp.json();
+  } catch (e) { console.error(e); }
+  if (!monthlyData.length) return;
+  const maxRevenue = Math.max(...monthlyData.map(d => fmtNum(d.totalRevenue)), 1);
+  monthlyData.forEach((d) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chart-bar-wrapper';
+    const bar = document.createElement('div');
+    bar.className = 'chart-bar';
+    bar.style.height = Math.max((fmtNum(d.totalRevenue) / maxRevenue) * 100, 2) + '%';
+    const valueLabel = document.createElement('span');
+    valueLabel.className = 'chart-bar-label';
+    valueLabel.textContent = (fmtNum(d.totalRevenue) / 1000).toFixed(0) + 'k';
+    bar.appendChild(valueLabel);
+    const monthLabel = document.createElement('span');
+    monthLabel.className = 'chart-month';
+    monthLabel.textContent = d.month + '/' + String(d.year).slice(2);
+    wrapper.appendChild(bar);
+    wrapper.appendChild(monthLabel);
+    wrapper.addEventListener('mouseenter', (e) => {
+      tooltip.style.display = 'block';
+      tooltip.innerHTML = '<b>' + d.label + '</b><br>Vé lượt: ' + fmtMoney(d.visitRevenue) + '<br>Gói tháng: ' + fmtMoney(d.subscriptionRevenue) + '<br>Tổng: ' + fmtMoney(d.totalRevenue);
+    });
+    wrapper.addEventListener('mousemove', (e) => {
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+    });
+    wrapper.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    wrapper.addEventListener('click', () => {
+      document.querySelectorAll('.chart-bar').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.chart-month').forEach(m => m.classList.remove('active'));
+      bar.classList.add('active');
+      monthLabel.classList.add('active');
+      fetch('/api/parking/revenue/filter?type=month&year=' + d.year + '&month=' + d.month).then(r => r.json()).then(data => {
+        renderStats(data);
+        document.getElementById('sumVisit').textContent = fmtMoney(data.visitRevenue);
+        document.getElementById('sumSubscription').textContent = fmtMoney(data.subscriptionRevenue);
+        document.getElementById('sumTotal').textContent = fmtMoney(data.totalRevenue);
+        const panel = document.getElementById('detailPanel');
+        panel.classList.add('show');
+        document.getElementById('detailTitle').textContent = 'Giao dịch tháng ' + d.month + '/' + d.year;
+        document.getElementById('detailTotal').textContent = fmtMoney(data.totalRevenue);
+        const rows = [];
+        (data.sessions || []).forEach(s => {
+          rows.push('<tr><td>' + fmtDate(s.exitTime) + '</td><td>Vé lượt</td><td>' + (s.entryPlate || '-') + '</td><td>' + fmtMoney(s.fee) + '</td></tr>');
+        });
+        (data.payments || []).forEach(p => {
+          rows.push('<tr><td>' + fmtDate(p.paidAt) + '</td><td>Gói tháng</td><td>' + (p.parkingCard ? p.parkingCard.cardCode : '-') + '</td><td>' + fmtMoney(p.amount) + '</td></tr>');
+        });
+        document.getElementById('detailBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="4" class="muted">Không có giao dịch trong tháng này.</td></tr>';
+      });
+    });
+    chart.appendChild(wrapper);
+  });
+})();
+</script>
+</body></html>

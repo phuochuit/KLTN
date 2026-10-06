@@ -728,6 +728,135 @@ public class AdminController {
         return "sessions";
     }
 
+    @GetMapping("/api/parking/revenue/monthly")
+    @ResponseBody
+    List<Map<String, Object>> monthlyRevenue() {
+        var result = new java.util.ArrayList<Map<String, Object>>();
+        var now = LocalDate.now();
+        for (int i = 11; i >= 0; i--) {
+            var month = now.minusMonths(i);
+            var from = month.withDayOfMonth(1).atStartOfDay();
+            var to = from.plusMonths(1);
+            BigDecimal visit = sessions
+                    .findByStatusAndExitTimeBetween(SessionStatus.COMPLETED, from, to).stream()
+                    .map(ParkingSession::getFee).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal subscription = payments.findByPaidAtBetween(from, to).stream()
+                    .map(SubscriptionPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            var data = new LinkedHashMap<String, Object>();
+            data.put("year", month.getYear());
+            data.put("month", month.getMonthValue());
+            data.put("label", month.getMonthValue() + "/" + month.getYear());
+            data.put("visitRevenue", visit);
+            data.put("subscriptionRevenue", subscription);
+            data.put("totalRevenue", visit.add(subscription));
+            result.add(data);
+        }
+        return result;
+    }
+
+    @GetMapping("/api/parking/revenue/filter")
+    @ResponseBody
+    Map<String, Object> revenueFilter(@RequestParam String type,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
+        LocalDateTime fromTime;
+        LocalDateTime toTime;
+        String label;
+        if ("month".equals(type) && year != null && month != null) {
+            fromTime = LocalDate.of(year, month, 1).atStartOfDay();
+            toTime = fromTime.plusMonths(1);
+            label = "Tháng " + month + "/" + year;
+        } else if ("year".equals(type) && year != null) {
+            fromTime = LocalDate.of(year, 1, 1).atStartOfDay();
+            toTime = fromTime.plusYears(1);
+            label = "Năm " + year;
+        } else if ("range".equals(type) && from != null && to != null) {
+            fromTime = from.atStartOfDay();
+            toTime = to.plusDays(1).atStartOfDay();
+            label = "Từ " + from + " đến " + to;
+        } else {
+            fromTime = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            toTime = fromTime.plusMonths(1);
+            label = "Tháng " + LocalDate.now().getMonthValue() + "/" + LocalDate.now().getYear();
+        }
+        var sessionList = sessions
+                .findByStatusAndExitTimeBetween(SessionStatus.COMPLETED, fromTime, toTime).stream()
+                .sorted((a, b) -> b.getExitTime().compareTo(a.getExitTime()))
+                .toList();
+        var paymentList = payments.findByPaidAtBetween(fromTime, toTime).stream()
+                .sorted((a, b) -> b.getPaidAt().compareTo(a.getPaidAt()))
+                .toList();
+        BigDecimal visitRevenue = sessionList.stream()
+                .map(ParkingSession::getFee).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal subscriptionRevenue = paymentList.stream()
+                .map(SubscriptionPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        var data = new LinkedHashMap<String, Object>();
+        data.put("label", label);
+        data.put("visitRevenue", visitRevenue);
+        data.put("subscriptionRevenue", subscriptionRevenue);
+        data.put("totalRevenue", visitRevenue.add(subscriptionRevenue));
+        data.put("householdCount", households.countByCreatedAtBefore(toTime));
+        data.put("vehicleCount", vehicles.countByCreatedAtBefore(toTime));
+        data.put("openCount", sessions.countPresentAt(toTime));
+        data.put("todayRevenue", visitRevenue.add(subscriptionRevenue));
+        data.put("monthRevenue", visitRevenue.add(subscriptionRevenue));
+        data.put("sessions", sessionList);
+        data.put("payments", paymentList);
+        return data;
+    }
+
+    @GetMapping("/api/parking/revenue/monthly/{year}/{month}")
+    @ResponseBody
+    Map<String, Object> monthlyRevenueDetail(@PathVariable int year, @PathVariable int month) {
+        var from = LocalDate.of(year, month, 1).atStartOfDay();
+        var to = from.plusMonths(1);
+        var sessionList = sessions
+                .findByStatusAndExitTimeBetween(SessionStatus.COMPLETED, from, to).stream()
+                .sorted((a, b) -> b.getExitTime().compareTo(a.getExitTime()))
+                .toList();
+        var paymentList = payments.findByPaidAtBetween(from, to).stream()
+                .sorted((a, b) -> b.getPaidAt().compareTo(a.getPaidAt()))
+                .toList();
+        BigDecimal visitRevenue = sessionList.stream()
+                .map(ParkingSession::getFee).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal subscriptionRevenue = paymentList.stream()
+                .map(SubscriptionPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        var data = new LinkedHashMap<String, Object>();
+        data.put("year", year);
+        data.put("month", month);
+        data.put("visitRevenue", visitRevenue);
+        data.put("subscriptionRevenue", subscriptionRevenue);
+        data.put("totalRevenue", visitRevenue.add(subscriptionRevenue));
+        data.put("sessions", sessionList);
+        data.put("payments", paymentList);
+        return data;
+    }
+
+    @GetMapping("/api/parking/revenue/stats/{year}/{month}")
+    @ResponseBody
+    Map<String, Object> monthlyStats(@PathVariable int year, @PathVariable int month) {
+        var from = LocalDate.of(year, month, 1).atStartOfDay();
+        var to = from.plusMonths(1);
+        var monthSessions = sessions.findByStatusAndExitTimeBetween(SessionStatus.COMPLETED, from, to);
+        var monthPayments = payments.findByPaidAtBetween(from, to);
+        BigDecimal visitRevenue = monthSessions.stream()
+                .map(ParkingSession::getFee).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal subscriptionRevenue = monthPayments.stream()
+                .map(SubscriptionPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        var data = new LinkedHashMap<String, Object>();
+        data.put("householdCount", households.countByCreatedAtBefore(to));
+        data.put("vehicleCount", vehicles.countByCreatedAtBefore(to));
+        data.put("openCount", sessions.countPresentAt(to));
+        data.put("todayRevenue", visitRevenue.add(subscriptionRevenue));
+        data.put("monthRevenue", visitRevenue.add(subscriptionRevenue));
+        data.put("visitRevenue", visitRevenue);
+        data.put("subscriptionRevenue", subscriptionRevenue);
+        data.put("totalRevenue", visitRevenue.add(subscriptionRevenue));
+        return data;
+    }
+
     private ParkingPolicy getPolicy() {
         return policies.findById(1L).orElseGet(() -> policies.save(new ParkingPolicy()));
     }

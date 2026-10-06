@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
-$mysqlClient = 'D:\laragon_new\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe'
+$mysqlClient = 'mysql-2709ad1f-phuoc190305-fcdc.e.aivencloud.com, Port: 26805, User: avnadmin'
 
 function Test-MySqlLogin {
     param([string]$Password)
