@@ -14,3 +14,5 @@ anpr-service/.EasyOCR/
 anpr-service/.ultralytics/
 *.log
 qa_*
+spring-web/src/main/resources/application.properties
+spring-web/src/main/resources/application-laragon.properties
