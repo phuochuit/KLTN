@@ -9,6 +9,8 @@ import vn.edu.parking.domain.*;
 import vn.edu.parking.repository.*;
 import vn.edu.parking.service.PlateNormalizer;
 import vn.edu.parking.service.ResidentImageStorage;
+import vn.edu.parking.service.ParkingService;
+import vn.edu.parking.web.dto.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,7 +18,9 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 
 @Controller
@@ -31,12 +35,14 @@ public class AdminController {
     private final ParkingPolicyRepository policies;
     private final ResidentImageStorage imageStorage;
     private final ParkingSlotRepository slots;
+    private final ParkingService parkingService;
 
     public AdminController(VehicleRepository vehicles, ParkingCardRepository cards,
             PricingRuleRepository prices, ParkingSessionRepository sessions,
             SubscriptionPaymentRepository payments, HouseholdRepository households,
             FamilyMemberRepository members, ParkingPolicyRepository policies,
-            ResidentImageStorage imageStorage, ParkingSlotRepository slots) {
+            ResidentImageStorage imageStorage, ParkingSlotRepository slots,
+            ParkingService parkingService) {
         this.vehicles = vehicles;
         this.cards = cards;
         this.prices = prices;
@@ -47,6 +53,7 @@ public class AdminController {
         this.policies = policies;
         this.imageStorage = imageStorage;
         this.slots = slots;
+        this.parkingService = parkingService;
     }
 
     @GetMapping("/")
@@ -435,26 +442,154 @@ public class AdminController {
     }
 
     @GetMapping("/slots")
-    String slots(Model model) {
-        model.addAttribute("slots", slots.findAllByOrderBySlotCodeAsc());
+    String slots(Model model,
+                 @RequestParam(required = false) String floor,
+                 @RequestParam(required = false) String zone) {
+        List<ParkingSlot> allSlots = slots.findAllByOrderBySlotCodeAsc();
+        List<String> floors = slots.findDistinctFloors();
+        List<String> zones = slots.findDistinctZones();
+
+        List<ParkingSlotResponse> slotResponses = allSlots.stream()
+            .filter(s -> floor == null || floor.isBlank() || floor.equalsIgnoreCase(s.getFloor()))
+            .filter(s -> zone == null || zone.isBlank() || zone.equalsIgnoreCase(s.getZoneName()))
+            .map(parkingService::toSlotResponse)
+            .toList();
+
+        long totalSlots = allSlots.size();
+        long availableCount = allSlots.stream().filter(s -> s.getCurrentSession() == null && s.getAssignedVehicle() == null && s.getStatusOverride() != SlotStatusOverride.BLOCKED).count();
+        long occupiedCount = allSlots.stream().filter(s -> s.getCurrentSession() != null).count();
+        long reservedCount = allSlots.stream().filter(s -> s.getAssignedVehicle() != null).count();
+        long borrowedCount = allSlots.stream().filter(s -> s.getBorrowedPlate() != null && !s.getBorrowedPlate().isBlank()).count();
+        long blockedCount = allSlots.stream().filter(s -> s.getStatusOverride() == SlotStatusOverride.BLOCKED).count();
+        long overdueCount = allSlots.stream().filter(s -> s.isOverdue(LocalDateTime.now())).count();
+
+        Set<Long> assignedVehicleIds = allSlots.stream()
+            .filter(s -> s.getAssignedVehicle() != null)
+            .map(s -> s.getAssignedVehicle().getId())
+            .collect(Collectors.toSet());
+        List<Vehicle> unassignedVehicles = vehicles.findAll().stream()
+            .filter(v -> v.isActive() && !assignedVehicleIds.contains(v.getId()))
+            .toList();
+
+        List<ParkingSession> unassignedSessions = sessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN).stream()
+            .limit(30)
+            .toList();
+
+        model.addAttribute("slots", slotResponses);
+        model.addAttribute("floors", floors);
+        model.addAttribute("zones", zones);
+        model.addAttribute("selectedFloor", floor == null ? "" : floor);
+        model.addAttribute("selectedZone", zone == null ? "" : zone);
+        model.addAttribute("totalSlots", totalSlots);
+        model.addAttribute("availableCount", availableCount);
+        model.addAttribute("occupiedCount", occupiedCount);
+        model.addAttribute("reservedCount", reservedCount);
+        model.addAttribute("borrowedCount", borrowedCount);
+        model.addAttribute("blockedCount", blockedCount);
+        model.addAttribute("overdueCount", overdueCount);
         model.addAttribute("vehicles", vehicles.findAll());
+        model.addAttribute("unassignedVehicles", unassignedVehicles);
+        model.addAttribute("unassignedSessions", unassignedSessions);
         return "slots";
     }
 
     @PostMapping("/slots")
     String saveSlot(@RequestParam String slotCode,
             @RequestParam(required = false) Long assignedVehicleId,
+            @RequestParam(required = false, defaultValue = "Tầng hầm B1") String floor,
             @RequestParam(required = false, defaultValue = "Khu A") String zoneName,
+            @RequestParam(required = false, defaultValue = "RESIDENT_RESERVED") String slotType,
+            @RequestParam(required = false, defaultValue = "CAR") String vehicleType,
             RedirectAttributes redirect) {
         ParkingSlot slot = slots.findBySlotCodeIgnoreCase(slotCode.trim()).orElseGet(ParkingSlot::new);
         slot.setSlotCode(slotCode.trim().toUpperCase());
+        slot.setFloor(floor.trim());
         slot.setZoneName(zoneName.trim());
-        slot.setAssignedVehicle(assignedVehicleId == null ? null
-                : vehicles.findById(assignedVehicleId)
-                        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy xe được gán")));
+        slot.setSlotType("VISITOR_FLEXIBLE".equalsIgnoreCase(slotType) ? SlotType.VISITOR_FLEXIBLE : SlotType.RESIDENT_RESERVED);
+        slot.setAllowedVehicleType("MOTORBIKE".equalsIgnoreCase(vehicleType) ? VehicleType.MOTORBIKE : VehicleType.CAR);
         slot.setActive(true);
-        slots.save(slot);
+        slot = slots.save(slot);
+
+        if (assignedVehicleId != null) {
+            parkingService.assignVehicleToSlot(slot.getId(), assignedVehicleId);
+        }
         redirect.addFlashAttribute("message", "Đã lưu vị trí " + slot.getSlotCode());
+        return "redirect:/slots";
+    }
+
+    @PostMapping("/slots/assign")
+    String assignSlot(@RequestParam Long slotId,
+                      @RequestParam(required = false) Long vehicleId,
+                      RedirectAttributes redirect) {
+        parkingService.assignVehicleToSlot(slotId, vehicleId);
+        redirect.addFlashAttribute("message", "Đã cập nhật gán xe cho ô đỗ thành công");
+        return "redirect:/slots";
+    }
+
+    @PostMapping("/slots/borrow")
+    String borrowSlot(@RequestParam Long slotId,
+                      @RequestParam String borrowedPlate,
+                      @RequestParam(defaultValue = "2") int hours,
+                      @RequestParam(required = false, defaultValue = "") String borrowNotes,
+                      RedirectAttributes redirect) {
+        parkingService.setupBorrowing(slotId, borrowedPlate, hours, borrowNotes);
+        redirect.addFlashAttribute("message", "Đã thiết lập xe đỗ nhờ thành công (thời hạn " + hours + " giờ)");
+        return "redirect:/slots";
+    }
+
+    @PostMapping("/slots/cancel-borrow")
+    String cancelBorrow(@RequestParam Long slotId, RedirectAttributes redirect) {
+        parkingService.cancelBorrowing(slotId);
+        redirect.addFlashAttribute("message", "Đã hủy đỗ nhờ cho ô đỗ");
+        return "redirect:/slots";
+    }
+
+    @PostMapping("/slots/status")
+    String changeSlotStatus(@RequestParam Long slotId,
+                            @RequestParam String statusOverride,
+                            RedirectAttributes redirect) {
+        try {
+            SlotStatusOverride override = SlotStatusOverride.valueOf(statusOverride.toUpperCase());
+            parkingService.setSlotStatusOverride(slotId, override);
+            redirect.addFlashAttribute("message", "Đã chuyển trạng thái ô sang: " + override.getDisplayName());
+        } catch (IllegalStateException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        } catch (Exception e) {
+            redirect.addFlashAttribute("error", "Lỗi: " + e.getMessage());
+        }
+        return "redirect:/slots";
+    }
+
+    @PostMapping("/slots/release")
+    String releaseSlot(@RequestParam Long slotId, RedirectAttributes redirect) {
+        try {
+            parkingService.releaseSlot(slotId);
+            redirect.addFlashAttribute("message", "Đã giải phóng ô đỗ về trạng thái trống");
+        } catch (Exception e) {
+            redirect.addFlashAttribute("error", "Lỗi: " + e.getMessage());
+        }
+        return "redirect:/slots";
+    }
+
+    @PostMapping("/slots/dispatch-session")
+    String dispatchSession(@RequestParam Long slotId,
+                           @RequestParam Long sessionId,
+                           RedirectAttributes redirect) {
+        try {
+            parkingService.dispatchSessionToSlot(slotId, sessionId);
+            redirect.addFlashAttribute("message", "Đã điều phối xe vào ô thành công");
+        } catch (IllegalStateException e) {
+            redirect.addFlashAttribute("error", e.getMessage());
+        } catch (Exception e) {
+            redirect.addFlashAttribute("error", "Lỗi: " + e.getMessage());
+        }
+        return "redirect:/slots";
+    }
+
+    @PostMapping("/slots/batch-generate")
+    String batchGenerateSlots(BatchSlotGenerateRequest req, RedirectAttributes redirect) {
+        int count = parkingService.batchGenerateSlots(req);
+        redirect.addFlashAttribute("message", "Đã tạo thành công " + count + " ô đỗ mới");
         return "redirect:/slots";
     }
 

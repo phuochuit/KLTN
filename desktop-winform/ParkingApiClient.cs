@@ -35,6 +35,78 @@ public sealed class ParkingApiClient
             "Spring Web", "tải sơ đồ bãi xe");
     }
 
+    public async Task AssignSlotAsync(long slotId, long? vehicleId)
+    {
+        using var response = await _http.PostAsJsonAsync($"{BaseUrl.TrimEnd('/')}/api/parking/slots/{slotId}/assign", new SlotAssignRequest(vehicleId), _json);
+        if (!response.IsSuccessStatusCode)
+        {
+            string err = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Lỗi gán xe: {err}");
+        }
+    }
+
+    public async Task BorrowSlotAsync(long slotId, string borrowedPlate, int hours, string notes)
+    {
+        using var response = await _http.PostAsJsonAsync($"{BaseUrl.TrimEnd('/')}/api/parking/slots/{slotId}/borrow", new SlotBorrowRequest(borrowedPlate, hours, notes), _json);
+        if (!response.IsSuccessStatusCode)
+        {
+            string err = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Lỗi thiết lập đỗ nhờ: {err}");
+        }
+    }
+
+    public async Task CancelBorrowAsync(long slotId)
+    {
+        using var response = await _http.PostAsync($"{BaseUrl.TrimEnd('/')}/api/parking/slots/{slotId}/cancel-borrow", null);
+        if (!response.IsSuccessStatusCode)
+        {
+            string err = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Lỗi hủy đỗ nhờ: {err}");
+        }
+    }
+
+    public async Task UpdateSlotStatusAsync(long slotId, string statusOverride)
+    {
+        using var response = await _http.PostAsJsonAsync($"{BaseUrl.TrimEnd('/')}/api/parking/slots/{slotId}/status", new SlotStatusRequest(statusOverride), _json);
+        if (!response.IsSuccessStatusCode)
+        {
+            string err = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Lỗi đổi trạng thái: {err}");
+        }
+    }
+
+    public async Task ReleaseSlotAsync(long slotId)
+    {
+        using var response = await _http.PostAsync($"{BaseUrl.TrimEnd('/')}/api/parking/slots/{slotId}/release", null);
+        if (!response.IsSuccessStatusCode)
+        {
+            string err = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Lỗi giải phóng ô: {err}");
+        }
+    }
+
+    public async Task DispatchSessionAsync(long slotId, long sessionId)
+    {
+        using var response = await _http.PostAsJsonAsync($"{BaseUrl.TrimEnd('/')}/api/parking/slots/{slotId}/dispatch-session", new DispatchSessionRequest(sessionId), _json);
+        if (!response.IsSuccessStatusCode)
+        {
+            string err = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Lỗi điều phối xe: {err}");
+        }
+    }
+
+    public async Task<List<UnassignedSessionResponse>> GetRecentUnassignedSessionsAsync()
+    {
+        using var response = await _http.GetAsync($"{BaseUrl.TrimEnd('/')}/api/parking/recent-unassigned");
+        return await ApiResponseReader.ReadAsync<List<UnassignedSessionResponse>>(response, _json, "Spring Web", "lấy xe vừa vào trạm");
+    }
+
+    public async Task<List<UnassignedVehicleResponse>> GetUnassignedVehiclesAsync()
+    {
+        using var response = await _http.GetAsync($"{BaseUrl.TrimEnd('/')}/api/parking/vehicles-unassigned");
+        return await ApiResponseReader.ReadAsync<List<UnassignedVehicleResponse>>(response, _json, "Spring Web", "lấy xe cư dân chưa có ô");
+    }
+
     private async Task<ParkingResponse> PostAsync(string path, ParkingRequest request)
     {
         using var response = await _http.PostAsJsonAsync($"{BaseUrl.TrimEnd('/')}{path}", request, _json);

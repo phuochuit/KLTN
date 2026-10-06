@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.parking.domain.SessionStatus;
 import vn.edu.parking.domain.PassType;
+import vn.edu.parking.domain.SlotStatusOverride;
+import vn.edu.parking.domain.ParkingSlot;
 import vn.edu.parking.repository.ParkingSessionRepository;
 import vn.edu.parking.repository.ParkingCardRepository;
 import vn.edu.parking.repository.VehicleRepository;
@@ -14,6 +16,9 @@ import vn.edu.parking.service.ParkingService;
 import vn.edu.parking.web.dto.*;
 
 import java.util.Map;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.time.LocalDate;
 import javax.sql.DataSource;
 
@@ -97,14 +102,96 @@ public class ParkingApiController {
     }
 
     @GetMapping("/slots")
-    public Object slots() {
-        return slots.findAllByOrderBySlotCodeAsc().stream().map(slot -> {
-            String assigned = slot.getAssignedVehicle() == null ? "" : slot.getAssignedVehicle().getPlateNumber();
-            String occupied = slot.getCurrentSession() == null ? "" : slot.getCurrentSession().getEntryPlate();
-            String status = occupied.isBlank() ? (assigned.isBlank() ? "AVAILABLE" : "RESERVED_EMPTY")
-                : (!assigned.isBlank() && assigned.equalsIgnoreCase(occupied) ? "OCCUPIED_VALID" : "OCCUPIED_MISMATCH");
-            return new ParkingSlotResponse(slot.getId(), slot.getSlotCode(), slot.getZoneName(), assigned, occupied, status);
-        }).toList();
+    public List<ParkingSlotResponse> slots() {
+        return slots.findAllByOrderBySlotCodeAsc().stream()
+            .map(parkingService::toSlotResponse)
+            .toList();
+    }
+
+    @PostMapping("/slots/{id}/assign")
+    public Map<String, Object> assignVehicle(@PathVariable Long id, @RequestBody SlotAssignRequest req) {
+        parkingService.assignVehicleToSlot(id, req.vehicleId());
+        return Map.of("success", true, "message", "Đã cập nhật gán xe cho ô đỗ");
+    }
+
+    @PostMapping("/slots/{id}/borrow")
+    public Map<String, Object> borrowSlot(@PathVariable Long id, @RequestBody SlotBorrowRequest req) {
+        parkingService.setupBorrowing(id, req.borrowedPlate(), req.hours() == null ? 2 : req.hours(), req.borrowNotes());
+        return Map.of("success", true, "message", "Đã thiết lập xe đỗ nhờ thành công");
+    }
+
+    @PostMapping("/slots/{id}/cancel-borrow")
+    public Map<String, Object> cancelBorrow(@PathVariable Long id) {
+        parkingService.cancelBorrowing(id);
+        return Map.of("success", true, "message", "Đã hủy đỗ nhờ");
+    }
+
+    @PostMapping("/slots/{id}/status")
+    public Map<String, Object> setStatusOverride(@PathVariable Long id, @RequestBody SlotStatusRequest req) {
+        SlotStatusOverride override = SlotStatusOverride.valueOf(req.statusOverride().toUpperCase());
+        parkingService.setSlotStatusOverride(id, override);
+        return Map.of("success", true, "message", "Đã đổi trạng thái ô thành " + override.getDisplayName());
+    }
+
+    @PostMapping("/slots/{id}/release")
+    public Map<String, Object> releaseSlot(@PathVariable Long id) {
+        parkingService.releaseSlot(id);
+        return Map.of("success", true, "message", "Đã giải phóng ô đỗ");
+    }
+
+    @PostMapping("/slots/{id}/dispatch-session")
+    public Map<String, Object> dispatchSession(@PathVariable Long id, @RequestBody DispatchSessionRequest req) {
+        parkingService.dispatchSessionToSlot(id, req.sessionId());
+        return Map.of("success", true, "message", "Đã điều phối xe vào ô");
+    }
+
+    @GetMapping("/recent-unassigned")
+    public List<Map<String, Object>> recentUnassigned() {
+        Map<Long, String> sessionSlotMap = slots.findByActiveTrueOrderBySlotCodeAsc().stream()
+            .filter(s -> s.getCurrentSession() != null)
+            .collect(Collectors.toMap(
+                s -> s.getCurrentSession().getId(),
+                ParkingSlot::getSlotCode,
+                (oldVal, newVal) -> oldVal
+            ));
+
+        return sessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN).stream()
+            .limit(30)
+            .map(s -> {
+                String currentSlot = sessionSlotMap.get(s.getId());
+                String slotInfo = currentSlot != null ? " (Đang ở ô " + currentSlot + ")" : " (Chưa có ô)";
+                return Map.<String, Object>of(
+                    "sessionId", s.getId(),
+                    "plateNumber", s.getEntryPlate(),
+                    "vehicleType", s.getDetectedVehicleType().name(),
+                    "entryTime", s.getEntryTime().toString(),
+                    "ownerName", (s.getVehicle() == null ? "Khách vãng lai" : s.getVehicle().getEffectiveOwnerName()) + slotInfo
+                );
+            }).toList();
+    }
+
+    @GetMapping("/vehicles-unassigned")
+    public List<Map<String, Object>> vehiclesUnassigned() {
+        Set<Long> assignedVehicleIds = slots.findByActiveTrueOrderBySlotCodeAsc().stream()
+            .filter(s -> s.getAssignedVehicle() != null)
+            .map(s -> s.getAssignedVehicle().getId())
+            .collect(Collectors.toSet());
+
+        return vehicles.findAll().stream()
+            .filter(v -> v.isActive() && !assignedVehicleIds.contains(v.getId()))
+            .map(v -> Map.<String, Object>of(
+                "id", v.getId(),
+                "plateNumber", v.getPlateNumber(),
+                "ownerName", v.getEffectiveOwnerName(),
+                "apartmentNumber", v.getEffectiveApartmentNumber(),
+                "vehicleType", v.getVehicleType().name()
+            )).toList();
+    }
+
+    @PostMapping("/slots/batch-generate")
+    public Map<String, Object> batchGenerate(@RequestBody BatchSlotGenerateRequest req) {
+        int count = parkingService.batchGenerateSlots(req);
+        return Map.of("success", true, "createdCount", count, "message", "Đã tạo thành công " + count + " ô đỗ");
     }
 
     @GetMapping("/health")
