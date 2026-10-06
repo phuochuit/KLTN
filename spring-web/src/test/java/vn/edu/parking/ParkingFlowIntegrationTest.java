@@ -130,7 +130,8 @@ class ParkingFlowIntegrationTest {
         byte[] image = java.util.Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
         MockMultipartFile face = new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image);
-        mvc.perform(multipart("/registrations").file(face).with(csrf())
+        MockMultipartFile registration = new MockMultipartFile("registrationImage", "registration.png", "image/png", image);
+        mvc.perform(multipart("/registrations").file(face).file(registration).with(csrf())
                 .param("householdCode", "HH-COMBINED-01").param("apartmentNumber", "C1-0101")
                 .param("buildingName", "C1").param("contactPhone", "0901000001")
                 .param("fullName", "Cư dân đăng ký tổng hợp").param("citizenId", "079205019299")
@@ -138,8 +139,7 @@ class ParkingFlowIntegrationTest {
                 .param("plateNumber", "61A1-234.56").param("vehicleType", "MOTORBIKE")
                 .param("fuelType", "GASOLINE").param("registrationNumber", "DKX-COMBINED")
                 .param("brand", "Honda").param("modelName", "Vision").param("color", "Đen")
-                .param("chassisNumber", "FRAME-COMBINED").param("engineNumber", "ENGINE-COMBINED")
-                .param("registrationImagePath", "uploads/vehicle-registration/combined.jpg"))
+                .param("chassisNumber", "FRAME-COMBINED").param("engineNumber", "ENGINE-COMBINED"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrlPattern("/cards?vehicleId=*"));
 

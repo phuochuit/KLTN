@@ -9,4 +9,4 @@
 7. Chưa tích hợp RFID vật lý, máy in vé, máy POS/chuyển khoản, hóa đơn và đối soát ca trực.
 8. Cần thêm phân quyền nhân viên/quản trị viên đầy đủ, quản lý tài khoản trong database, khóa tài khoản và audit log.
 9. Cần kiểm thử camera ban đêm, ngược sáng, mưa, biển số bẩn/che, mất mạng, mất điện, xe bám đuôi và mở barrier thủ công.
-10. Project đang dùng .NET 7 đã hết hỗ trợ; nên nâng WinForms lên .NET 8 LTS.
+10. WinForms đã được nâng lên .NET 8 LTS; cần kiểm thử lại sau mỗi bản cập nhật SDK Windows.

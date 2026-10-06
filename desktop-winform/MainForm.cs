@@ -159,6 +159,8 @@ public sealed class MainForm : Form
         if (dialog.ShowDialog() != DialogResult.OK) return;
         try
         {
+            _result.Text = "";
+            _result.BackColor = SystemColors.Control;
             ConfigureApis();
             SetBusy(true, video ? "Đang lấy mẫu frame và nhận dạng video..." : "Đang nhận dạng ảnh...");
             if (!video) ShowLocalImage(dialog.FileName);
@@ -218,6 +220,12 @@ public sealed class MainForm : Form
             _exitPlate.Text = response.PlateNumber;
             _exitCard.Text = response.CardCode;
             _entryGuestFaceBase64 = "";
+
+            if (!response.Warning || _manual.Checked)
+            {
+                await Task.Delay(2000);
+                ClearEntryForm();
+            }
         }
         catch (Exception ex) { ShowError(ex); }
     }
@@ -287,6 +295,12 @@ public sealed class MainForm : Form
             if(!response.Warning || _manual.Checked) AutoOpenBarrier("Xe ra đã được xác nhận");
             NotifyMapUpdated();
             _lastPreview = null;
+
+            if (!response.Warning || _manual.Checked)
+            {
+                await Task.Delay(2000);
+                ClearExitForm();
+            }
         }
         catch (Exception ex) { ShowError(ex); }
     }
@@ -295,7 +309,9 @@ public sealed class MainForm : Form
     {
         try
         {
-            ConfigureApis(); var combo=entry?_entryMember:_exitMember;
+            ConfigureApis();
+            SetBusy(true, "Đang chụp và xác thực khuôn mặt...");
+            var combo=entry?_entryMember:_exitMember;
             string path;
             if(combo.SelectedItem is AuthorizedMemberResponse member){if(!member.FaceImageAvailable)throw new InvalidOperationException("Thành viên chưa có ảnh đăng ký");path=member.RegistrationFaceImagePath;}
             else if(!entry && !string.IsNullOrWhiteSpace(_exitGuestFacePath)) path=_exitGuestFacePath;
@@ -304,9 +320,10 @@ public sealed class MainForm : Form
             bool pass=response.Decision=="PASS";
             if(entry){_entryFaceVerified=pass;_entryFaceSimilarity=response.Similarity;_entryVerifiedMemberId=(combo.SelectedItem as AuthorizedMemberResponse)?.Id;}else{_exitFaceVerified=pass;_exitFaceSimilarity=response.Similarity;_exitVerifiedMemberId=(combo.SelectedItem as AuthorizedMemberResponse)?.Id;}
             if(!string.IsNullOrWhiteSpace(response.RealtimeImageBase64)){using var ms=new MemoryStream(Convert.FromBase64String(response.RealtimeImageBase64));using var img=Image.FromStream(ms);_preview.Image?.Dispose();_preview.Image=new Bitmap(img);}
-            _result.Text=$"Xác thực khuôn mặt: {DisplayFaceDecision(response.Decision)}\r\nĐiểm tương đồng SFace: {response.Similarity:0.000}\r\nNgưỡng cho phép: từ {response.MatchThreshold:0.000}\r\n{response.Message}\r\nLưu ý: demo chưa có liveness chống ảnh giả.";
+            _result.Text=$"Xác thực khuôn mặt: {DisplayFaceDecision(response.Decision)}\r\nĐiểm tương đồng SFace: {response.Similarity:0.000}\r\nNgưỡng cho phép: từ {response.MatchThreshold:0.000}\r\n{response.Message}";
             _result.BackColor=pass?Color.Honeydew:Color.MistyRose;
         } catch(Exception ex){ShowError(ex);}
+        finally { SetBusy(false, "Chọn ảnh hoặc video để nhận dạng tự động"); }
     }
 
     private ParkingRequest Request(string plate, string card)
@@ -375,6 +392,46 @@ public sealed class MainForm : Form
         _result.BackColor = r.Warning ? Color.FromArgb(255, 247, 230) : Color.FromArgb(234, 245, 239);
         _result.ForeColor = r.Warning ? Color.DarkGoldenrod : Color.DarkGreen;
         _result.Text = $"{r.Message}\r\n\r\nMã lượt: {r.SessionId}\r\nBiển số: {r.PlateNumber}\r\nLoại xe: {DisplayVehicleType(r.VehicleType)}\r\nChủ xe: {r.OwnerName}\r\nThẻ: {r.CardCode}\r\nTrạng thái: {r.Status}\r\nGiờ vào: {r.EntryTime:dd/MM/yyyy HH:mm:ss}\r\nPhí: {r.Fee:N0} đ";
+    }
+
+    private void ClearEntryForm()
+    {
+        _entryPlate.Text = "";
+        _entryCard.Text = "";
+        _vehicleType.Text = "UNKNOWN";
+        _preview.Image?.Dispose();
+        _preview.Image = null;
+        _result.Text = "";
+        _result.BackColor = SystemColors.Control;
+        _aiStatus.Text = "Chọn ảnh hoặc video để nhận dạng tự động";
+        _aiStatus.ForeColor = Color.DimGray;
+        _residentInfo.Text = "Chưa tra cứu cư dân";
+        _residentInfo.BackColor = Color.FromArgb(245, 247, 250);
+        _entryMember.DataSource = null;
+        _entryFaceVerified = false;
+        _entryFaceSimilarity = null;
+        _entryVerifiedMemberId = null;
+        _entryGuestFaceBase64 = "";
+    }
+
+    private void ClearExitForm()
+    {
+        _exitPlate.Text = "";
+        _exitCard.Text = "";
+        _vehicleType.Text = "UNKNOWN";
+        _preview.Image?.Dispose();
+        _preview.Image = null;
+        _result.Text = "";
+        _result.BackColor = SystemColors.Control;
+        _aiStatus.Text = "Chọn ảnh hoặc video để nhận dạng tự động";
+        _aiStatus.ForeColor = Color.DimGray;
+        _residentInfo.Text = "Chưa tra cứu cư dân";
+        _residentInfo.BackColor = Color.FromArgb(245, 247, 250);
+        _exitMember.DataSource = null;
+        _exitFaceVerified = false;
+        _exitFaceSimilarity = null;
+        _exitVerifiedMemberId = null;
+        _exitGuestFacePath = "";
     }
 
     private void ShowError(Exception ex)

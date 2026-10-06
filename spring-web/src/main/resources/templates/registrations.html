@@ -3,7 +3,7 @@
 <body><header th:replace="~{fragments :: header}"></header><main>
 <h1>Đăng ký cư dân và phương tiện</h1>
 <div class="card help"><strong>Luồng đăng ký:</strong> nhập một lần thông tin hộ/căn hộ, người đăng ký và phương tiện. Sau khi lưu, hệ thống chuyển sang bước tạo thẻ hoặc gói 30 ngày và tự chọn đúng chiếc xe vừa đăng ký.</div>
-<form class="registration-form" method="post" enctype="multipart/form-data" th:action="@{/registrations}">
+<form id="registrationForm" class="registration-form" method="post" enctype="multipart/form-data" th:action="@{/registrations}">
 <section class="card registration-section"><h2><span class="step-number">1</span> Thông tin hộ và căn hộ</h2><div class="form-grid">
  <label>Mã hộ<input name="householdCode" required placeholder="HH-A1-1205"></label><label>Căn hộ/phòng<input name="apartmentNumber" required placeholder="A1-1205"></label>
  <label>Tòa/block<input name="buildingName" placeholder="A1"></label><label>Điện thoại liên hệ<input name="contactPhone" placeholder="0901234567"></label>
@@ -17,7 +17,7 @@
  <label>Điện thoại cá nhân<input name="phone"></label><label>Email<input name="email" type="email"></label>
  <label class="span-2">Địa chỉ thường trú<input name="permanentAddress"></label><label>Ngày cấp CCCD<input name="cccdIssueDate" type="date"></label><label>Nơi cấp<input name="cccdIssuePlace"></label>
  <fieldset class="span-2"><legend>Quét QR trên CCCD để tự điền</legend><input id="cccdQrFile" type="file" accept="image/*" capture="environment"><button id="scanQr" type="button">Quét từ ảnh đã chọn</button><button id="openQrCamera" type="button">Mở camera quét QR</button><button id="captureQr" type="button" hidden>Chụp và đọc QR</button><video id="qrVideo" autoplay playsinline hidden></video><canvas id="qrCanvas" hidden></canvas><input id="cccdQrRaw" name="cccdQrRaw" type="hidden"><small id="qrStatus">Chọn ảnh QR rõ nét hoặc mở camera và đưa mặt sau CCCD vào khung hình.</small></fieldset>
- <fieldset class="span-2"><legend>Ảnh khuôn mặt đăng ký</legend><input name="registrationFaceImage" id="faceUpload" type="file" accept="image/*"><video id="faceVideo" autoplay playsinline hidden></video><img id="facePreview" alt="Ảnh khuôn mặt" hidden><canvas id="faceCanvas" hidden></canvas><input id="registrationFaceCapture" name="registrationFaceCapture" type="hidden"><button id="openCamera" type="button">Mở camera</button><button id="captureFace" type="button" hidden>Chụp ảnh</button><small>Phải tải ảnh hoặc chụp trực tiếp để đối chiếu tại cổng.</small></fieldset>
+ <fieldset class="span-2"><legend>Ảnh khuôn mặt đăng ký</legend><input name="registrationFaceImage" id="faceUpload" type="file" accept="image/*"><video id="faceVideo" autoplay playsinline hidden></video><img id="facePreview" alt="Ảnh khuôn mặt" hidden><canvas id="faceCanvas" hidden></canvas><input id="registrationFaceCapture" name="registrationFaceCapture" type="hidden"><button id="openCamera" type="button">Mở camera</button><button id="captureFace" type="button" hidden>Chụp ảnh</button><small>Phải tải ảnh hoặc chụp trực tiếp để đối chiếu tại cổng. Mỗi ảnh tối đa 10 MB.</small></fieldset>
 </div></section>
 
 <section class="card registration-section"><h2><span class="step-number">3</span> Thông tin phương tiện</h2><div class="form-grid">
@@ -25,15 +25,20 @@
  <label>Nhiên liệu<select name="fuelType" required><option th:each="f:${fuelTypes}" th:value="${f}" th:text="${f.displayName}"></option></select></label><label>Số giấy đăng ký xe<input name="registrationNumber" required></label>
  <label>Hãng xe<input name="brand" required></label><label>Dòng xe<input name="modelName" required></label><label>Màu xe<input name="color" required></label><label>Năm sản xuất<input name="manufactureYear" type="number" min="1950" max="2100"></label>
  <label>Số khung<input name="chassisNumber" required></label><label>Số máy<input name="engineNumber" required></label><label>Số chỗ ngồi<input name="seatCount" type="number" min="1"></label><label>Dung tích xi-lanh (cc)<input name="cylinderCapacityCc" type="number" min="0"></label>
- <label class="span-all">Ảnh/đường dẫn giấy đăng ký xe<input name="registrationImagePath" required placeholder="uploads/vehicle-registration/... hoặc mã hồ sơ lưu trữ"></label>
+ <label class="span-all">Ảnh giấy đăng ký xe<input id="registrationImage" type="file" name="registrationImage" accept="image/*" required><small>Mỗi ảnh tối đa 10 MB.</small></label>
 </div></section>
 <div class="registration-submit"><button type="submit">LƯU HỒ SƠ VÀ CHUYỂN SANG ĐĂNG KÝ GÓI</button></div>
 </form>
 </main><script>
 const q=id=>document.getElementById(id);let stream,qrStream;
-q('openCamera').onclick=async()=>{try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});q('faceVideo').srcObject=stream;q('faceVideo').hidden=false;q('captureFace').hidden=false;}catch(e){alert('Không mở được camera: '+e.message)}};
-q('captureFace').onclick=()=>{const v=q('faceVideo'),c=q('faceCanvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);const data=c.toDataURL('image/jpeg',.9);q('registrationFaceCapture').value=data;q('facePreview').src=data;q('facePreview').hidden=false;v.hidden=true;if(stream)stream.getTracks().forEach(t=>t.stop());};
-q('faceUpload').onchange=e=>{if(e.target.files[0]){q('registrationFaceCapture').value='';q('facePreview').src=URL.createObjectURL(e.target.files[0]);q('facePreview').hidden=false;}};
+const MAX_IMAGE_BYTES=10*1024*1024;
+function validateImage(input,label){const file=input.files&&input.files[0];if(!file)return true;if(file.size>MAX_IMAGE_BYTES){alert(label+' vượt quá 10 MB. Hãy chọn ảnh nhỏ hơn.');input.value='';return false;}if(!file.type.startsWith('image/')){alert(label+' phải là tệp hình ảnh.');input.value='';return false;}return true;}
+function captureCompressed(video,canvas,maxSide=1280){const scale=Math.min(1,maxSide/Math.max(video.videoWidth,video.videoHeight));canvas.width=Math.max(1,Math.round(video.videoWidth*scale));canvas.height=Math.max(1,Math.round(video.videoHeight*scale));canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/jpeg',.78);}
+q('openCamera').onclick=async()=>{try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});q('faceVideo').srcObject=stream;q('faceVideo').hidden=false;q('captureFace').hidden=false;}catch(e){alert('Không mở được camera: '+e.message)}};
+q('captureFace').onclick=()=>{const v=q('faceVideo'),data=captureCompressed(v,q('faceCanvas'));q('registrationFaceCapture').value=data;q('facePreview').src=data;q('facePreview').hidden=false;v.hidden=true;if(stream)stream.getTracks().forEach(t=>t.stop());};
+q('faceUpload').onchange=e=>{if(!validateImage(e.target,'Ảnh khuôn mặt'))return;if(e.target.files[0]){q('registrationFaceCapture').value='';q('facePreview').src=URL.createObjectURL(e.target.files[0]);q('facePreview').hidden=false;}};
+q('registrationImage').onchange=e=>validateImage(e.target,'Ảnh giấy đăng ký xe');
+q('registrationForm').addEventListener('submit',e=>{if(!validateImage(q('faceUpload'),'Ảnh khuôn mặt')||!validateImage(q('registrationImage'),'Ảnh giấy đăng ký xe'))e.preventDefault();});
 const parseDate=s=>s&&s.length===8?s.slice(4)+'-'+s.slice(2,4)+'-'+s.slice(0,2):'';
 async function scanQrBlob(blob){q('qrStatus').textContent='Đang đọc QR...';try{const form=new FormData();form.append('file',blob,'cccd-qr.jpg');const response=await fetch('/api/cccd/scan-qr',{method:'POST',body:form});const data=await response.json();if(!response.ok)throw new Error(data.message||'Không đọc được QR');q('cccdQrRaw').value=data.raw||'';q('citizenId').value=data.citizenId||'';q('oldCitizenId').value=data.oldCitizenId||'';document.querySelector('[name=fullName]').value=data.fullName||'';document.querySelector('[name=dateOfBirth]').value=data.dateOfBirth||'';document.querySelector('[name=gender]').value=data.gender||'';document.querySelector('[name=permanentAddress]').value=data.permanentAddress||'';document.querySelector('[name=cccdIssueDate]').value=data.cccdIssueDate||'';q('qrStatus').textContent=data.message;}catch(e){q('qrStatus').textContent='Không đọc được QR: '+e.message;}}
 q('scanQr').onclick=()=>{const f=q('cccdQrFile').files[0];if(!f)return alert('Hãy chọn ảnh có mã QR trên CCCD');scanQrBlob(f);};

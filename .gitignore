@@ -13,3 +13,4 @@ anpr-service/*.pt
 anpr-service/.EasyOCR/
 anpr-service/.ultralytics/
 *.log
+qa_*
