@@ -8,6 +8,14 @@ if (Test-Path 'C:\Program Files\Java\jdk-21.0.12') {
     $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
 }
 
+$laragon = 'D:\laragon_new\laragon.exe'
+$mysqlClient = 'D:\laragon_new\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe'
+
+if (Test-Path 'C:\Program Files\Java\jdk-21.0.12') {
+    $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21.0.12'
+    $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
+}
+
 # Kiem tra va giai phong port 8080
 try {
     $health = Invoke-RestMethod -Uri 'http://localhost:8080/api/parking/health' -TimeoutSec 2
