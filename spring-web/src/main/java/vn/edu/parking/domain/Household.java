@@ -1,6 +1,7 @@
 package vn.edu.parking.domain;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "households", uniqueConstraints = @UniqueConstraint(columnNames = "household_code"))
@@ -16,6 +17,13 @@ public class Household {
     private Integer maxTwoWheelers;
     private Integer maxCars;
     private boolean active = true;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void initializeCreatedAt() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -33,4 +41,6 @@ public class Household {
     public void setMaxCars(Integer maxCars) { this.maxCars = maxCars; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
