@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Ảnh tải lên quá lớn</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
+<body><header th:replace="~{fragments :: header}"></header><main>
+<section class="card">
+    <h1>Không thể lưu hồ sơ</h1>
+    <p class="notice" th:text="${message}">Ảnh tải lên quá lớn.</p>
+    <p>Hãy quay lại, chọn ảnh JPG nhỏ hơn hoặc giảm độ phân giải rồi lưu lại hồ sơ.</p>
+    <button type="button" onclick="history.back()">Quay lại form đăng ký</button>
+</section>
+</main></body></html>

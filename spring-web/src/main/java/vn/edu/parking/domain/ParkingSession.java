@@ -27,13 +27,16 @@ public class ParkingSession {
     private VehicleType detectedVehicleType = VehicleType.MOTORBIKE;
     @Column(nullable = false, precision = 12, scale = 0)
     private BigDecimal fee = BigDecimal.ZERO;
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean manualOverride;
     @ManyToOne(fetch = FetchType.EAGER)
     private FamilyMember entryMember;
     @ManyToOne(fetch = FetchType.EAGER)
     private FamilyMember exitMember;
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean entryFaceVerified;
     private Double entryFaceSimilarity;
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean exitFaceVerified;
     private Double exitFaceSimilarity;
     @Column(length = 500)

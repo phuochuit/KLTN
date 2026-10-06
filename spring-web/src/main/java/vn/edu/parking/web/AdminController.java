@@ -121,7 +121,7 @@ public class AdminController {
             @RequestParam String chassisNumber, @RequestParam String engineNumber,
             @RequestParam(required = false) Integer seatCount,
             @RequestParam(required = false) Integer cylinderCapacityCc,
-            @RequestParam String registrationImagePath, RedirectAttributes redirect) {
+            @RequestParam(required = false) MultipartFile registrationImage, RedirectAttributes redirect) {
         String normalizedCitizenId = citizenId.replaceAll("\\D", "");
         if (normalizedCitizenId.length() != 12)
             throw new IllegalArgumentException("Số CCCD phải gồm đúng 12 chữ số");
@@ -180,7 +180,11 @@ public class AdminController {
         vehicle.setEngineNumber(requireText(engineNumber, "Số máy"));
         vehicle.setSeatCount(seatCount);
         vehicle.setCylinderCapacityCc(cylinderCapacityCc);
-        vehicle.setRegistrationImagePath(requireText(registrationImagePath, "Ảnh/đường dẫn giấy đăng ký xe"));
+        String savedRegImage = imageStorage.save(registrationImage, "");
+        if (savedRegImage != null)
+            vehicle.setRegistrationImagePath(savedRegImage);
+        if (vehicle.getRegistrationImagePath() == null || vehicle.getRegistrationImagePath().isBlank())
+            throw new IllegalArgumentException("Ảnh giấy đăng ký xe không được để trống");
         vehicle.setAuthorizedMembers(new LinkedHashSet<>(List.of(member)));
         vehicle.setActive(true);
         vehicle = vehicles.save(vehicle);
@@ -207,6 +211,7 @@ public class AdminController {
             @RequestParam(required = false) Integer seatCount,
             @RequestParam(required = false) Integer cylinderCapacityCc,
             @RequestParam FuelType fuelType,
+            @RequestParam(required = false) MultipartFile registrationImage,
             @RequestParam(required = false, defaultValue = "") String registrationImagePath,
             RedirectAttributes redirect) {
         String plate = PlateNormalizer.normalize(plateNumber);
@@ -245,7 +250,14 @@ public class AdminController {
         vehicle.setSeatCount(seatCount);
         vehicle.setCylinderCapacityCc(cylinderCapacityCc);
         vehicle.setFuelType(fuelType);
-        vehicle.setRegistrationImagePath(requireText(registrationImagePath, "Ảnh giấy đăng ký xe"));
+        
+        String savedRegImage = imageStorage.save(registrationImage, "");
+        if (savedRegImage != null) {
+            vehicle.setRegistrationImagePath(savedRegImage);
+        } else if (vehicle.getRegistrationImagePath() == null || vehicle.getRegistrationImagePath().isBlank()) {
+            vehicle.setRegistrationImagePath(requireText(registrationImagePath, "Ảnh giấy đăng ký xe"));
+        }
+        
         LinkedHashSet<FamilyMember> authorized = new LinkedHashSet<>();
         authorized.add(owner);
         if (authorizedMemberIds != null) {

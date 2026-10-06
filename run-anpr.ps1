@@ -50,23 +50,29 @@ function Test-VenvPython {
     } catch { return $false }
 }
 
-try {
-    $health = Invoke-RestMethod -Uri 'http://localhost:8001/health' -TimeoutSec 2
-    if ($health.status -eq 'UP' -and $health.service -eq 'parking-anpr' -and $health.version -eq '3.1-face-threshold') {
-        Write-Host 'ANPR API is already running at http://localhost:8001' -ForegroundColor Green
-        exit 0
-    }
-    if ($health.status -eq 'UP' -and $health.service -eq 'parking-anpr') {
-        throw 'ANPR API cu dang chay. Hay dong cua so Parking ANPR cu, sau do chay lai run-all.cmd.'
-    }
-} catch {
-    if ($_.Exception.Message -like 'ANPR API cu*') { throw }
-    # ANPR API is not running yet.
-}
-
 $occupied = Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue
 if ($occupied) {
-    throw 'Port 8001 is being used by another application.'
+    # A just-started Uvicorn process can reserve its port before /health is
+    # ready. Wait briefly, then distinguish our running ANPR service from a
+    # real port conflict instead of showing a misleading generic error.
+    $health = $null
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            $health = Invoke-RestMethod -Uri 'http://localhost:8001/health' -TimeoutSec 5
+            if ($health.status -eq 'UP' -and $health.service -eq 'parking-anpr') { break }
+            $health = $null
+        } catch {
+            Start-Sleep -Milliseconds 500
+        }
+    }
+    if ($health) {
+        Write-Host 'ANPR API dang chay san tai http://localhost:8001. Khong can mo run-anpr.cmd lan thu hai.' -ForegroundColor Green
+        exit 0
+    }
+    $processId = $occupied[0].OwningProcess
+    $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+    $processName = if ($process) { $process.ProcessName } else { 'unknown' }
+    throw "Cong 8001 dang duoc tien trinh $processName (PID $processId) su dung, nhung khong phai ANPR API. Hay dong tien trinh do hoac doi cong."
 }
 
 if (-not (Test-VenvPython)) {
@@ -94,4 +100,12 @@ if ($currentHash -ne $installedHash) {
 
 Write-Host 'ANPR API: http://localhost:8001' -ForegroundColor Green
 Push-Location $service
-try { & $python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 } finally { Pop-Location }
+try {
+    while ($true) {
+        & $python -m uvicorn app.main:app --host 0.0.0.0 --port 8001
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) { break } # Ctrl+C or a normal shutdown.
+        Write-Warning "ANPR native runtime stopped unexpectedly (exit code $exitCode). Restarting in 2 seconds..."
+        Start-Sleep -Seconds 2
+    }
+} finally { Pop-Location }

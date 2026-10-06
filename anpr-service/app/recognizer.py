@@ -17,10 +17,25 @@ from .schemas import BoundingBox, RecognitionResponse
 
 CAR_CLASS = "car"
 MOTORCYCLE_CLASSES = {"motorcycle", "motorbike"}
+VIETNAM_PLATE_PATTERN = re.compile(r"^\d{2}[A-Z]{1,2}\d{4,6}$")
 
 
 def normalize_plate(value: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", (value or "").upper())
+
+
+def plate_format_score(value: str) -> float:
+    """Ưu tiên chuỗi có cấu trúc gần với biển số Việt Nam.
+
+    Hàm chỉ dùng để xếp hạng các kết quả OCR, không tự ý sửa ký tự vì sửa
+    đoán có thể biến một biển sai thành biển có vẻ hợp lệ.
+    """
+    text = normalize_plate(value)
+    if VIETNAM_PLATE_PATTERN.fullmatch(text):
+        return 0.35
+    if 7 <= len(text) <= 10 and text[:2].isdigit():
+        return 0.12
+    return 0.0
 
 
 def vehicle_type_from_detections(detections: list[tuple[str, float]]) -> tuple[str, float]:
@@ -123,7 +138,7 @@ class AnprRecognizer:
             message=message,
         )
 
-    def recognize_video(self, path: Path, max_frames: int = 24) -> RecognitionResponse:
+    def recognize_video(self, path: Path, max_frames: int = 12) -> RecognitionResponse:
         capture = cv2.VideoCapture(str(path))
         if not capture.isOpened():
             raise ValueError("Không mở được video")
@@ -146,6 +161,10 @@ class AnprRecognizer:
                     score += min(len(response.plate_text), 10) / 100
                 if best is None or score > best.score:
                     best = Candidate(response, score)
+
+                # Early stop for video if we have a highly confident plate
+                if best.score > 0.85 and 7 <= len(best.response.plate_text) <= 10:
+                    break
         finally:
             capture.release()
         if best is None:
@@ -160,7 +179,10 @@ class AnprRecognizer:
         gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
         equalized = cv2.equalizeHist(gray)
         denoised = cv2.bilateralFilter(equalized, 7, 35, 35)
-        variants = [enlarged, equalized, denoised]
+
+        # Ảnh cân bằng + khử nhiễu thường tốt nhất với biển số ngoài trời.
+        # Chạy nó trước để đa số trường hợp chỉ cần một lượt OCR.
+        variants = [denoised, equalized, enlarged]
 
         best_text, best_conf, best_quality = "", 0.0, -1.0
         with self._lock:
@@ -171,22 +193,61 @@ class AnprRecognizer:
                     paragraph=False,
                     allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
                 )
-                ordered = sorted(
-                    results,
-                    key=lambda item: (
-                        round(self._box_center(item[0])[1] / 35),
-                        self._box_center(item[0])[0],
-                    ),
-                )
+                ordered = self._order_ocr_results(results)
                 text = normalize_plate("".join(str(item[1]) for item in ordered))
-                confidence = (
-                    float(np.mean([float(item[2]) for item in ordered])) if ordered else 0.0
-                )
+                token_lengths = [max(1, len(normalize_plate(str(item[1])))) for item in ordered]
+                confidence = (sum(float(item[2]) * length for item, length in zip(ordered, token_lengths))
+                              / sum(token_lengths)) if ordered else 0.0
                 plausible_length = 7 <= len(text) <= 10
-                quality = confidence + min(len(text), 10) / 50 + (0.15 if plausible_length else 0.0)
+                format_score = plate_format_score(text)
+                quality = confidence + min(len(text), 10) / 50 + format_score
                 if text and quality > best_quality:
                     best_text, best_conf, best_quality = text, confidence, quality
+
+                # Dừng ngay khi đã có biển đúng cấu trúc và độ tin cậy tốt.
+                # Nhờ vậy ảnh rõ chỉ chạy một biến thể OCR thay vì cả ba.
+                if confidence >= 0.82 and format_score >= 0.35:
+                    break
         return best_text, best_conf
+
+    @classmethod
+    def _order_ocr_results(cls, results: list) -> list:
+        """Ghép OCR theo từng dòng rồi từ trái sang phải.
+
+        Cách cũ chia tọa độ Y cho một hằng số 35 nên biển hai dòng có thể bị
+        xen ký tự dòng dưới vào dòng trên khi kích thước crop thay đổi.
+        """
+        if len(results) < 2:
+            return list(results)
+
+        items = []
+        heights = []
+        for item in results:
+            points = item[0]
+            x, y = cls._box_center(points)
+            ys = [float(point[1]) for point in points]
+            height = max(ys) - min(ys)
+            heights.append(max(1.0, height))
+            items.append((x, y, item))
+
+        row_tolerance = max(18.0, float(np.median(heights)) * 0.55)
+        rows: list[dict[str, object]] = []
+        for x, y, item in sorted(items, key=lambda value: value[1]):
+            nearest = min(rows, key=lambda row: abs(y - float(row["center_y"])), default=None)
+            if nearest is None or abs(y - float(nearest["center_y"])) > row_tolerance:
+                rows.append({"center_y": y, "items": [(x, item)]})
+            else:
+                row_items = nearest["items"]
+                assert isinstance(row_items, list)
+                row_items.append((x, item))
+                nearest["center_y"] = (float(nearest["center_y"]) * (len(row_items) - 1) + y) / len(row_items)
+
+        ordered = []
+        for row in sorted(rows, key=lambda value: float(value["center_y"])):
+            row_items = row["items"]
+            assert isinstance(row_items, list)
+            ordered.extend(item for _, item in sorted(row_items, key=lambda value: value[0]))
+        return ordered
 
     @staticmethod
     def _box_center(points: list[list[float]]) -> tuple[float, float]:
