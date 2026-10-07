@@ -16,3 +16,6 @@ anpr-service/.ultralytics/
 qa_*
 spring-web/src/main/resources/application.properties
 spring-web/src/main/resources/application-laragon.properties
+
+# Local AI / coding-agent tooling
+.opencode/
