@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $PSScriptRoot
 $localDotnet = Join-Path $workspace 'tools\dotnet\dotnet.exe'
 $globalDotnet = Get-Command 'dotnet.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
 $dotnet = $globalDotnet

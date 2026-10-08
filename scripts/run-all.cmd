@@ -1,5 +1,5 @@
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0.."
 echo Dang khoi dong Web Spring Boot...
 start "Parking Web" powershell.exe -NoExit -NoProfile -ExecutionPolicy Bypass -File "%~dp0run-web.ps1"
 timeout /t 5 /nobreak >nul

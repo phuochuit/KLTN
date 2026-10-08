@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $PSScriptRoot
 $mysqlClient = 'mysql-2709ad1f-phuoc190305-fcdc.e.aivencloud.com, Port: 26805, User: avnadmin'
 
 function Test-MySqlLogin {
@@ -40,7 +40,7 @@ if ($web) {
 
 Start-Process -FilePath 'powershell.exe' -ArgumentList @(
     '-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-    '-File', (Join-Path $workspace 'run-web-laragon.ps1')
+    '-File', (Join-Path $PSScriptRoot 'run-web-laragon.ps1')
 ) -WorkingDirectory $workspace
 
 $ready = $false
@@ -55,8 +55,8 @@ if (-not $ready) { throw 'Spring Web khong ket noi duoc MySQL. Xem loi trong cua
 
 Start-Process -FilePath 'powershell.exe' -ArgumentList @(
     '-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-    '-File', (Join-Path $workspace 'run-anpr.ps1')
+    '-File', (Join-Path $PSScriptRoot 'run-anpr.ps1')
 ) -WorkingDirectory $workspace
 Start-Sleep -Seconds 5
-& (Join-Path $workspace 'run-desktop.ps1')
+& (Join-Path $PSScriptRoot 'run-desktop.ps1')
 $env:PARKING_DB_PASSWORD = $null

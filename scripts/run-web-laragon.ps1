@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $PSScriptRoot
 $localMaven = Join-Path $workspace 'tools\apache-maven-3.9.11\bin\mvn.cmd'
 $maven = if (Test-Path $localMaven) { $localMaven } else { 'mvn' }
 

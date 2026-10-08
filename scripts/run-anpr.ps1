@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $PSScriptRoot
 $service = Join-Path $workspace 'anpr-service'
 $venv = Join-Path $service '.venv'
 $python = Join-Path $venv 'Scripts\python.exe'
