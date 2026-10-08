@@ -7,6 +7,8 @@ tools/apache-maven-*/
 tools/apache-maven-*.zip
 tools/dotnet/
 tools/dotnet-install.ps1
+**/.venv/
+**/.venv.*/
 anpr-service/.venv/
 anpr-service/.venv.incompatible.*/
 anpr-service/*.pt
@@ -14,8 +16,28 @@ anpr-service/.EasyOCR/
 anpr-service/.ultralytics/
 *.log
 qa_*
+!evidence/qa/
+!evidence/qa/**
 spring-web/src/main/resources/application.properties
 spring-web/src/main/resources/application-laragon.properties
 
 # Local AI / coding-agent tooling
-.opencode/
+/AGENTS.md
+/.opencode/
+/.codegraph/
+
+# Local task plans and execution tracking
+/tasks/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Local environment secrets
+.env
+.env.*
+!.env.example
