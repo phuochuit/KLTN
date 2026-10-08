@@ -2,7 +2,7 @@ from pathlib import Path
 from docx import Document
 
 
-SOURCE = Path(r"D:\Code\KhoaLuan\De_cuong_chi_tiet_KLCN_QL_BaiDoXe.docx")
+SOURCE = Path(__file__).resolve().parents[1] / "evidence" / "thesis" / "De_cuong_chi_tiet_KLCN_QL_BaiDoXe.docx"
 OUTPUT = Path(r"D:\Code\KhoaLuan\De_cuong_chi_tiet_KLCN_QL_BaiDoXe_KHONG_SAC_XE_DIEN.docx")
 
 
