@@ -118,7 +118,6 @@ public class AdminController {
             @RequestParam(required = false, defaultValue = "") String permanentAddress,
             @RequestParam(required = false) LocalDate cccdIssueDate,
             @RequestParam(required = false, defaultValue = "") String cccdIssuePlace,
-            @RequestParam(required = false, defaultValue = "") String cccdQrRaw,
             @RequestParam(required = false) MultipartFile registrationFaceImage,
             @RequestParam(required = false, defaultValue = "") String registrationFaceCapture,
             @RequestParam String plateNumber, @RequestParam VehicleType vehicleType,
@@ -159,7 +158,7 @@ public class AdminController {
         member.setPermanentAddress(permanentAddress.trim());
         member.setCccdIssueDate(cccdIssueDate);
         member.setCccdIssuePlace(cccdIssuePlace.trim());
-        member.setCccdQrRaw(cccdQrRaw.trim());
+        member.setCccdQrRaw(null);
         member.setActive(true);
         String savedFace = imageStorage.save(registrationFaceImage, registrationFaceCapture);
         if (savedFace != null)
@@ -359,7 +358,6 @@ public class AdminController {
             @RequestParam(required = false) LocalDate cccdIssueDate,
             @RequestParam(required = false, defaultValue = "") String cccdIssuePlace,
             @RequestParam(required = false, defaultValue = "") String oldCitizenId,
-            @RequestParam(required = false, defaultValue = "") String cccdQrRaw,
             @RequestParam(required = false) MultipartFile registrationFaceImage,
             @RequestParam(required = false, defaultValue = "") String registrationFaceCapture,
             RedirectAttributes redirect) {
@@ -391,7 +389,7 @@ public class AdminController {
         member.setCccdIssueDate(cccdIssueDate);
         member.setCccdIssuePlace(cccdIssuePlace.trim());
         member.setOldCitizenId(oldCitizenId.replaceAll("\\D", ""));
-        member.setCccdQrRaw(cccdQrRaw.trim());
+        member.setCccdQrRaw(null);
         String savedImage = imageStorage.save(registrationFaceImage, registrationFaceCapture);
         if (savedImage != null)
             member.setRegistrationFaceImagePath(savedImage);
@@ -442,7 +440,6 @@ public class AdminController {
         data.put("permanentAddress", m.getPermanentAddress());
         data.put("cccdIssueDate", m.getCccdIssueDate());
         data.put("cccdIssuePlace", m.getCccdIssuePlace());
-        data.put("cccdQrRaw", m.getCccdQrRaw());
         data.put("registrationFaceImagePath", m.getRegistrationFaceImagePath());
         return data;
     }

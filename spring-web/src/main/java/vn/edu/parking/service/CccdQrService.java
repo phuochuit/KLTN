@@ -17,7 +17,7 @@ import java.util.Map;
 
 @Service
 public class CccdQrService {
-    public record CccdQrResult(String raw, String citizenId, String oldCitizenId, String fullName,
+    public record CccdQrResult(String citizenId, String oldCitizenId, String fullName,
                                LocalDate dateOfBirth, String gender, String permanentAddress,
                                LocalDate issueDate) { }
 
@@ -35,7 +35,7 @@ public class CccdQrService {
             String raw = new MultiFormatReader().decode(bitmap, hints).getText();
             String[] parts = raw.split("\\|", -1);
             if (parts.length < 7) throw new IllegalArgumentException("QR đọc được nhưng không đúng cấu trúc dữ liệu CCCD Việt Nam");
-            return new CccdQrResult(raw, digits(parts[0]), digits(parts[1]), parts[2].trim(),
+            return new CccdQrResult(digits(parts[0]), digits(parts[1]), parts[2].trim(),
                 parseDate(parts[3], "ngày sinh"), parts[4].trim(), parts[5].trim(), parseDate(parts[6], "ngày cấp"));
         } catch (NotFoundException ex) {
             throw new IllegalArgumentException("Không tìm thấy mã QR rõ ràng. Hãy chụp gần hơn, lấy nét và tránh phản sáng");

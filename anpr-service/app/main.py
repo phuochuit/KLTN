@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import shutil
 import tempfile
 import base64
+import hmac
+import os
 from functools import lru_cache
 from pathlib import Path
 from threading import Lock
-from urllib.request import urlopen
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse, Response
-from pydantic import BaseModel
 
 from .face_engine import FaceEngine, decode_image
 from .recognizer import AnprRecognizer
@@ -23,6 +22,12 @@ SERVICE_VERSION = "4.0-robust-liveness"
 app = FastAPI(title="Parking ANPR Service", version=SERVICE_VERSION)
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".wmv", ".m4v", ".webm"}
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_VIDEO_BYTES = 10 * 1024 * 1024
+
+
+class CameraUnavailableError(RuntimeError):
+    pass
 
 
 @lru_cache(maxsize=1)
@@ -44,9 +49,16 @@ def preload_recognizer() -> None:
     recognizer().recognize_frame(np.zeros((640, 640, 3), dtype=np.uint8))
 
 
-class CameraFaceRequest(BaseModel):
-    registeredImageUrl: str
-    cameraIndex: int = 0
+def require_internal_service(authorization: str | None = Header(default=None)) -> None:
+    expected_token = os.environ.get("ANPR_SERVICE_TOKEN", "")
+    if (len(expected_token) < 32 or not expected_token.isascii()
+            or any(ord(char) < 0x21 or ord(char) > 0x7e for char in expected_token)):
+        raise HTTPException(503, "ANPR service authentication is not configured")
+    scheme, separator, supplied_token = (authorization or "").partition(" ")
+    if (not separator or scheme.lower() != "bearer" or not supplied_token or not supplied_token.isascii()
+            or not hmac.compare_digest(supplied_token, expected_token)):
+        raise HTTPException(401, "Valid internal service credentials are required",
+                            headers={"WWW-Authenticate": "Bearer"})
 
 
 def capture_camera_frame(camera_index: int) -> np.ndarray:
@@ -55,14 +67,14 @@ def capture_camera_frame(camera_index: int) -> np.ndarray:
         camera = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
         try:
             if not camera.isOpened():
-                raise ValueError("Không mở được camera")
+                raise CameraUnavailableError("Camera is unavailable")
             frame = None
             for _ in range(12):
                 ok, candidate = camera.read()
                 if ok:
                     frame = candidate
             if frame is None:
-                raise ValueError("Camera không trả về hình ảnh")
+                raise CameraUnavailableError("Camera is unavailable")
             return frame
         finally:
             camera.release()
@@ -74,7 +86,7 @@ def capture_camera_frames(camera_index: int, count: int = 8) -> list[np.ndarray]
         camera = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
         try:
             if not camera.isOpened():
-                raise ValueError("Không mở được camera")
+                raise CameraUnavailableError("Camera is unavailable")
             frames = []
             for _ in range(12):
                 camera.read()
@@ -83,7 +95,7 @@ def capture_camera_frames(camera_index: int, count: int = 8) -> list[np.ndarray]
                 if ok:
                     frames.append(frame)
             if not frames:
-                raise ValueError("Camera không trả về hình ảnh")
+                raise CameraUnavailableError("Camera is unavailable")
             return frames
         finally:
             camera.release()
@@ -119,14 +131,8 @@ def liveness_score(frames: list[np.ndarray]) -> float:
 
 
 @app.get("/health")
-def health() -> dict[str, str | bool]:
-    return {
-        "status": "UP",
-        "service": "parking-anpr",
-        "version": SERVICE_VERSION,
-        "modelLoaded": recognizer.cache_info().currsize > 0,
-        "faceModelsReady": face_engine.models_ready,
-    }
+def health() -> dict[str, str]:
+    return {"status": "UP"}
 
 
 @app.get("/", include_in_schema=False)
@@ -139,23 +145,28 @@ def favicon() -> Response:
     return Response(status_code=204)
 
 
-@app.post("/face/verify")
+@app.post("/face/verify", dependencies=[Depends(require_internal_service)])
 async def verify_face(registration: UploadFile = File(...), realtime: UploadFile = File(...)) -> dict:
     try:
-        return face_engine.compare(decode_image(await registration.read()), decode_image(await realtime.read()))
+        registration_bytes = await registration.read(MAX_IMAGE_BYTES + 1)
+        realtime_bytes = await realtime.read(MAX_IMAGE_BYTES + 1)
+        if len(registration_bytes) > MAX_IMAGE_BYTES or len(realtime_bytes) > MAX_IMAGE_BYTES:
+            raise HTTPException(413, "Ảnh khuôn mặt vượt quá 10 MB")
+        return face_engine.compare(decode_image(registration_bytes), decode_image(realtime_bytes))
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(503, str(exc)) from exc
+        raise HTTPException(503, "Face recognition is unavailable") from exc
 
 
-@app.post("/face/verify-camera")
-def verify_face_camera(request: CameraFaceRequest) -> dict:
-    if not request.registeredImageUrl.startswith(("http://localhost:", "http://127.0.0.1:")):
-        raise HTTPException(400, "Ảnh đăng ký phải được lấy từ Spring API cục bộ")
+@app.post("/face/verify-camera", dependencies=[Depends(require_internal_service)])
+async def verify_face_camera(registration: UploadFile = File(...), cameraIndex: int = Form(default=0)) -> dict:
     try:
-        frames = capture_camera_frames(request.cameraIndex, count=8)
-        registered = decode_image(urlopen(request.registeredImageUrl, timeout=10).read())
+        registration_bytes = await registration.read(MAX_IMAGE_BYTES + 1)
+        if len(registration_bytes) > MAX_IMAGE_BYTES:
+            raise HTTPException(413, "Ảnh đăng ký vượt quá 10 MB")
+        frames = capture_camera_frames(cameraIndex, count=8)
+        registered = decode_image(registration_bytes)
         # Score every captured frame (plus a contrast-normalized copy)
         # and keep the clearest match instead of trusting the last frame.
         result = face_engine.compare_best(registered, frames)
@@ -166,15 +177,17 @@ def verify_face_camera(request: CameraFaceRequest) -> dict:
         ok, encoded = cv2.imencode(".jpg", frame)
         result["realtimeImageBase64"] = base64.b64encode(encoded).decode() if ok else ""
         return result
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(503, str(exc)) from exc
+        raise HTTPException(503, "Camera or face recognition is unavailable") from exc
     except Exception as exc:
         raise HTTPException(502, "Không tải được ảnh đăng ký: " + str(exc)) from exc
 
 
-@app.post("/face/capture-camera")
+@app.post("/face/capture-camera", dependencies=[Depends(require_internal_service)])
 def capture_face_camera() -> dict:
     try:
         frames = capture_camera_frames(0, count=8)
@@ -187,35 +200,44 @@ def capture_face_camera() -> dict:
         return {"decision":"CAPTURED","similarity":0.0,"message":"Đã chụp một khuôn mặt rõ ràng","realtimeImageBase64":data}
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, "Camera or face recognition is unavailable") from exc
 
 
-@app.post("/recognize/image", response_model=RecognitionResponse, response_model_by_alias=True)
+@app.post("/recognize/image", response_model=RecognitionResponse, response_model_by_alias=True,
+          dependencies=[Depends(require_internal_service)])
 async def recognize_image(file: UploadFile = File(...)) -> RecognitionResponse:
     suffix = Path(file.filename or "image.jpg").suffix.lower()
     if suffix not in IMAGE_EXTENSIONS:
         raise HTTPException(400, "Định dạng ảnh không được hỗ trợ")
-    data = await file.read()
-    if len(data) > 25 * 1024 * 1024:
-        raise HTTPException(413, "Ảnh vượt quá 25 MB")
+    data = await file.read(MAX_IMAGE_BYTES + 1)
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(413, "Ảnh vượt quá 10 MB")
     try:
         return recognizer().recognize_image_bytes(data)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
 
-@app.post("/recognize/video", response_model=RecognitionResponse, response_model_by_alias=True)
+@app.post("/recognize/video", response_model=RecognitionResponse, response_model_by_alias=True,
+          dependencies=[Depends(require_internal_service)])
 async def recognize_video(file: UploadFile = File(...)) -> RecognitionResponse:
     suffix = Path(file.filename or "video.mp4").suffix.lower()
     if suffix not in VIDEO_EXTENSIONS:
         raise HTTPException(400, "Định dạng video không được hỗ trợ")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
-        shutil.copyfileobj(file.file, temp)
-        temp_path = Path(temp.name)
+    data = await file.read(MAX_VIDEO_BYTES + 1)
+    if len(data) > MAX_VIDEO_BYTES:
+        raise HTTPException(413, "Video vượt quá 10 MB")
+    temp_root = Path(os.environ.get("ANPR_TEMP_DIR", Path(__file__).resolve().parents[1] / "var" / "tmp"))
+    temp_root.mkdir(parents=True, exist_ok=True)
+    temp_path = None
     try:
-        if temp_path.stat().st_size > 250 * 1024 * 1024:
-            raise HTTPException(413, "Video vượt quá 250 MB")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir=temp_root) as temp:
+            temp_path = Path(temp.name)
+            temp.write(data)
         return recognizer().recognize_video(temp_path)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     finally:
-        temp_path.unlink(missing_ok=True)
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)

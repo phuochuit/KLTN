@@ -8,15 +8,16 @@ public record ParkingRequest(
     [property: JsonPropertyName("vehicleType")] string VehicleType,
     [property: JsonPropertyName("manualOverride")] bool ManualOverride,
     [property: JsonPropertyName("familyMemberId")] long? FamilyMemberId,
-    [property: JsonPropertyName("faceVerified")] bool FaceVerified,
-    [property: JsonPropertyName("faceSimilarity")] double? FaceSimilarity,
-    [property: JsonPropertyName("realtimeFaceImageBase64")] string RealtimeFaceImageBase64);
+    [property: JsonPropertyName("evidenceId")] string? EvidenceId,
+    [property: JsonPropertyName("faceEvidenceId")] string? FaceEvidenceId,
+    [property: JsonPropertyName("override")] ManualOverrideRequest? Override = null);
+
+public record ManualOverrideRequest([property: JsonPropertyName("reason")] string Reason);
 
 public record AuthorizedMemberResponse(
     [property: JsonPropertyName("id")] long Id,
     [property: JsonPropertyName("fullName")] string FullName,
     [property: JsonPropertyName("relationship")] string Relationship,
-    [property: JsonPropertyName("registrationFaceImagePath")] string RegistrationFaceImagePath,
     [property: JsonPropertyName("faceImageAvailable")] bool FaceImageAvailable)
 { public override string ToString() => $"{FullName} ({Relationship})"; }
 
@@ -46,15 +47,15 @@ public record ResidentLookupResponse(
     [property: JsonPropertyName("validUntil")] DateTime? ValidUntil,
     [property: JsonPropertyName("monthlyValid")] bool MonthlyValid,
     [property: JsonPropertyName("message")] string Message,
-    [property: JsonPropertyName("authorizedMembers")] List<AuthorizedMemberResponse> AuthorizedMembers,
-    [property: JsonPropertyName("guestEntryFaceImagePath")] string GuestEntryFaceImagePath);
+    [property: JsonPropertyName("authorizedMembers")] List<AuthorizedMemberResponse> AuthorizedMembers);
 
 public record FaceVerificationResponse(
     [property: JsonPropertyName("decision")] string Decision,
     [property: JsonPropertyName("similarity")] double Similarity,
-    [property: JsonPropertyName("matchThreshold")] double MatchThreshold,
+    [property: JsonPropertyName("matchThreshold")] double? MatchThreshold,
     [property: JsonPropertyName("message")] string Message,
-    [property: JsonPropertyName("realtimeImageBase64")] string RealtimeImageBase64);
+    [property: JsonPropertyName("realtimeImageBase64")] string RealtimeImageBase64,
+    [property: JsonPropertyName("evidenceId")] string? EvidenceId);
 
 public record ParkingSlotResponse(
     [property: JsonPropertyName("id")] long Id,
@@ -90,13 +91,11 @@ public record UnassignedSessionResponse(
     [property: JsonPropertyName("plateNumber")] string PlateNumber,
     [property: JsonPropertyName("vehicleType")] string VehicleType,
     [property: JsonPropertyName("entryTime")] string EntryTime,
-    [property: JsonPropertyName("ownerName")] string OwnerName);
+    [property: JsonPropertyName("slotCode")] string SlotCode);
 
 public record UnassignedVehicleResponse(
     [property: JsonPropertyName("id")] long Id,
     [property: JsonPropertyName("plateNumber")] string PlateNumber,
-    [property: JsonPropertyName("ownerName")] string OwnerName,
-    [property: JsonPropertyName("apartmentNumber")] string ApartmentNumber,
     [property: JsonPropertyName("vehicleType")] string VehicleType);
 
 public record BoundingBox(
@@ -114,4 +113,6 @@ public record AnprResponse(
     [property: JsonPropertyName("boundingBox")] BoundingBox? BoundingBox,
     [property: JsonPropertyName("frameIndex")] int FrameIndex,
     [property: JsonPropertyName("annotatedImageBase64")] string AnnotatedImageBase64,
-    [property: JsonPropertyName("message")] string Message);
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("evidenceId")] string? EvidenceId,
+    [property: JsonPropertyName("processingStatus")] string? ProcessingStatus = null);

@@ -22,31 +22,48 @@ public class ParkingService {
     private final PricingRuleRepository pricingRules;
     private final FamilyMemberRepository members;
     private final ParkingSlotRepository slots;
-    private final ResidentImageStorage imageStorage;
+    private final SecurityAuditService audit;
 
     public ParkingService(VehicleRepository vehicles, ParkingCardRepository cards,
                           ParkingSessionRepository sessions, PricingRuleRepository pricingRules,
                           FamilyMemberRepository members, ParkingSlotRepository slots,
-                          ResidentImageStorage imageStorage) {
+                          SecurityAuditService audit) {
         this.vehicles = vehicles;
         this.cards = cards;
         this.sessions = sessions;
         this.pricingRules = pricingRules;
         this.members = members;
         this.slots = slots;
-        this.imageStorage = imageStorage;
+        this.audit = audit;
     }
 
     @Transactional
     public ParkingResponse enter(EntryRequest request) {
+        return enter(request, null);
+    }
+
+    @Transactional
+    public ParkingResponse enter(EntryRequest request, GateEvidenceService.FaceProof faceProof) {
+        return enter(request, faceProof, null, null);
+    }
+
+    @Transactional
+    public ParkingResponse enter(EntryRequest request, GateEvidenceService.FaceProof faceProof,
+            GateEvidenceService.Recognition recognition,
+            org.springframework.security.core.Authentication authentication) {
+        rejectClientFaceVerificationClaims(request.faceVerified(), request.faceSimilarity());
+        String overrideCode = validateEntryOverride(request, faceProof, recognition, authentication);
+        boolean faceVerified = faceProof != null && "PASS".equals(faceProof.decision());
+        if (faceProof != null && !java.util.Objects.equals(faceProof.familyMemberId(), request.familyMemberId()))
+            throw new IllegalArgumentException("Face evidence does not match the selected family member");
         String plate = requirePlate(request.plateNumber());
         if (sessions.existsByEntryPlateIgnoreCaseAndStatus(plate, SessionStatus.OPEN)) {
             throw new IllegalStateException("Xe " + plate + " đã có lượt đang mở");
         }
 
         Vehicle vehicle = vehicles.findByPlateNumberIgnoreCase(plate).orElse(null);
-        FamilyMember driver = verifyDriver(vehicle, request.familyMemberId(), request.faceVerified(),
-            request.faceSimilarity(), request.manualOverride());
+        FamilyMember driver = verifyDriver(vehicle, request.familyMemberId(), overrideCode,
+            faceVerified, faceProof, recognition);
         ParkingCard card = resolveCard(request.cardCode());
         VehicleType cameraType = parseDetectedType(request.vehicleType());
         boolean warning = false;
@@ -84,20 +101,39 @@ public class ParkingService {
         session.setEntryMember(driver);
         session.setEntryTime(LocalDateTime.now());
         session.setStatus(SessionStatus.OPEN);
-        session.setEntryFaceVerified(request.faceVerified());
-        session.setEntryFaceSimilarity(request.faceSimilarity());
-        if (request.realtimeFaceImageBase64() != null && !request.realtimeFaceImageBase64().isBlank()) {
-            session.setEntryFaceImagePath(imageStorage.saveCaptured(request.realtimeFaceImageBase64()));
-        }
+        session.setManualOverride(overrideCode != null);
+        session.setEntryFaceVerified(faceVerified);
+        session.setEntryFaceSimilarity(faceVerified ? faceProof.similarity() : null);
+        if (vehicle == null && faceProof != null && "CAPTURED".equals(faceProof.decision()))
+            session.setEntryFaceImagePath("gate-evidence:" + faceProof.evidenceId());
         session = sessions.save(session);
         assignSlot(session);
+        if (overrideCode != null) {
+            audit.record(authentication, "OVERRIDE_ENTRY", "PARKING_SESSION", session.getId().toString(),
+                "SUCCESS", overrideAuditReason(overrideCode, request.override().reason()), recognition.evidenceId());
+        }
         return toResponse(session, message, warning);
     }
 
     @Transactional(readOnly = true)
     public ParkingResponse previewExit(ExitRequest request) {
+        return previewExit(request, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ParkingResponse previewExit(ExitRequest request, GateEvidenceService.FaceProof faceProof) {
+        return previewExit(request, faceProof, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ParkingResponse previewExit(ExitRequest request, GateEvidenceService.FaceProof faceProof,
+            GateEvidenceService.Recognition recognition,
+            org.springframework.security.core.Authentication authentication) {
+        rejectClientVerificationClaims(request.faceVerified(), request.faceSimilarity(), request.manualOverride());
+        String overrideCode = validateExitOverride(request, faceProof, recognition, authentication);
         ParkingSession session = findOpenSession(request.plateNumber(), request.cardCode());
-        verifyGuestExit(session, request.faceVerified(), request.manualOverride());
+        validateExitFaceProof(request, faceProof);
+        verifyGuestExit(session, faceProof, overrideCode, recognition);
         LocalDateTime exitTime = LocalDateTime.now();
         BigDecimal fee = calculateFee(session, exitTime);
         ParkingResponse r = toResponse(session, "Xem trước phí gửi xe", false);
@@ -107,15 +143,36 @@ public class ParkingService {
 
     @Transactional
     public ParkingResponse confirmExit(ExitRequest request) {
+        return confirmExit(request, null);
+    }
+
+    @Transactional
+    public ParkingResponse confirmExit(ExitRequest request, GateEvidenceService.FaceProof faceProof) {
+        return confirmExit(request, faceProof, null, null);
+    }
+
+    @Transactional
+    public ParkingResponse confirmExit(ExitRequest request, GateEvidenceService.FaceProof faceProof,
+            GateEvidenceService.Recognition recognition,
+            org.springframework.security.core.Authentication authentication) {
+        rejectClientVerificationClaims(request.faceVerified(), request.faceSimilarity(), request.manualOverride());
+        String overrideCode = validateExitOverride(request, faceProof, recognition, authentication);
         ParkingSession session = findOpenSession(request.plateNumber(), request.cardCode());
-        verifyGuestExit(session, request.faceVerified(), request.manualOverride());
+        validateExitFaceProof(request, faceProof);
+        verifyGuestExit(session, faceProof, overrideCode, recognition);
         session.setExitPlate(PlateNormalizer.normalize(request.plateNumber()));
         session.setExitTime(LocalDateTime.now());
         session.setFee(calculateFee(session, session.getExitTime()));
         session.setStatus(SessionStatus.COMPLETED);
-        session.setExitFaceVerified(request.faceVerified());
-        session.setExitFaceSimilarity(request.faceSimilarity());
+        session.setManualOverride(overrideCode != null);
+        boolean faceVerified = faceProof != null && "PASS".equals(faceProof.decision());
+        session.setExitFaceVerified(faceVerified);
+        session.setExitFaceSimilarity(faceVerified ? faceProof.similarity() : null);
         session = sessions.save(session);
+        if (overrideCode != null) {
+            audit.record(authentication, "OVERRIDE_EXIT", "PARKING_SESSION", session.getId().toString(),
+                "SUCCESS", overrideAuditReason(overrideCode, request.override().reason()), recognition.evidenceId());
+        }
         slots.findFirstByCurrentSessionId(session.getId()).ifPresent(slot -> {
             slot.setCurrentSession(null);
             slots.save(slot);
@@ -265,11 +322,22 @@ public class ParkingService {
     }
 
     public ParkingSlotResponse toSlotResponse(ParkingSlot slot) {
+        return toSlotResponse(slot, true);
+    }
+
+    public ParkingSlotResponse toOperationalSlotResponse(ParkingSlot slot) {
+        return toSlotResponse(slot, false);
+    }
+
+    private ParkingSlotResponse toSlotResponse(ParkingSlot slot, boolean includeResidentContacts) {
         LocalDateTime now = LocalDateTime.now();
         String assignedPlate = slot.getAssignedVehicle() == null ? "" : slot.getAssignedVehicle().getPlateNumber();
-        String ownerName = slot.getAssignedVehicle() == null ? "" : slot.getAssignedVehicle().getEffectiveOwnerName();
-        String ownerPhone = slot.getAssignedVehicle() == null ? "" : slot.getAssignedVehicle().getOwnerPhone();
-        String apartment = slot.getAssignedVehicle() == null ? "" : slot.getAssignedVehicle().getEffectiveApartmentNumber();
+        String ownerName = !includeResidentContacts || slot.getAssignedVehicle() == null ? null
+            : slot.getAssignedVehicle().getEffectiveOwnerName();
+        String ownerPhone = !includeResidentContacts || slot.getAssignedVehicle() == null ? null
+            : slot.getAssignedVehicle().getOwnerPhone();
+        String apartment = !includeResidentContacts || slot.getAssignedVehicle() == null ? null
+            : slot.getAssignedVehicle().getEffectiveApartmentNumber();
 
         String occupiedPlate = slot.getCurrentSession() == null ? "" : slot.getCurrentSession().getEntryPlate();
         LocalDateTime entryTime = slot.getCurrentSession() == null ? null : slot.getCurrentSession().getEntryTime();
@@ -394,14 +462,14 @@ public class ParkingService {
         throw new IllegalStateException("Không tìm thấy lượt xe vào đang mở");
     }
 
-    private FamilyMember verifyDriver(Vehicle vehicle, Long memberId, boolean faceVerified,
-                                      Double faceSimilarity, boolean manualOverride) {
-        if (vehicle == null) return null; // Khách vãng lai chỉ đối chiếu ảnh vào/ra ở nghiệp vụ riêng.
+    private FamilyMember verifyDriver(Vehicle vehicle, Long memberId, String overrideCode, boolean faceVerified,
+            GateEvidenceService.FaceProof faceProof, GateEvidenceService.Recognition recognition) {
+        boolean manualOverride = overrideCode != null;
+        if (vehicle == null) {
+            if (manualOverride) throw new IllegalStateException("Manual override requires an authorized resident member");
+            return null; // Khách vãng lai chỉ đối chiếu ảnh vào/ra ở nghiệp vụ riêng.
+        }
         if (memberId == null) {
-            boolean hasFaceProfile = vehicle.getAuthorizedMembers().stream().anyMatch(m ->
-                m.getRegistrationFaceImagePath() != null && !m.getRegistrationFaceImagePath().isBlank());
-            if (!hasFaceProfile) return null; // dữ liệu cũ được phép đi qua để quản trị viên bổ sung ảnh sau
-            if (manualOverride) return null;
             throw new IllegalStateException("Hãy chọn thành viên gia đình đang điều khiển xe");
         }
         FamilyMember member = members.findById(memberId)
@@ -410,17 +478,148 @@ public class ParkingService {
             .anyMatch(item -> item.getId().equals(member.getId()));
         if (!authorized) throw new IllegalStateException("Thành viên này không được đăng ký sử dụng xe");
         if (member.getRegistrationFaceImagePath() == null || member.getRegistrationFaceImagePath().isBlank()) {
-            if (!manualOverride) throw new IllegalStateException("Thành viên chưa có ảnh khuôn mặt đăng ký");
-        } else if (!faceVerified && !manualOverride) {
+            if (!"MISSING_REFERENCE_IMAGE".equals(overrideCode))
+                throw new IllegalStateException("Thành viên chưa có ảnh khuôn mặt đăng ký");
+        } else if ("MISSING_REFERENCE_IMAGE".equals(overrideCode)) {
+            throw new IllegalStateException("Manual override is only allowed when the registration face image is missing");
+        } else if ("AI_REVIEW".equals(overrideCode)
+                && faceProof != null && "REVIEW".equals(faceProof.decision())) {
+            // A backend-linked REVIEW result requires the audited manual decision.
+        } else if ("RECOGNITION_SERVICE_UNAVAILABLE".equals(overrideCode)
+                && (recognition.recognitionUnavailable()
+                    || "UNAVAILABLE".equals(recognition.faceVerificationStatus()))) {
+            // Spring recorded an upstream outage for this operation; the reasoned override is auditable.
+        } else if (!faceVerified) {
             throw new IllegalStateException("Khuôn mặt realtime chưa khớp ảnh đăng ký");
         }
         return member;
     }
 
-    private void verifyGuestExit(ParkingSession session, boolean faceVerified, boolean manualOverride) {
+    private void verifyGuestExit(ParkingSession session, GateEvidenceService.FaceProof faceProof,
+            String overrideCode, GateEvidenceService.Recognition recognition) {
+        boolean faceVerified = faceProof != null && "PASS".equals(faceProof.decision());
+        boolean reviewed = "AI_REVIEW".equals(overrideCode) && faceProof != null
+            && "REVIEW".equals(faceProof.decision());
+        boolean faceServiceUnavailable = "RECOGNITION_SERVICE_UNAVAILABLE".equals(overrideCode)
+            && recognition != null && "UNAVAILABLE".equals(recognition.faceVerificationStatus());
         if (session.getVehicle() == null && session.getEntryFaceImagePath() != null
-            && !session.getEntryFaceImagePath().isBlank() && !faceVerified && !manualOverride)
+            && !session.getEntryFaceImagePath().isBlank() && !faceVerified && !reviewed && !faceServiceUnavailable)
             throw new IllegalStateException("Khách vãng lai phải xác thực khuôn mặt ra với ảnh đã chụp lúc vào");
+    }
+
+    private static void validateExitFaceProof(ExitRequest request, GateEvidenceService.FaceProof faceProof) {
+        if (faceProof != null && (!"PASS".equals(faceProof.decision()) && !"REVIEW".equals(faceProof.decision())
+                || !java.util.Objects.equals(faceProof.familyMemberId(), request.familyMemberId())))
+            throw new IllegalArgumentException("Face evidence does not match the selected exit operation");
+    }
+
+    private String validateEntryOverride(EntryRequest request, GateEvidenceService.FaceProof faceProof,
+            GateEvidenceService.Recognition recognition,
+            org.springframework.security.core.Authentication authentication) {
+        if (request.manualOverride())
+            throw new IllegalArgumentException("Client manualOverride claims are not accepted");
+        if (faceProof != null && "REJECT".equals(faceProof.decision()))
+            throw new IllegalStateException("Backend face verification rejected the operation");
+        String exception = null;
+        if (recognition != null) {
+            if (recognition.recognitionUnavailable()) {
+                if (faceProof == null || (!"PASS".equals(faceProof.decision())
+                        && !"REVIEW".equals(faceProof.decision()))
+                        || !java.util.Objects.equals(recognition.faceEvidenceId(), faceProof.evidenceId()))
+                    throw new IllegalStateException("Backend face evidence is required when recognition is unavailable");
+                exception = "REVIEW".equals(faceProof.decision()) ? "AI_REVIEW"
+                    : "RECOGNITION_SERVICE_UNAVAILABLE";
+            } else if ("UNAVAILABLE".equals(recognition.faceVerificationStatus())) {
+                exception = "RECOGNITION_SERVICE_UNAVAILABLE";
+            } else if ("REVIEW".equals(recognition.faceVerificationStatus())) {
+                if (faceProof == null || !"REVIEW".equals(faceProof.decision())
+                        || !java.util.Objects.equals(recognition.faceEvidenceId(), faceProof.evidenceId()))
+                    throw new IllegalStateException("A linked backend REVIEW result is required");
+                exception = "AI_REVIEW";
+            }
+        }
+        if (exception == null && isMissingAuthorizedMemberImage(request, recognition))
+            exception = "MISSING_REFERENCE_IMAGE";
+        if (request.override() == null) {
+            if (exception != null) throw new IllegalStateException("A reasoned manual override is required");
+            return null;
+        }
+        authorizeOverride(authentication, request.override().reason());
+        if (exception == null) throw new IllegalStateException("No supported override exception is present");
+        return exception;
+    }
+
+    private String validateExitOverride(ExitRequest request, GateEvidenceService.FaceProof faceProof,
+            GateEvidenceService.Recognition recognition,
+            org.springframework.security.core.Authentication authentication) {
+        if (request.manualOverride())
+            throw new IllegalArgumentException("Client manualOverride claims are not accepted");
+        if (faceProof != null && "REJECT".equals(faceProof.decision()))
+            throw new IllegalStateException("Backend face verification rejected the operation");
+        String exception = null;
+        if (recognition != null) {
+            if (recognition.recognitionUnavailable()) {
+                if (faceProof == null || (!"PASS".equals(faceProof.decision())
+                        && !"REVIEW".equals(faceProof.decision()))
+                        || !java.util.Objects.equals(recognition.faceEvidenceId(), faceProof.evidenceId()))
+                    throw new IllegalStateException("Backend face evidence is required when recognition is unavailable");
+                exception = "REVIEW".equals(faceProof.decision()) ? "AI_REVIEW"
+                    : "RECOGNITION_SERVICE_UNAVAILABLE";
+            } else if ("UNAVAILABLE".equals(recognition.faceVerificationStatus())) {
+                exception = "RECOGNITION_SERVICE_UNAVAILABLE";
+            } else if ("REVIEW".equals(recognition.faceVerificationStatus())) {
+                if (faceProof == null || !"REVIEW".equals(faceProof.decision())
+                        || !java.util.Objects.equals(recognition.faceEvidenceId(), faceProof.evidenceId()))
+                    throw new IllegalStateException("A linked backend REVIEW result is required");
+                exception = "AI_REVIEW";
+            }
+        }
+        if (request.override() == null) {
+            if (exception != null) throw new IllegalStateException("A reasoned manual override is required");
+            return null;
+        }
+        authorizeOverride(authentication, request.override().reason());
+        if (exception == null) throw new IllegalStateException("No supported override exception is present");
+        return exception;
+    }
+
+    private boolean isMissingAuthorizedMemberImage(EntryRequest request,
+            GateEvidenceService.Recognition recognition) {
+        if (recognition == null || request.familyMemberId() == null) return false;
+        Vehicle vehicle = vehicles.findByPlateNumberIgnoreCase(recognition.plateNumber()).orElse(null);
+        if (vehicle == null) return false;
+        return members.findById(request.familyMemberId())
+            .filter(FamilyMember::isActive)
+            .filter(member -> vehicle.getAuthorizedMembers().stream()
+                .anyMatch(authorized -> authorized.getId().equals(member.getId())))
+            .map(member -> member.getRegistrationFaceImagePath() == null
+                || member.getRegistrationFaceImagePath().isBlank())
+            .orElse(false);
+    }
+
+    private static void authorizeOverride(org.springframework.security.core.Authentication authentication,
+            String reason) {
+        if (authentication == null || authentication.getAuthorities().stream()
+                .noneMatch(authority -> "OVERRIDE_CREATE".equals(authority.getAuthority())))
+            throw new org.springframework.security.access.AccessDeniedException("Override permission is required");
+        if (reason == null || reason.trim().length() < 10 || reason.trim().length() > 450)
+            throw new IllegalArgumentException("A specific override reason between 10 and 450 characters is required");
+    }
+
+    private static String overrideAuditReason(String exception, String reason) {
+        return exception + ": " + reason.trim();
+    }
+
+    private void rejectClientVerificationClaims(boolean faceVerified, Double faceSimilarity, boolean manualOverride) {
+        if (faceVerified || faceSimilarity != null || manualOverride) {
+            throw new IllegalArgumentException("Client-supplied verification and override claims are not accepted");
+        }
+    }
+
+    private void rejectClientFaceVerificationClaims(boolean faceVerified, Double faceSimilarity) {
+        if (faceVerified || faceSimilarity != null) {
+            throw new IllegalArgumentException("Client-supplied face verification claims are not accepted");
+        }
     }
 
     private BigDecimal calculateFee(ParkingSession session, LocalDateTime exitTime) {

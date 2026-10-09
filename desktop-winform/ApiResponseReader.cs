@@ -10,7 +10,7 @@ public static class ApiResponseReader
     {
         string body = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(BuildHttpError(response.StatusCode, body, serviceName, action));
+            throw CreateHttpError(response.StatusCode, body, serviceName, action);
 
         if (string.IsNullOrWhiteSpace(body))
             throw new InvalidOperationException($"{serviceName} không trả về dữ liệu khi {action}.\n\nCách xử lý: đóng và chạy lại dịch vụ, sau đó bấm Kiểm tra.");
@@ -60,6 +60,21 @@ public static class ApiResponseReader
         return $"Không thể {action}.\n\nDịch vụ: {service}\nNguyên nhân: {reason}\n\nCách xử lý: kiểm tra dịch vụ bằng nút Kiểm tra; nếu vẫn lỗi, đóng các cửa sổ dịch vụ cũ và chạy lại run-all-laragon.cmd.";
     }
 
+    public static async Task EnsureSuccessAsync(HttpResponseMessage response, string serviceName, string action)
+    {
+        if (!response.IsSuccessStatusCode)
+            throw CreateHttpError(response.StatusCode, await response.Content.ReadAsStringAsync(), serviceName, action);
+    }
+
+    private static Exception CreateHttpError(HttpStatusCode status, string body, string service, string action) => status switch
+    {
+        HttpStatusCode.Unauthorized => new DesktopAuthenticationException(
+            "Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Hãy đăng nhập lại trước khi tiếp tục."),
+        HttpStatusCode.Forbidden => new DesktopAuthorizationException(
+            "Tài khoản hiện tại không có quyền thực hiện thao tác này."),
+        _ => new InvalidOperationException(BuildHttpError(status, body, service, action))
+    };
+
     private static string ExtractMessage(string body)
     {
         if (string.IsNullOrWhiteSpace(body) || LooksLikeHtml(body)) return "";
@@ -73,3 +88,7 @@ public static class ApiResponseReader
         return body.Length <= 300 ? body : body[..300];
     }
 }
+
+public sealed class DesktopAuthenticationException(string message) : InvalidOperationException(message);
+
+public sealed class DesktopAuthorizationException(string message) : InvalidOperationException(message);

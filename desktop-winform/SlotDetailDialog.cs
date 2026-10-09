@@ -236,7 +236,7 @@ public sealed class SlotDetailDialog : Form
             _cboResidentVehicles.Items.Add("-- Chọn xe cư dân --");
             foreach (var v in unassignedVehicles)
             {
-                _cboResidentVehicles.Items.Add(new ComboBoxItem(v.Id, $"{v.PlateNumber} - {v.OwnerName} ({v.ApartmentNumber})"));
+                _cboResidentVehicles.Items.Add(new ComboBoxItem(v.Id, $"{v.PlateNumber} ({v.VehicleType})"));
             }
             _cboResidentVehicles.SelectedIndex = 0;
 
@@ -246,7 +246,8 @@ public sealed class SlotDetailDialog : Form
             _cboRecentSessions.Items.Add("-- Chọn xe vừa vào trạm --");
             foreach (var s in recentSessions)
             {
-                _cboRecentSessions.Items.Add(new ComboBoxItem(s.SessionId, $"{s.PlateNumber} | {s.OwnerName}"));
+                string slot = string.IsNullOrWhiteSpace(s.SlotCode) ? "Chưa có ô" : $"Đang ở ô {s.SlotCode}";
+                _cboRecentSessions.Items.Add(new ComboBoxItem(s.SessionId, $"{s.PlateNumber} | {slot}"));
             }
             _cboRecentSessions.SelectedIndex = 0;
 

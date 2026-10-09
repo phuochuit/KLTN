@@ -30,22 +30,30 @@ public sealed class MainForm : Form
         Text = "Chưa tra cứu cư dân"
     };
     private readonly CheckBox _manual = new() { Text = "Xác nhận thủ công khi AI cảnh báo", AutoSize = true };
+    private readonly CheckBox _entryOverride = new() { Text = "Yêu cầu override có kiểm soát", AutoSize = true, Visible = false };
+    private readonly CheckBox _exitOverride = new() { Text = "Yêu cầu override có kiểm soát", AutoSize = true, Visible = false };
+    private readonly TextBox _entryOverrideReason = new() { Width = 280, MaxLength = 450 };
+    private readonly TextBox _exitOverrideReason = new() { Width = 280, MaxLength = 450 };
+    private Control? _entryOverrideReasonField;
+    private Control? _exitOverrideReasonField;
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
     private readonly ComboBox _entryMember = new() { Width = 250, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox _exitMember = new() { Width = 250, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly FlowLayoutPanel _mapPanel = new() { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true };
     private readonly Label _barrierState = new() { Text = "BARRIER: ĐANG ĐÓNG", AutoSize = true, ForeColor = Color.Firebrick, Font = new Font("Segoe UI", 10, FontStyle.Bold), Margin = new Padding(8, 17, 5, 0) };
-    private bool _entryFaceVerified, _exitFaceVerified;
-    private double? _entryFaceSimilarity, _exitFaceSimilarity;
     private long? _entryVerifiedMemberId, _exitVerifiedMemberId;
-    private string _entryGuestFaceBase64 = "", _exitGuestFacePath = "";
+    private string? _entryFaceEvidenceId, _exitFaceEvidenceId;
+    private string? _entryEvidenceId, _exitEvidenceId;
     private bool _barrierOpen;
+    private bool _entryRecognitionUnavailable, _entryFaceReview, _entryFaceUnavailable;
+    private bool _exitRecognitionUnavailable, _exitFaceReview, _exitFaceUnavailable;
     private ParkingResponse? _lastPreview;
     private string _detectedType = "UNKNOWN";
 
     public MainForm()
     {
         _mapPanel.Resize += (_, _) => ResizeSlots(_mapPanel);
+        _entryMember.SelectedIndexChanged += (_, _) => UpdateOverrideControls();
 
         OnSharedMapUpdated += () => {
             if (!this.IsDisposed && this.IsHandleCreated)
@@ -72,7 +80,19 @@ public sealed class MainForm : Form
         root.Controls.Add(BuildBody(), 0, 1);
         root.Controls.Add(_manual, 0, 2);
 
-        this.Shown += async (_, _) => await CheckServicesAsync();
+        this.Shown += async (_, _) =>
+        {
+            ConfigureApis();
+            using var login = new DesktopLoginDialog(_parkingApi.LoginAsync);
+            if (login.ShowDialog(this) != DialogResult.OK)
+            {
+                Close();
+                return;
+            }
+            await CheckServicesAsync();
+        };
+        FormClosing += LogoutBeforeClose;
+        FormClosed += (_, _) => _parkingApi.Dispose();
     }
 
     private Control BuildHeader()
@@ -82,6 +102,7 @@ public sealed class MainForm : Form
         panel.Controls.Add(HeaderField("Spring API", _parkingUrl));
         panel.Controls.Add(HeaderField("ANPR API", _anprUrl));
         panel.Controls.Add(CreateButton("Kiểm tra", async (_, _) => await CheckServicesAsync()));
+        panel.Controls.Add(CreateButton("Đăng xuất", (_, _) => Close()));
         panel.Controls.Add(CreateButton("Sơ đồ bãi", (_, _) => { ConfigureApis(); new ParkingMapForm(_parkingApi).Show(this); }));
         panel.Controls.Add(CreateButton("MỞ BARRIER", (_, _) => SetBarrier(true, "Mở thủ công")));
         panel.Controls.Add(CreateButton("ĐÓNG BARRIER", (_, _) => SetBarrier(false, "Đóng thủ công")));
@@ -129,6 +150,10 @@ public sealed class MainForm : Form
         flow.Controls.Add(ComboField("Người đang điều khiển", _entryMember));
         flow.Controls.Add(CreateButton("CHỤP & XÁC THỰC KHUÔN MẶT", async (_, _) => await VerifyFaceAsync(true)));
         flow.Controls.Add(CreateButton("CHỤP ẢNH KHÁCH VÃNG LAI", async (_, _) => await CaptureGuestAsync()));
+        flow.Controls.Add(_entryOverride);
+        _entryOverrideReasonField = Field("Lý do cụ thể (bắt buộc)", _entryOverrideReason);
+        _entryOverrideReasonField.Visible = false;
+        flow.Controls.Add(_entryOverrideReasonField);
         flow.Controls.Add(new Label { Text = "Cư dân / gói gửi xe", AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold) });
         flow.Controls.Add(_residentInfo);
         flow.Controls.Add(CreateButton("XÁC NHẬN XE VÀO", async (_, _) => await EntryAsync()));
@@ -145,6 +170,10 @@ public sealed class MainForm : Form
         flow.Controls.Add(CreateButton("TRA CỨU NGƯỜI ĐƯỢC PHÉP", async (_, _) => await LookupResidentAsync(false)));
         flow.Controls.Add(ComboField("Người đang lấy xe", _exitMember));
         flow.Controls.Add(CreateButton("CHỤP & XÁC THỰC KHUÔN MẶT", async (_, _) => await VerifyFaceAsync(false)));
+        flow.Controls.Add(_exitOverride);
+        _exitOverrideReasonField = Field("Lý do cụ thể (bắt buộc)", _exitOverrideReason);
+        _exitOverrideReasonField.Visible = false;
+        flow.Controls.Add(_exitOverrideReasonField);
         flow.Controls.Add(CreateButton("XEM TRƯỚC PHÍ", async (_, _) => await PreviewExitAsync()));
         flow.Controls.Add(CreateButton("XÁC NHẬN XE RA", async (_, _) => await ConfirmExitAsync()));
         tab.Controls.Add(flow);
@@ -165,8 +194,8 @@ public sealed class MainForm : Form
             SetBusy(true, video ? "Đang lấy mẫu frame và nhận dạng video..." : "Đang nhận dạng ảnh...");
             if (!video) ShowLocalImage(dialog.FileName);
             AnprResponse response = video
-                ? await _anprApi.RecognizeVideoAsync(dialog.FileName)
-                : await _anprApi.RecognizeImageAsync(dialog.FileName);
+                ? await _parkingApi.RecognizeVideoAsync(dialog.FileName, _tabs.SelectedIndex == 0 ? "ENTRY" : "EXIT")
+                : await _parkingApi.RecognizeImageAsync(dialog.FileName, _tabs.SelectedIndex == 0 ? "ENTRY" : "EXIT");
             ApplyRecognition(response);
         }
         catch (Exception ex) { ShowError(ex); }
@@ -177,8 +206,31 @@ public sealed class MainForm : Form
     {
         _detectedType = response.VehicleType;
         _vehicleType.Text = DisplayVehicleType(response.VehicleType);
-        if (_tabs.SelectedIndex == 0) _entryPlate.Text = response.PlateText;
-        else _exitPlate.Text = response.PlateText;
+        if (_tabs.SelectedIndex == 0)
+        {
+            _entryPlate.Text = response.PlateText;
+            _entryEvidenceId = response.EvidenceId;
+            _entryFaceEvidenceId = null;
+            _entryVerifiedMemberId = null;
+            _entryRecognitionUnavailable = "UNAVAILABLE".Equals(response.ProcessingStatus, StringComparison.OrdinalIgnoreCase);
+            _entryFaceReview = false;
+            _entryFaceUnavailable = false;
+            _entryOverride.Checked = false;
+            _entryOverrideReason.Clear();
+        }
+        else
+        {
+            _exitPlate.Text = response.PlateText;
+            _exitEvidenceId = response.EvidenceId;
+            _exitFaceEvidenceId = null;
+            _exitVerifiedMemberId = null;
+            _exitRecognitionUnavailable = "UNAVAILABLE".Equals(response.ProcessingStatus, StringComparison.OrdinalIgnoreCase);
+            _exitFaceReview = false;
+            _exitFaceUnavailable = false;
+            _exitOverride.Checked = false;
+            _exitOverrideReason.Clear();
+        }
+        UpdateOverrideControls();
         if (!string.IsNullOrWhiteSpace(response.AnnotatedImageBase64))
         {
             byte[] bytes = Convert.FromBase64String(response.AnnotatedImageBase64);
@@ -190,7 +242,9 @@ public sealed class MainForm : Form
         bool lowConfidence = string.IsNullOrWhiteSpace(response.PlateText) || response.OcrConfidence < 0.45 || response.DetectionConfidence < 0.25;
         _manual.Checked = lowConfidence;
         _aiStatus.ForeColor = lowConfidence ? Color.DarkOrange : Color.SeaGreen;
-        _aiStatus.Text = $"{response.Message} | Biển số: {response.PlateText} | {DisplayVehicleType(response.VehicleType)} | YOLO {response.DetectionConfidence:P0} | OCR {response.OcrConfidence:P0} | frame {response.FrameIndex}";
+        _aiStatus.Text = response.ProcessingStatus == "UNAVAILABLE"
+            ? response.Message
+            : $"{response.Message} | Biển số: {response.PlateText} | {DisplayVehicleType(response.VehicleType)} | YOLO {response.DetectionConfidence:P0} | OCR {response.OcrConfidence:P0} | frame {response.FrameIndex}";
         if (_tabs.SelectedIndex == 0 && !string.IsNullOrWhiteSpace(response.PlateText))
             _ = LookupResidentAsync();
     }
@@ -215,11 +269,12 @@ public sealed class MainForm : Form
             ConfigureApis();
             var response = await _parkingApi.EntryAsync(Request(_entryPlate.Text, _entryCard.Text));
             ShowParkingResult(response);
+            _entryEvidenceId = null;
             if(!response.Warning || _manual.Checked) AutoOpenBarrier("Xe vào đã được xác nhận");
             NotifyMapUpdated();
             _exitPlate.Text = response.PlateNumber;
             _exitCard.Text = response.CardCode;
-            _entryGuestFaceBase64 = "";
+            _entryFaceEvidenceId = null;
 
             if (!response.Warning || _manual.Checked)
             {
@@ -246,8 +301,9 @@ public sealed class MainForm : Form
             ResidentLookupResponse resident = await _parkingApi.LookupResidentAsync(plate, card);
             ComboBox combo = entry ? _entryMember : _exitMember;
             combo.DataSource = resident.AuthorizedMembers?.ToList() ?? new List<AuthorizedMemberResponse>();
-            if(!entry) _exitGuestFacePath=resident.GuestEntryFaceImagePath ?? "";
-            if(entry){_entryFaceVerified=false;_entryFaceSimilarity=null;_entryVerifiedMemberId=null;}else{_exitFaceVerified=false;_exitFaceSimilarity=null;_exitVerifiedMemberId=null;}
+            UpdateOverrideControls();
+            if (entry) { _entryFaceEvidenceId = null; _entryVerifiedMemberId = null; }
+            else { _exitFaceEvidenceId = null; _exitVerifiedMemberId = null; }
             _residentInfo.BackColor = resident.Registered && resident.CardMatched
                 ? Color.FromArgb(234, 245, 239) : Color.FromArgb(255, 247, 230);
             string pass = resident.PassType switch
@@ -259,7 +315,7 @@ public sealed class MainForm : Form
                 _ => "Chưa gán thẻ / gói"
             };
             _residentInfo.Text = resident.Registered
-                ? $"Cư dân: {resident.OwnerName}\r\nCăn hộ: {Blank(resident.ApartmentNumber)}\r\nĐiện thoại: {Blank(resident.OwnerPhone)}\r\nGói: {pass}\r\n{resident.Message}"
+                ? $"Cư dân: {resident.OwnerName}\r\nCăn hộ: {Blank(resident.ApartmentNumber)}\r\nGói: {pass}\r\n{resident.Message}"
                 : $"KHÁCH VÃNG LAI\r\n{resident.Message}";
         }
         catch (Exception ex)
@@ -292,6 +348,8 @@ public sealed class MainForm : Form
             ConfigureApis();
             var response = await _parkingApi.ConfirmExitAsync(Request(_exitPlate.Text, _exitCard.Text));
             ShowParkingResult(response);
+            _exitEvidenceId = null;
+            _exitFaceEvidenceId = null;
             if(!response.Warning || _manual.Checked) AutoOpenBarrier("Xe ra đã được xác nhận");
             NotifyMapUpdated();
             _lastPreview = null;
@@ -311,30 +369,96 @@ public sealed class MainForm : Form
         {
             ConfigureApis();
             SetBusy(true, "Đang chụp và xác thực khuôn mặt...");
-            var combo=entry?_entryMember:_exitMember;
-            string path;
-            if(combo.SelectedItem is AuthorizedMemberResponse member){if(!member.FaceImageAvailable)throw new InvalidOperationException("Thành viên chưa có ảnh đăng ký");path=member.RegistrationFaceImagePath;}
-            else if(!entry && !string.IsNullOrWhiteSpace(_exitGuestFacePath)) path=_exitGuestFacePath;
-            else throw new InvalidOperationException(entry?"Cư dân: hãy chọn thành viên. Khách: dùng nút chụp ảnh khách vãng lai.":"Không tìm thấy ảnh khuôn mặt lúc vào");
-            var response=await _anprApi.VerifyCameraAsync(_parkingUrl.Text.TrimEnd('/')+path);
-            bool pass=response.Decision=="PASS";
-            if(entry){_entryFaceVerified=pass;_entryFaceSimilarity=response.Similarity;_entryVerifiedMemberId=(combo.SelectedItem as AuthorizedMemberResponse)?.Id;}else{_exitFaceVerified=pass;_exitFaceSimilarity=response.Similarity;_exitVerifiedMemberId=(combo.SelectedItem as AuthorizedMemberResponse)?.Id;}
-            if(!string.IsNullOrWhiteSpace(response.RealtimeImageBase64)){using var ms=new MemoryStream(Convert.FromBase64String(response.RealtimeImageBase64));using var img=Image.FromStream(ms);_preview.Image?.Dispose();_preview.Image=new Bitmap(img);}
-            _result.Text=$"Xác thực khuôn mặt: {DisplayFaceDecision(response.Decision)}\r\nĐiểm tương đồng SFace: {response.Similarity:0.000}\r\nNgưỡng cho phép: từ {response.MatchThreshold:0.000}\r\n{response.Message}";
-            _result.BackColor=pass?Color.Honeydew:Color.MistyRose;
+            string plate = entry ? _entryPlate.Text : _exitPlate.Text;
+            var member = (entry ? _entryMember : _exitMember).SelectedItem as AuthorizedMemberResponse;
+            if (string.IsNullOrWhiteSpace(plate))
+                throw new InvalidOperationException("Hãy nhận dạng hoặc nhập biển số trước khi xác thực khuôn mặt.");
+            if (entry && member is null)
+                throw new InvalidOperationException("Cư dân: hãy chọn thành viên. Khách: dùng nút chụp ảnh khách vãng lai.");
+            if (member is { FaceImageAvailable: false })
+            {
+                if (entry)
+                {
+                    UpdateOverrideControls();
+                    _result.Text = "Thành viên chưa có ảnh đăng ký. Có thể gửi yêu cầu override có lý do; máy chủ sẽ kiểm tra lại tình trạng này.";
+                    return;
+                }
+                throw new InvalidOperationException("Thành viên chưa có ảnh đăng ký.");
+            }
+
+            string operationEvidenceId = entry ? _entryEvidenceId ?? "" : _exitEvidenceId ?? "";
+            if (string.IsNullOrWhiteSpace(operationEvidenceId))
+                throw new InvalidOperationException("Hãy nhận dạng ảnh trước khi xác thực khuôn mặt.");
+            var response = await _parkingApi.VerifyFaceAsync(entry ? "ENTRY" : "EXIT", plate,
+                member?.Id, operationEvidenceId);
+            if (entry)
+            {
+                _entryFaceEvidenceId = response.Decision is "PASS" or "REVIEW" ? response.EvidenceId : null;
+                _entryVerifiedMemberId = member?.Id;
+                _entryFaceReview = response.Decision == "REVIEW";
+                _entryFaceUnavailable = response.Decision == "UNAVAILABLE";
+            }
+            else
+            {
+                _exitFaceEvidenceId = response.Decision is "PASS" or "REVIEW" ? response.EvidenceId : null;
+                _exitVerifiedMemberId = member?.Id;
+                _exitFaceReview = response.Decision == "REVIEW";
+                _exitFaceUnavailable = response.Decision == "UNAVAILABLE";
+            }
+            UpdateOverrideControls();
+            ShowCapturedFace(response);
+            string threshold = response.MatchThreshold is double value ? $"\r\nNgưỡng cho phép: từ {value:0.000}" : "";
+            _result.Text = $"Xác thực khuôn mặt: {DisplayFaceDecision(response.Decision)}\r\nĐiểm tương đồng SFace: {response.Similarity:0.000}{threshold}\r\n{response.Message}";
+            _result.BackColor = response.Decision == "PASS" ? Color.Honeydew : Color.MistyRose;
         } catch(Exception ex){ShowError(ex);}
         finally { SetBusy(false, "Chọn ảnh hoặc video để nhận dạng tự động"); }
     }
 
     private ParkingRequest Request(string plate, string card)
     {
-        bool entry=_tabs.SelectedIndex==0; var selected=(entry?_entryMember:_exitMember).SelectedItem as AuthorizedMemberResponse;
-        bool verified=entry?_entryFaceVerified:_exitFaceVerified;long? verifiedId=entry?_entryVerifiedMemberId:_exitVerifiedMemberId;
-        if(selected != null && selected.Id != verifiedId) verified=false;
-        return new(plate,card,_detectedType,_manual.Checked,selected?.Id,verified,entry?_entryFaceSimilarity:_exitFaceSimilarity,entry?_entryGuestFaceBase64:"");
+        bool entry = _tabs.SelectedIndex == 0;
+        var selected = (entry ? _entryMember : _exitMember).SelectedItem as AuthorizedMemberResponse;
+        long? verifiedMemberId = entry ? _entryVerifiedMemberId : _exitVerifiedMemberId;
+        string? faceEvidenceId = entry ? _entryFaceEvidenceId : _exitFaceEvidenceId;
+        if (selected?.Id != verifiedMemberId) faceEvidenceId = null;
+        bool requestedOverride = entry ? _entryOverride.Checked : _exitOverride.Checked;
+        string reason = (entry ? _entryOverrideReason.Text : _exitOverrideReason.Text).Trim();
+        if (requestedOverride && reason.Length < 10)
+            throw new InvalidOperationException("Nhập lý do override cụ thể (ít nhất 10 ký tự).");
+        return new(plate, card, _detectedType, false, selected?.Id,
+            entry ? _entryEvidenceId : _exitEvidenceId, faceEvidenceId,
+            requestedOverride ? new ManualOverrideRequest(reason) : null);
     }
 
-    private async Task CaptureGuestAsync(){try{ConfigureApis();var r=await _anprApi.CaptureCameraAsync();_entryGuestFaceBase64="data:image/jpeg;base64,"+r.RealtimeImageBase64;ShowCapturedFace(r);_result.Text="Ảnh khách lúc vào đã chụp và sẽ lưu tạm cùng lượt xe.";}catch(Exception ex){ShowError(ex);}}
+    private void UpdateOverrideControls()
+    {
+        var selectedEntryMember = _entryMember.SelectedItem as AuthorizedMemberResponse;
+        bool entryEligible = _entryRecognitionUnavailable || _entryFaceReview || _entryFaceUnavailable
+            || selectedEntryMember is { FaceImageAvailable: false };
+        _entryOverride.Visible = entryEligible;
+        if (_entryOverrideReasonField is not null) _entryOverrideReasonField.Visible = entryEligible;
+        if (!entryEligible) { _entryOverride.Checked = false; _entryOverrideReason.Clear(); }
+        bool exitEligible = _exitRecognitionUnavailable || _exitFaceReview || _exitFaceUnavailable;
+        _exitOverride.Visible = exitEligible;
+        if (_exitOverrideReasonField is not null) _exitOverrideReasonField.Visible = exitEligible;
+        if (!exitEligible) { _exitOverride.Checked = false; _exitOverrideReason.Clear(); }
+    }
+
+    private async Task CaptureGuestAsync()
+    {
+        try
+        {
+            ConfigureApis();
+            if (string.IsNullOrWhiteSpace(_entryPlate.Text))
+                throw new InvalidOperationException("Hãy nhận dạng hoặc nhập biển số trước khi chụp ảnh khách.");
+            var response = await _parkingApi.CaptureGuestFaceAsync(_entryPlate.Text);
+            _entryFaceEvidenceId = response.EvidenceId;
+            _entryVerifiedMemberId = null;
+            ShowCapturedFace(response);
+            _result.Text = "Ảnh khách lúc vào đã được ghi nhận làm bằng chứng riêng tư cho lượt xe.";
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
     private void ShowCapturedFace(FaceVerificationResponse r){if(string.IsNullOrWhiteSpace(r.RealtimeImageBase64))return;using var ms=new MemoryStream(Convert.FromBase64String(r.RealtimeImageBase64));using var img=Image.FromStream(ms);_preview.Image?.Dispose();_preview.Image=new Bitmap(img);}
         private async Task RefreshMapAsync()
     {
@@ -408,10 +532,13 @@ public sealed class MainForm : Form
         _residentInfo.Text = "Chưa tra cứu cư dân";
         _residentInfo.BackColor = Color.FromArgb(245, 247, 250);
         _entryMember.DataSource = null;
-        _entryFaceVerified = false;
-        _entryFaceSimilarity = null;
         _entryVerifiedMemberId = null;
-        _entryGuestFaceBase64 = "";
+        _entryFaceEvidenceId = null;
+        _entryEvidenceId = null;
+        _entryRecognitionUnavailable = _entryFaceReview = _entryFaceUnavailable = false;
+        _entryOverride.Checked = false;
+        _entryOverrideReason.Clear();
+        UpdateOverrideControls();
     }
 
     private void ClearExitForm()
@@ -428,16 +555,21 @@ public sealed class MainForm : Form
         _residentInfo.Text = "Chưa tra cứu cư dân";
         _residentInfo.BackColor = Color.FromArgb(245, 247, 250);
         _exitMember.DataSource = null;
-        _exitFaceVerified = false;
-        _exitFaceSimilarity = null;
         _exitVerifiedMemberId = null;
-        _exitGuestFacePath = "";
+        _exitFaceEvidenceId = null;
+        _exitEvidenceId = null;
+        _exitRecognitionUnavailable = _exitFaceReview = _exitFaceUnavailable = false;
+        _exitOverride.Checked = false;
+        _exitOverrideReason.Clear();
+        UpdateOverrideControls();
     }
 
     private void ShowError(Exception ex)
     {
         string message = ex switch
         {
+            DesktopAuthenticationException => "Phiên đăng nhập hết hạn hoặc bị thu hồi. Thao tác hiện tại không được gửi lại tự động; hãy kiểm tra trạng thái lượt xe rồi đăng nhập lại.",
+            DesktopAuthorizationException => "Tài khoản đã đăng nhập nhưng không được cấp quyền cho thao tác này.",
             HttpRequestException => "Không kết nối được đến dịch vụ.\r\n\r\nNguyên nhân có thể: Spring Web hoặc ANPR chưa chạy, sai địa chỉ/cổng, hoặc dịch vụ vừa bị tắt.\r\n\r\nCách xử lý: chạy run-all-laragon.cmd, chờ các dịch vụ khởi động xong rồi bấm Kiểm tra.",
             TaskCanceledException => "Dịch vụ phản hồi quá thời gian cho phép.\r\n\r\nNếu đang nhận dạng video hoặc mở camera, hãy kiểm tra camera và thử lại. Nếu không, hãy khởi động lại dịch vụ ANPR.",
             System.Text.Json.JsonException => "Máy chủ trả về dữ liệu không đúng định dạng. Có thể đang chạy phiên bản dịch vụ cũ.\r\n\r\nHãy đóng các cửa sổ Parking Web/ANPR cũ và chạy lại run-all-laragon.cmd.",
@@ -448,6 +580,19 @@ public sealed class MainForm : Form
         _result.Text = "KHÔNG THỂ THỰC HIỆN\r\n\r\n" + message;
         _aiStatus.Text = "Nhận dạng thất bại - có thể nhập biển số thủ công";
         _aiStatus.ForeColor = Color.Firebrick;
+    }
+
+    private bool _closingAfterLogout;
+
+    private async void LogoutBeforeClose(object? sender, FormClosingEventArgs e)
+    {
+        if (_closingAfterLogout || !_parkingApi.IsAuthenticated) return;
+        e.Cancel = true;
+        _closingAfterLogout = true;
+        Enabled = false;
+        try { await _parkingApi.LogoutAsync(); }
+        catch { /* Local close must proceed even when Spring is unreachable; server session then expires normally. */ }
+        finally { Close(); }
     }
 
     private void ShowLocalImage(string path)
