@@ -32,15 +32,15 @@ Cards hỗ trợ per-visit/monthly và form validity; price/pass-expiry/payment-
 | Thành phần | Quan hệ thực tế theo static source và giới hạn |
 | --- | --- |
 | Spring Web / browser | Thymeleaf pages và REST nghiệp vụ; service/repositories ghi database, filesystem media; actual datasource/profile runtime chưa xác minh |
-| Desktop WinForms | Gọi Spring lookup/entry/exit/slots; gọi trực tiếp ANPR image/video/face/capture. Base URL local mặc định; client flag/manual không signed AI evidence |
-| ANPR FastAPI | YOLO/EasyOCR plate/type, YuNet/SFace face; camera trên máy ANPR và tải reference ảnh từ Spring. Quality/readiness/model files không liveness/accuracy/integration PASS |
+| Desktop WinForms | Gọi Spring lookup/entry/exit/slots và gửi image/video/face/camera requests qua JWT API. Base URL local mặc định; client face claims không phải bằng chứng |
+| ANPR FastAPI | YOLO/EasyOCR plate/type, YuNet/SFace face; Spring đọc registration/evidence bytes và gọi protected multipart/camera routes bằng internal Bearer. Quality/readiness/model files không liveness/accuracy/live integration PASS |
 | Standalone face demo | Ba ảnh CCCD/registration/realtime qua API riêng; shared model fallback không chứng minh gate gọi demo hoặc integrated three-way identity |
 | DB/media/barrier | DB và media có failure boundary riêng; transaction không bao gồm filesystem/barrier. Barrier WinForms là label/timer mô phỏng, không relay/PLC feedback |
 
-Chi tiết và diagram ở [system](architecture/system.md), entities/constraints ở [database](architecture/database.md), method/payload/error/caller ở [contracts](api/contracts.md). Không suy ra Spring tự gọi AI từ mô tả thiết kế tổng quát; gate caller đã quan sát là Desktop → ANPR và Desktop → Spring.
+Chi tiết và diagram ở [system](architecture/system.md), entities/constraints ở [database](architecture/database.md), method/payload/error/caller ở [contracts](api/contracts.md). Current source path for processing is Desktop → authenticated Spring → internal-authenticated ANPR; H2/fake tests do not establish live cross-service or deployment behavior.
 
 ## Bảo mật, vận hành và kiểm chứng
 
-Observed [SecurityConfig](security/overview.md) cho public API/uploads/H2 và CSRF exclusions; form login không full role matrix. Liveness non-blocking/không được chứng minh, client flags, resident exit authorization, settlement, replay/offline và deployed protection còn open. Không mô tả chúng là end-to-end hoạt động.
+Observed [SecurityConfig](security/overview.md) tách Web session và Desktop JWT chains, áp dụng quyền theo route; API không được allowlist bị deny, resident uploads chỉ dành cho MANAGEMENT, còn gate evidence được giới hạn theo session/operation. Đây là source và H2 evidence, không phải deployed authorization proof. Liveness vẫn không blocking; resident exit proof/collector, settlement, replay/offline và deployment còn open.
 
-[Operations](operations/setup-and-troubleshooting.md) giải thích startup order và H2/MySQL/launcher caveats; [user guide](operations/user-guide.md) ghi đúng tên UI và simulation. [Testing](testing/strategy.md) phân biệt existing assertions, proposed tests và thực thi; không test/app được chạy trong các slice tài liệu này. [Thesis requirements](thesis/requirements.md) tách minima học thuật khỏi project commitments. Survey và source authority chưa chốt; các kết luận phải xem [implementation status](implementation-status.md) trước khi demo/nghiệm thu.
+[Operations](operations/setup-and-troubleshooting.md) giải thích startup order và H2/MySQL/launcher caveats; [user guide](operations/user-guide.md) ghi đúng tên UI và simulation. [Testing](testing/strategy.md) phân biệt test hiện diện với kết quả thực thi: Spring 108/108, Desktop 12/12 và ANPR 10/10 là các bằng chứng local đã ghi nhận, không phải live deployment/E2E evidence. [Thesis requirements](thesis/requirements.md) tách minima học thuật khỏi project commitments. Survey và source authority chưa chốt; các kết luận phải xem [implementation status](implementation-status.md) trước khi demo/nghiệm thu.

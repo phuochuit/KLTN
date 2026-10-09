@@ -64,11 +64,11 @@ Fee được tính lại khi confirm, không khóa bằng số tiền preview; k
 ## Actual call path xác thực cư dân ra và barrier
 
 - [MainForm](../../desktop-winform/MainForm.cs):139–149 có lookup/người lấy/verify/preview/confirm. :233–264 lấy authorized members active từ [controller](../../spring-web/src/main/java/vn/edu/parking/web/ParkingApiController.java):58–101.
-- MainForm :308–335 chọn member có ảnh đăng ký → [AnprApiClient](../../desktop-winform/AnprApiClient.cs):22–27 `/face/verify-camera` → [ANPR main.py](../../anpr-service/app/main.py):152–174; PASS thành cờ client, score và verified member ID. Đây là so registration–camera, không phải ba phép so exit–entry–registration/CCCD được cưỡng chế.
-- MainForm :283–305 chỉ yêu cầu `_lastPreview` cùng normalized plate rồi gọi confirm; không bắt buộc gọi VerifyFaceAsync. Server chỉ gọi verifyGuestExit, không verifyDriver resident. **Có thao tác xác thực tùy chọn không đồng nghĩa resident exit face/authorized alternative driver đã được enforced end-to-end.** familyMemberId được gửi nhưng không lưu exitMember trong confirm body đã đọc.
+- MainForm requests face verification through authenticated Spring; Spring resolves the selected active member against the vehicle, reads the registration image server-side and proxies image bytes to protected FastAPI. PASS is stored as operation/session-bound face evidence; no client URL/score is trusted. This remains registration–camera comparison, not the three-way exit–entry–registration/CCCD requirement.
+- MainForm requires a matching preview before confirm. Server supports resident exit face evidence and tests binding/consumption, but does not require a face proof for every resident exit; the selected member is not persisted as `exitMember` on confirmation. **Optional face proof is not equivalent to a required authorized-collector policy.**
 - DTO exit không gửi ảnh ra; ảnh ANPR được hiển thị :322 nhưng không lưu qua request. Chưa chứng minh side-by-side entry/exit evidence storage hay CCCD-reference matching trong luồng này; demo ba ảnh độc lập không phải bằng chứng tích hợp.
 - ANPR tính liveness nhưng bỏ khỏi blocking decision. MainForm :295,386–387 mở mô phỏng sau success, timer đóng 5 giây; :86–87 còn nút mở trực tiếp. Không phải hardware/audit fulfillment; không khóa event/confirm bằng idempotency code trong những body này.
-- [SecurityConfig](../../spring-web/src/main/java/vn/edu/parking/config/SecurityConfig.java):17–21 API/uploads permitAll, API bỏ CSRF; chưa đáp ứng mặc nhiên quyền xem ảnh/thẩm quyền gate/manual từ nguồn.
+- [SecurityConfig](../../spring-web/src/main/java/vn/edu/parking/config/SecurityConfig.java) routes Desktop operations through the JWT chain. Exit recognition is bound to the open session and consumed at confirmation; private evidence reads are audited. H2 evidence does not establish production authorization or concurrency behavior.
 
 ## Conflicts và unresolved behavior
 

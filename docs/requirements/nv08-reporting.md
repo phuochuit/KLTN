@@ -72,7 +72,7 @@ Revenue body chỉ lọc status COMPLETED cho sessions; không kiểm proof paym
 
 ## Quyền truy cập và charging variant conflict
 
-- [SecurityConfig](../../spring-web/src/main/java/vn/edu/parking/config/SecurityConfig.java):17–21 permitAll `/api/**`/uploads, các trang còn lại authenticated. Vì revenue endpoints ở `/api/parking/revenue/...`, vị trí trong AdminController không tự khiến API ADMIN-only. Bodies reporting đã đọc không cho thấy role/data projection/redaction riêng; trả sessions/payments entity lists. Không privacy/RBAC PASS.
+- [SecurityConfig](../../spring-web/src/main/java/vn/edu/parking/config/SecurityConfig.java) routes `/api/parking/revenue/**` through the Web session chain and requires MANAGEMENT; GATE_STAFF is denied and anonymous JSON receives 401 in integration tests. Revenue DTO minimization, sensitive-view/export audit and known-total correctness remain unverified.
 - Generator :347 và ảnh charging p.13 yêu cầu dashboard có **vị trí sạc**; NV06 B có quyền/ChargingSession. NV06 A trong PDF no-EV p.11 chỉ classification. R01 chưa đủ comparison chi tiết để kết luận từng dòng NV08 no-EV đã xóa vị trí sạc; giữ conflict/câu hỏi scope, không tự chọn B hoặc tự bỏ yêu cầu này.
 - ParkingSlot/xe điện trong enum không chứng minh station/ChargingSession/report charging hay hardware integration. Báo cáo code mới đọc không đủ evidence charging metrics.
 

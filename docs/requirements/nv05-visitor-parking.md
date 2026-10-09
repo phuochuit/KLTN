@@ -61,18 +61,18 @@ Symbols service thuộc [ParkingService](../../spring-web/src/main/java/vn/edu/p
 | `enter:40–94`, `verifyDriver:397–399` | Require normalized plate, precheck duplicate OPEN; vehicle lookup null → guest, bỏ resident driver helper. Không có request selector KHÁCH; không kiểm ACTIVE resident theo precondition nguồn trong nhánh này |
 | `resolveCard:470–473`, `enter:55–63` | Không thẻ được vào; supplied unknown code lỗi, known inactive lỗi. Guest vẫn có thể lưu known active card khác xe, body không cấp thẻ khách mới; session ID là output, không proof quy trình issuing visitor card |
 | `resolveVehicleType:482–491` | Guest dùng enum parsed, invalid/blank fallback MOTORBIKE; không tự coi taxonomy code bằng sáu nhóm proposal |
-| `enter:87–93` | EntryFaceImage chỉ lưu nếu base64 có; **không bắt buộc ảnh khách ở service entry**. ImageStorage được gọi nhưng body storage/privacy/rollback chưa audit |
-| [MainForm](../../desktop-winform/MainForm.cs):121–134,211–230,337–338 | Có nút CaptureGuestAsync nhưng EntryAsync không bắt buộc đã capture. Capture qua ANPR, giữ base64, gửi kèm entry, xóa biến sau response; không enrollment cư dân |
-| [ANPR main.py](../../anpr-service/app/main.py):177–189; [AnprApiClient](../../desktop-winform/AnprApiClient.cs):29–33 | `/face/capture-camera` capture 8 frames, analyze frame cuối, trả CAPTURED/base64; tính liveness không chứng minh blocking anti-spoof |
-| [controller](../../spring-web/src/main/java/vn/edu/parking/web/ParkingApiController.java):58–74; MainForm :233–250,308–335 | Lookup guest entry face từ OPEN theo plate; exit verify dùng path đó khi không selected resident member → `/face/verify-camera`; PASS thành faceVerified/score. Match pair entry–camera, không CCCD/demo ba ảnh |
+| `ParkingApiController.entry` + `ParkingService.enter` | Guest capture remains optional. When supplied, Spring-owned CAPTURED evidence is bound and consumed with the resulting parking session; the client base64 is not authoritative |
+| [MainForm](../../desktop-winform/MainForm.cs) → [ParkingApiClient](../../desktop-winform/ParkingApiClient.cs) | Capture and exit verification go through authenticated Spring. No direct Desktop face/camera-processing call to ANPR; no visitor enrollment |
+| [ANPR main.py](../../anpr-service/app/main.py) | `/face/capture-camera` and `/face/verify-camera` require internal Bearer. Spring stores private evidence; liveness calculation does not establish blocking anti-spoof |
+| [ParkingApiController](../../spring-web/src/main/java/vn/edu/parking/web/ParkingApiController.java) | Guest exit verification uses the private entry-face image for the OPEN session and requires a recent PASS proof bound to plate/session when that image exists. This is pairwise entry–camera comparison, not CCCD/standalone-demo three-image verification |
 | `findOpenSession:383–395` | OPEN mới nhất theo plate trước, card fallback qua **card.vehicle plate**; không dùng trực tiếp repository visitor card-code query trong helper. Chưa chứng minh lost visitor card/session ownership recovery |
-| `verifyGuestExit:420–423` | Chỉ guest **có entry-face path** mới bị chặn nếu !faceVerified && !manualOverride, cả preview/confirm. Guest không ảnh vào không bị helper này chặn; score client không được helper dùng threshold |
+| `verifyGuestExit` | Only guest sessions **with a stored entry-face path** require a matching recent PASS face proof at preview/confirm. Capture is optional, so a guest session without entry evidence does not trigger this conditional check. Client scores/flags cannot satisfy it |
 | `previewExit:97–105`, `confirmExit:108–126` | Preview tính tại now; confirm tính lại fee rồi COMPLETED/exit flags/score, clear slot. Không payment-confirmation/receipt/reason gate, không so plate/type hoặc lưu exit image trong body |
 | [EntryRequest](../../spring-web/src/main/java/vn/edu/parking/web/dto/EntryRequest.java):5–7; [ExitRequest](../../spring-web/src/main/java/vn/edu/parking/web/dto/ExitRequest.java):5–6 | Plate @NotBlank; flags/scores client, exit không base64/payment/amount/reason. Card-only blank plate không phải contract được validation cho phép |
 
 Desktop :283–305 yêu cầu preview cùng plate rồi confirm, nhưng server không đòi đã preview; không có thanh toán form trong exit-tab :139–151/confirmation body đã đọc. Không xem chuỗi thông báo “tổng thu” là payment đã thu. :86–87,386–387 có barrier label/manual buttons/timer 5 giây, không thiết bị thật hoặc log manual fulfillment.
 
-ANPR verify :152–174 dùng ảnh Spring cục bộ và compare_best; liveness được tính nhưng không chặn decision. [SecurityConfig](../../spring-web/src/main/java/vn/edu/parking/config/SecurityConfig.java):17–21 public API/uploads và CSRF exclusions; không claim faceVerified/manualOverride đáng tin hoặc media đã phân quyền. Những kiểm tra trên không phải security/runtime audit.
+ANPR camera routes require internal Bearer and receive registration bytes from Spring; liveness is calculated but does not gate the decision. Spring uses JWT/RBAC and private gate evidence. H2/fake tests do not prove deployed security, genuine face accuracy, liveness or payment policy.
 
 ## Pricing, payment và gaps
 
@@ -94,7 +94,7 @@ NV02 pricing/payment, NV06 nhóm xe, NV07 quality/manual/outage/lost-card, NV08 
 - Không đóng trước payment confirmation hoặc free exception có reason; không invent eligible miễn/phạt.
 - Retry/resend không duplicate session/payment; manual giữ kết quả AI riêng, evidence được bảo vệ; barrier mô tả đúng simulation.
 
-**Test hiện diện đã đọc:** [ParkingFlowIntegrationTest](../../spring-web/src/test/java/vn/edu/parking/ParkingFlowIntegrationTest.java) `guestFaceIsStoredAtEntryAndRequiredAtExit:114–126` gửi one-pixel PNG, assert entry no warning, preview không faceVerified → 400, confirm faceVerified=true → COMPLETED. Đây là client-flag/storage branch test, không real AI/liveness/payment test; không assert nội dung ảnh/lookup path. `completesEntryPreviewAndExitFlow:51–72` có fee/state assertions nhưng không chứng minh guest exceptions đầy đủ. Không tests executed, không chứng nhận pricing/payment/manual completeness.
+**Test/execution evidence:** `guestFaceCaptureAndExitVerificationStayBehindSpringAndBindToOneParkingSession` exercises authenticated synthetic guest capture, entry binding, session-bound exit verification and evidence consumption; `clientFaceAndOverrideAssertionsCannotBypassGuestExitVerification` rejects client-supplied assertions. The 2026-10-09 full Spring suite passed 108/108 on H2/fake ANPR. This does not prove real AI/liveness, mandatory capture policy, payment, pricing or production behavior.
 
 ## Tham chiếu nguồn chính xác
 

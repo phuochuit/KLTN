@@ -6,7 +6,7 @@
 
 Hướng dẫn dựa trên đọc tĩnh launcher/config/source và [README](../../README.md), **không phải kết quả chạy thành công**. Không chạy lệnh khởi động/build, cài dependencies hoặc kiểm thử trong R08; chỉ đọc và kiểm tra tài liệu tĩnh. Các lệnh bên dưới dành cho lần vận hành được cho phép riêng. Không bảo đảm integrated deployment hoặc production readiness; không cung cấp mật khẩu/secret.
 
-Desktop gọi Spring cho nghiệp vụ và ANPR cho AI; ANPR tải ảnh tham chiếu từ Spring và dùng camera trên máy chạy ANPR. Demo ba ảnh là app riêng, không phải dependency API đã được chứng minh của gate.
+Desktop gọi Spring cho nghiệp vụ và các yêu cầu image/video/face/camera; Spring đọc ảnh tham chiếu từ private storage và gọi FastAPI qua internal Bearer. Camera vẫn chạy trên máy ANPR. Demo ba ảnh là app riêng, không phải dependency API của gate.
 
 ## Prerequisites và working directory
 
@@ -26,7 +26,7 @@ CMD wrappers Web/ANPR/Desktop ở root đổi working directory về root và g�
 
 1. Xác nhận datasource, DB server/access và media/model directories. Nếu chọn local MySQL, khởi động database trước Spring.
 2. Chạy Spring, đọc log startup/datasource và kiểm tra `http://localhost:8080/api/parking/health`; đối chiếu tên database thực tế. Health metadata không thay persistence/integration test.
-3. Chạy ANPR, chờ initialization/model warm-up, kiểm `http://localhost:8001/health` và `/docs`. File/cache readiness không chứng minh accuracy/liveness/camera hoàn chỉnh.
+3. Chạy ANPR, chờ initialization/model warm-up, kiểm `http://localhost:8001/health` và `/docs`. Health chỉ trả status process; không xác nhận model readiness, camera, accuracy hay liveness.
 4. Chạy Desktop, đặt `Spring API` và `ANPR API`, bấm **Kiểm tra**. Chỉ sau khi xác nhận services và datasource mới thao tác dữ liệu thử.
 5. Demo ba ảnh khởi động riêng nếu cần; không đưa vào thứ tự bắt buộc cho gate.
 
@@ -78,11 +78,13 @@ Không chạy launcher Laragon nếu chưa rõ datasource đang dùng. Trước 
 | `PARKING_PYTHON` | Interpreter base do người vận hành chọn; không hardcode đường dẫn máy khác. |
 | `EASYOCR_MODULE_PATH`, `YOLO_CONFIG_DIR`, `PYTHONUTF8` | Launcher set local `.EasyOCR`, `.ultralytics` dưới service và UTF8; cần quyền ghi/cache/network phù hợp. |
 | `ANPR_PLATE_MODEL`, `ANPR_VEHICLE_MODEL` | [recognizer](../../anpr-service/app/recognizer.py):58–72 mặc định service `models/license_plate_detector.pt` / `models/vehicle_detector.pt`. File phải đúng model và readable. |
+| `ANPR_SERVICE_TOKEN` | Same externally provisioned secret in Spring and FastAPI process environments; minimum 32 printable ASCII characters. Protects FastAPI image/video/face processing routes; health is public. Missing/weak config fails closed. Never place the value in source, Desktop config, logs or docs. No real value was provisioned for this work. |
+| `ANPR_BASE_URL` | Spring upstream destination for image/video/face processing; default `http://localhost:8001`. Source accepts HTTPS or loopback HTTP only and rejects URL path/query/credentials. Desktop's ANPR client remains for health checks. |
 | `ANPR_GPU` | EasyOCR GPU bật khi giá trị là `true`; default `false`. Không tự bảo đảm CUDA/GPU support. |
 | `ANPR_PLATE_CONFIDENCE`, `ANPR_VEHICLE_CONFIDENCE` | Default0.20 /0.25; không phải quality acceptance hoặc OCR UI threshold. |
 | `FACE_MATCH_THRESHOLD`, `FACE_REVIEW_THRESHOLD`, `FACE_DETECTION_THRESHOLD` | [face engine](../../anpr-service/app/face_engine.py):14–16 default0.363 /0.300 /0.60. Cần site calibration; hạ threshold không phải cách xử lý authorization hay liveness. |
 | `PARKING_DB_PASSWORD` | Laragon coordinator đọc/prompt và truyền process environment; chưa verified Spring mapping. Không ghi giá trị vào log/docs/shell history. |
-| `parking.upload-dir` | Spring media property, default `uploads`; cần xác nhận config/working directory. Xem [database/media](../architecture/database.md). |
+| `parking.upload-dir` | Resident-media source default is `var/private-media`; may be overridden by local configuration. Gate evidence uses a separate `parking.gate-evidence.directory` root. Effective runtime paths are unverified; see [database/media](../architecture/database.md). |
 
 Sau khi venv/dependencies đã được chuẩn bị, manual ANPR tương đương (chưa chạy):
 
@@ -101,7 +103,7 @@ Launcher bind `0.0.0.0`, không chỉ loopback; mạng có thể truy cập tùy
 dotnet build desktop-winform\ParkingGateDesktop.csproj --configuration Release
 ```
 
-Muốn vừa build vừa mở, dùng `scripts/run-desktop.cmd`. Thay Desktop source phải rebuild; không dùng EXE cũ để kết luận API incompatibility đã sửa. Defaults UI là localhost8080/8001; thay host cho cả hai dịch vụ nếu cần, nhưng remote deployment chưa verified. Face verify-camera chỉ chấp nhận prefix URL local theo handler hiện tại; thay Web host có thể khiến HTTP400. Camera capture vẫn diễn ra trên máy ANPR.
+Muốn vừa build vừa mở, dùng `scripts/run-desktop.cmd`. Thay Desktop source phải rebuild; không dùng EXE cũ để kết luận API incompatibility đã sửa. Defaults UI là localhost8080/8001; Spring gọi processing routes tại ANPR base URL nên cấu hình shared service token ở Spring và FastAPI process, không đưa token vào Desktop. Remote deployment chưa verified. Camera capture vẫn diễn ra trên máy ANPR.
 
 ## Demo face-verification độc lập
 

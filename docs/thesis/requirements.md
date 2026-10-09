@@ -31,7 +31,7 @@ Bản trích còn nêu cử nhân 4 tín chỉ/12 tuần/3 sinh viên và kỹ s
 
 ## Hệ thống, tác nhân và ranh giới
 
-Theo [kiến trúc quan sát](../architecture/system.md), browser quản trị và WinForms dùng Spring cho nghiệp vụ/lưu dữ liệu; Desktop gọi trực tiếp ANPR cho nhận dạng; Spring dùng database/filesystem. Demo đối chiếu ba ảnh độc lập và model fallback **không chứng minh tích hợp demo API vào cổng**. Barrier hiện được mô tả là mô phỏng, không điều khiển vật lý đã nghiệm thu.
+Theo [kiến trúc quan sát](../architecture/system.md), browser quản trị và WinForms dùng Spring cho nghiệp vụ/lưu dữ liệu; Desktop gửi image/video/face requests qua Spring đến FastAPI, Spring lưu gate evidence riêng; database/filesystem boundary vẫn có failure cases. Demo đối chiếu ba ảnh độc lập và model fallback **không chứng minh tích hợp demo API vào cổng**. Tests dùng H2/fake service, không live service/deployment. Barrier hiện được mô tả là mô phỏng, không điều khiển vật lý đã nghiệm thu.
 
 | Tác nhân | Trách nhiệm theo yêu cầu |
 | --- | --- |

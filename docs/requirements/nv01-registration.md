@@ -50,8 +50,8 @@ Bước 9 classification-only lấy từ PDF no-EV p.6; bước có quyền sạ
 | Evidence | Quan sát / giới hạn |
 | --- | --- |
 | `spring-web/src/main/java/vn/edu/parking/web/ParkingApiController.java:58–101` | Lookup vehicle/card, active authorized family members và pass status; code lookup dùng Household/FamilyMember, không chứng minh toàn registration workflow |
-| `spring-web/src/main/java/vn/edu/parking/service/ParkingService.java:47–49,397–417` | Entry gọi `verifyDriver`: member phải active và thuộc authorized members; thiếu ảnh hoặc faceVerified=false bị chặn trừ manual override. Legacy nhánh không chọn member và không ai có ảnh có thể bypass; không phải fulfillment ba đối chiếu |
-| Cùng service `:397–417` | Client `faceVerified` được dùng; không thấy helper dùng `faceSimilarity` để tự quyết threshold. Không chứng minh tính xác thực AI evidence/liveness |
+| `ParkingService.enter` + `ParkingApiController` face verification | Entry requires selected active authorized member and, when that member has a registration image, recent server-owned PASS evidence matching member and recognized plate. Missing-image override is narrowly available and audited. Client face claims are rejected; this is not fulfillment of three-way comparison |
+| Spring → FastAPI face path | Spring reads allowlisted registration bytes and proxies them to protected FastAPI; face evidence is stored/bound server-side. H2/fake tests do not prove AI authenticity, identity accuracy or liveness |
 | `README.md:5–9,78–86`; `evidence/archive/PROJECT_GAPS.md:3–12` | Claims QR autofill/không dùng CCCD-photo so mặt, gaps liveness. Khác yêu cầu nguồn; không được quảng bá integrated three-photo verification |
 | `AdminController.java`, `CccdQrController.java`, `ResidentImageStorage.java` | Indexed, chưa đủ body/form/security mapping để xác nhận dedup/consent/approval/media lifecycle |
 | `face-verification-demo/app.py:28,207–223` | Demo compare độc lập mới indexed; model resource chung không chứng minh gate tích hợp |

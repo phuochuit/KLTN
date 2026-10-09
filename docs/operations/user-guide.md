@@ -47,17 +47,17 @@ README có dữ liệu mẫu plate `59A112345`/card `CARD001`, `51H88888`/`CARD0
 
 1. Chọn **XE VÀO**, nhận dạng ảnh/video hoặc nhập **Biển số AI tự điền**, kiểm lại biển và loại được hiển thị. Nhập **Mã thẻ (không bắt buộc)** nếu có. Nhận dạng entry có thể tự gọi lookup.
 2. Bấm **TRA CỨU CƯ DÂN**; xem owner/hộ/card/pass/message và chọn **Người đang điều khiển** trong danh sách authorized members trả về.
-3. Bấm **CHỤP & XÁC THỰC KHUÔN MẶT** khi member có ảnh đăng ký. Desktop gửi URL ảnh tới ANPR camera; chỉ decision `PASS` làm faceVerified=true. Chọn member khác sau verify làm flag không còn hợp lệ cho member đó khi request được tạo; lookup cũng reset face state.
+3. Bấm **CHỤP & XÁC THỰC KHUÔN MẶT** khi member có ảnh đăng ký. Desktop gửi operation/plate/member ID tới Spring; Spring đọc ảnh đăng ký từ private storage rồi gọi FastAPI có internal Bearer. `PASS` được lưu thành Spring-owned evidence và entry bắt buộc evidence hợp lệ cho member/plate đó; Desktop không gửi URL ảnh hoặc `faceVerified` làm proof.
 4. Kiểm flags, member và evidence rồi **XÁC NHẬN XE VÀO**. Result hiển thị mã lượt, plate/type/owner/card/status/time/fee.
 5. Source gọi auto-open barrier khi response không Warning **hoặc manual được tick**; đồng bộ map event, copy plate/card sang exit, clear guest capture và có thể clear entry form sau2 giây. Barrier label/timer đóng sau5 giây là **mô phỏng**, không device integration.
 
-**Cảnh báo quan trọng:** missing/mismatched card hoặc expired monthly pass có thể tạo OPEN và warning tại backend, trong khi UI không auto-open nếu chưa manual. Warning không đồng nghĩa “không có session”; kiểm history/lookup trước submit lại. Unknown/inactive cards có nhánh reject riêng. Entry rights có legacy/manual bypass và client flag trust; source requirement không tự cho phép dùng chúng để vượt xác minh. Xem [NV03](../requirements/nv03-resident-entry.md).
+**Cảnh báo quan trọng:** missing/mismatched card hoặc expired monthly pass có thể tạo OPEN và warning tại backend, trong khi UI không auto-open nếu chưa manual. Warning không đồng nghĩa “không có session”; kiểm history/lookup trước submit lại. Unknown/inactive cards có nhánh reject riêng. Server chỉ chấp nhận narrow override cho resident active/authorized đã chọn nhưng thiếu ảnh đăng ký; client face/score claims bị từ chối. Low-confidence plate correction is not independently server-authorized by this flow and must still match the server recognition result. Xem [NV03](../requirements/nv03-resident-entry.md).
 
 ## Cư dân ra
 
 1. Chọn **XE RA**, nhận dạng/kiểm plate, nhập card nếu có.
 2. **TRA CỨU NGƯỜI ĐƯỢC PHÉP** → chọn **Người đang lấy xe**. Người này có thể khác người vào nếu được cấp quyền cho đúng xe theo yêu cầu nguồn.
-3. Dùng **CHỤP & XÁC THỰC KHUÔN MẶT** với ảnh đăng ký, kiểm decision/score/message. UI có button này nhưng **resident exit backend chưa được chứng minh bắt buộc face/driver rights**, nên không gọi workflow là secure enforcement.
+3. Dùng **CHỤP & XÁC THỰC KHUÔN MẶT** với ảnh đăng ký, kiểm decision/score/message. Spring kiểm member được phép dùng đúng xe và lấy ảnh đăng ký từ server; nếu dùng proof thì proof phải khớp plate/open session/member. Resident exit face proof hiện được hỗ trợ nhưng backend không bắt buộc ở mọi lượt; authorized-collector policy vẫn cần xác nhận.
 4. Bấm **XEM TRƯỚC PHÍ** và đọc result. **XÁC NHẬN XE RA** yêu cầu `_lastPreview` phù hợp normalized plate; nếu thiếu, UI báo “Hãy bấm Xem trước phí trước khi xác nhận.” Thay plate phải preview lại. Preview không là proof đã thanh toán và không giữ giá cố định; confirm tính lại.
 5. Khi đủ evidence và việc thu/miễn phí được xử lý theo policy quản trị, confirm. Result code dùng `COMPLETED`, nguồn có `CLOSED`; không equate như acceptance đã đạt. UI auto-open theo cùng Warning/manual condition, refresh map/reset preview và có thể clear form.
 
@@ -65,9 +65,9 @@ Không có UI payment settlement/receipt/waiver audit đã được xác minh �
 
 ## Khách vãng lai
 
-- Entry: cùng tab **XE VÀO**, nhận dạng/nhập plate, lookup xem **KHÁCH VÃNG LAI**, dùng **CHỤP ẢNH KHÁCH VÃNG LAI** rồi kiểm preview và confirm entry. Source gửi captured base64 cùng request để lưu ảnh theo lượt; không có visitor enrollment/special KHÁCH selector đã observed.
-- Capture button không chứng minh backend bắt buộc ảnh: entry source cho phép optional capture. Quy trình nguồn NV05 đòi evidence phải được đối chiếu riêng, không suy ra thiếu capture là được phép.
-- Exit: **XE RA** → lookup lấy entry-face path → **CHỤP & XÁC THỰC KHUÔN MẶT** so với ảnh vào → preview/confirm. Backend guest face gate có điều kiện khi entry-face path tồn tại, trừ override; client flag không proof genuine verification.
+- Entry: cùng tab **XE VÀO**, nhận dạng/nhập plate, lookup xem **KHÁCH VÃNG LAI**, dùng **CHỤP ẢNH KHÁCH VÃNG LAI** rồi kiểm preview và confirm entry. Capture đi qua Spring, lưu private và nếu được gửi kèm thì bind/consume vào parking session; không có visitor enrollment/special KHÁCH selector đã observed.
+- Capture vẫn optional. Nếu không có ảnh face entry thì server không áp dụng conditional guest face check khi ra; policy yêu cầu capture bắt buộc chưa được xác nhận.
+- Exit: **XE RA** → chọn guest session → **CHỤP & XÁC THỰC KHUÔN MẶT** để Spring dùng ảnh entry private làm registration image → preview/confirm. Khi entry image có mặt, backend đòi PASS evidence đúng exit operation/plate/open session; client flag không phải proof genuine verification.
 - Fee/payment/waiver/lost-card/ownership cần policy người quản trị và evidence; không có payment-provider hoặc lost-card wizard được chứng minh. Không cấp cư dân/card để “sửa” thiếu evidence của khách. Xem [NV05](../requirements/nv05-visitor-parking.md).
 
 ## Phân loại xe

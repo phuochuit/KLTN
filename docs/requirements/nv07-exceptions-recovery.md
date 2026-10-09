@@ -63,13 +63,13 @@ Trạng thái nghiệp vụ mô tả sự cố đang xử lý → đóng hoặc 
 
 | Evidence / exact reference | Quan sát tĩnh, không phải fulfillment toàn NV07 |
 | --- | --- |
-| [MainForm](../../desktop-winform/MainForm.cs):176–195,211–230,283–335 | Low confidence chọn manual; request có manualOverride/face flags; entry/confirm catch lỗi. Resident exit không bắt VerifyFaceAsync; warning entry có thể đã lưu OPEN nhưng UI không tự mở |
+| [MainForm](../../desktop-winform/MainForm.cs) | Low confidence can select UI manual/correction state; recognition and face requests now go through authenticated Spring APIs. Warning entry can still persist OPEN while UI does not auto-open |
 | MainForm :86–87,386–387 | Nút mở/đóng trực tiếp và label/timer barrier 5 giây; không có audit call/reason record trong bodies này. Không thiết bị thật |
-| [ParkingService](../../spring-web/src/main/java/vn/edu/parking/service/ParkingService.java):397–423 | Override bypass thiếu ảnh/false face; selected unauthorized member vẫn bị chặn lúc vào; legacy không ai có ảnh có thể bypass. Guest exit chỉ bắt face khi có entry-face path |
-| Service :40–94,108–126; [ParkingSession](../../spring-web/src/main/java/vn/edu/parking/domain/ParkingSession.java):7–43 | Transaction/precheck, lưu flags/score và optional entry photo; body không set manualOverride/exitMember hoặc lưu reason/operator audit. Field manualOverride tồn tại không chứng minh manual trail |
-| [ANPR main.py](../../anpr-service/app/main.py):152–189 | Compare_best/capture 8 frames, handler errors; tính liveness nhưng không enforce camera decision. Không proof retry limits đầy đủ/anti-spoof fail-closed |
+| [ParkingService](../../spring-web/src/main/java/vn/edu/parking/service/ParkingService.java) | Client face claims and exit override claims are rejected; entry override is limited to selected active authorized member without registration image and is audited. Guest exit requires PASS only when entry-face evidence exists |
+| Parking service/controller; [ParkingSession](../../spring-web/src/main/java/vn/edu/parking/domain/ParkingSession.java) | Entry/exit evidence is server-owned, operation-bound and single-use; resident exit face proof is supported but not universally required. OPEN warning, filesystem/DB atomicity and concurrent session completion are not fully verified |
+| [ANPR main.py](../../anpr-service/app/main.py) | Processing routes require internal Bearer; face compare/camera handlers calculate liveness but do not gate PASS. No proof of anti-spoof effectiveness or live service behavior |
 | [ApiResponseReader](../../desktop-winform/ApiResponseReader.cs):8–37,47–74 | Non-success/empty/HTML/JSON lỗi → exception/thông báo kiểm tra/restart; không queue/resync trong helper này |
-| [SecurityConfig](../../spring-web/src/main/java/vn/edu/parking/config/SecurityConfig.java):17–21 | API/uploads public, API CSRF excluded; không xác nhận role-gated override hoặc protected media |
+| [SecurityConfig](../../spring-web/src/main/java/vn/edu/parking/config/SecurityConfig.java) | Web sessions and Desktop JWT APIs use separate chains; gate and evidence routes are protected. H2 tests do not prove deployed TLS/proxy/session configuration |
 | [AdminController](../../spring-web/src/main/java/vn/edu/parking/web/AdminController.java):635–675 | Save monthly card rồi SubscriptionPayment; đoạn đã đọc không annotation transaction trên method, không thể kết luận atomic toàn luồng/card-payment rollback |
 | [PROJECT_GAPS](../../evidence/archive/PROJECT_GAPS.md):3–12 | Deployment gaps là claims tác giả, không independent runtime audit; không dùng claim thay evidence implementation |
 

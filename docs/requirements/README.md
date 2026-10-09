@@ -56,13 +56,13 @@ Các quan sát sau không đủ chứng nhận toàn luồng đã hoạt động
 
 | Tính năng | Evidence code và mức kiểm tra | Liên hệ |
 | --- | --- | --- |
-| Lookup cư dân/thẻ/thành viên/gói, ảnh vào của khách | `spring-web/src/main/java/vn/edu/parking/web/ParkingApiController.java:58–101` đã đọc | NV01–NV05 |
+| Lookup cư dân/thẻ/thành viên/gói, guest face evidence | `ParkingApiController` lookup plus Spring-owned face capture/verification and evidence routes; H2 integration coverage executed 2026-10-09 | NV01–NV05 |
 | Slots: danh sách, gán xe, cho mượn/hủy, override, release, dispatch session | Controller `:104–146`; `service/ParkingService.java:129–236,267–380` đã đọc; UI/tests chưa đủ | Hỗ trợ NV03/NV05 và quản trị bãi |
 | Lượt/xe chưa gán và batch slot generation | Controller `:148–195`; service `:239–264` tạo tối đa 100 slot/lần, bỏ code tồn tại | Hỗ trợ quản trị, không bảo đảm scheduling/concurrency |
-| Health/database metadata | Controller `:197–204` đã đọc; fallback `Unknown` khi lỗi | Vận hành; không runtime UP claim |
-| Recognition ảnh/video, face verify/capture-camera | `anpr-service/app/main.py:142–206` mới indexed; xử lý/models/tests còn pending | NV01/NV03–NV07 |
+| Health response | `ParkingApiController.java:616–619` returns only `status` and `service`; it is not a database or dependency readiness check | Minimal status response; no runtime/deployment UP claim |
+| Recognition ảnh/video, face verify/capture-camera | Desktop → Spring JWT proxy → FastAPI internal Bearer; private evidence and entry/exit operation binding are source-observed and H2/fake-tested. Model/camera/live service not verified | NV01/NV03–NV07 |
 | Admin CRUD, CCCD QR, media và cấu hình | `AdminController.java`, `CccdQrController.java`, `CccdQrService.java`, `ResidentImageStorage.java`, `WebConfig.java` mới indexed | Không coi QR autofill là CCCD-photo face matching |
-| Web login/API/media access | `config/SecurityConfig.java:17–32` đã đọc: public paths/CSRF exclusions/in-memory ADMIN; chưa runtime security test | RBAC/privacy nguồn không mặc nhiên implemented |
+| Web login/API/media access | Separate Web session and opt-in Desktop JWT chains; route-specific role checks, deny-by-default API fallback, MANAGEMENT-only resident uploads and session/operation-scoped gate evidence. Spring H2 integration tests cover authorization and audit paths | Source/H2 evidence only; effective deployment, TLS, MySQL behavior and broader privacy minimization remain unverified |
 | Demo ba ảnh độc lập | `face-verification-demo/app.py:28,207–223`, ANPR model fallback `app/face_engine.py:11` indexed | Dùng chung model resource không chứng minh demo API tích hợp vào gate |
 
 ## Quyết định còn mở
