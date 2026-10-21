@@ -1,0 +1,19 @@
+package vn.edu.parking.domain;
+
+public enum SecurityPermission {
+    DASHBOARD_VIEW,
+    ACCOUNT_MANAGE,
+    ROLE_MANAGE,
+    SHIFT_MANAGE,
+    RESIDENT_MANAGE,
+    VEHICLE_MANAGE,
+    CARD_MANAGE,
+    PRICING_MANAGE,
+    SLOT_MANAGE,
+    HISTORY_VIEW,
+    PAYMENT_RECONCILE,
+    SECURITY_AUDIT_VIEW,
+    PRIVATE_EVIDENCE_VIEW,
+    GATE_OPERATE,
+    AI_RESULT_CORRECT
+}

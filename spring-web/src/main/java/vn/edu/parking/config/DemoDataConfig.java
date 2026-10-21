@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import vn.edu.parking.domain.*;
 import vn.edu.parking.repository.*;
+import vn.edu.parking.service.PlateNormalizer;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashSet;
@@ -97,7 +98,7 @@ public class DemoDataConfig {
                 var allVehicles = vehicles.findAll();
                 for (int i = 0; i < Math.min(2, allVehicles.size()); i++) {
                     ParkingCard card = new ParkingCard();
-                    card.setCardCode(String.format("CARD%03d", i + 1));
+                    card.setCardCode(PlateNormalizer.normalize(allVehicles.get(i).getPlateNumber()));
                     card.setVehicle(allVehicles.get(i));
                     card.setStatus(CardStatus.ACTIVE);
                     cards.save(card);

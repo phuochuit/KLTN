@@ -1,34 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
-$mysqlClient = 'mysql-2709ad1f-phuoc190305-fcdc.e.aivencloud.com, Port: 26805, User: avnadmin'
-
-function Test-MySqlLogin {
-    param([string]$Password)
-    if (-not (Test-Path $mysqlClient)) { return $true }
-    $oldMysqlPwd = $env:MYSQL_PWD
-    try {
-        $env:MYSQL_PWD = $Password
-        & $mysqlClient --default-character-set=utf8mb4 --protocol=TCP --host=127.0.0.1 --port=3306 --user=root --connect-timeout=5 --silent --skip-column-names --execute='SELECT 1;' 2>$null | Out-Null
-        return $LASTEXITCODE -eq 0
-    } finally {
-        $env:MYSQL_PWD = $oldMysqlPwd
-    }
-}
-
-$mysql = Get-NetTCPConnection -LocalPort 3306 -State Listen -ErrorAction SilentlyContinue
-if (-not $mysql) { throw 'MySQL Laragon chua chay. Hay mo Laragon va bam Start All.' }
-
-if (-not $env:PARKING_DB_PASSWORD) {
-    $secure = Read-Host 'Nhap mat khau MySQL root cua Laragon' -AsSecureString
-    $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-    try { $env:PARKING_DB_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
-    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
-}
-
-if (-not (Test-MySqlLogin -Password $env:PARKING_DB_PASSWORD)) {
-    $env:PARKING_DB_PASSWORD = $null
-    throw 'Sai mat khau MySQL root, hoac cong 3306 dang la MySQL khac khong phai Laragon. Hay mo HeidiSQL, thu dang nhap root tai 127.0.0.1:3306, roi chay lai va nhap dung mat khau.'
-}
+Write-Host 'Luu y: launcher ten Laragon duoc giu de tuong thich, nhung database chinh van la Aiven parking_anpr.' -ForegroundColor Yellow
 
 $web = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($web) {
@@ -40,7 +12,7 @@ if ($web) {
 
 Start-Process -FilePath 'powershell.exe' -ArgumentList @(
     '-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-    '-File', (Join-Path $workspace 'run-web-laragon.ps1')
+    '-File', (Join-Path $workspace 'run-web.ps1')
 ) -WorkingDirectory $workspace
 
 $ready = $false
@@ -59,4 +31,3 @@ Start-Process -FilePath 'powershell.exe' -ArgumentList @(
 ) -WorkingDirectory $workspace
 Start-Sleep -Seconds 5
 & (Join-Path $workspace 'run-desktop.ps1')
-$env:PARKING_DB_PASSWORD = $null

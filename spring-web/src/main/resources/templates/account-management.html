@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quản lý tài khoản</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <style>
+        .account-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+        .account-actions form { display:flex; gap:6px; align-items:center; }
+        .account-actions select { min-width:145px; }
+        .temporary-secret { padding:16px; border:2px solid #d97706; background:#fff7ed; border-radius:8px; margin-bottom:18px; }
+        .temporary-secret code { display:block; margin-top:8px; padding:10px; background:#fff; overflow-wrap:anywhere; user-select:all; }
+        .error-notice { background:#fff1f0; color:#8a1c13; border:1px solid #efb2ad; border-radius:8px; padding:12px 16px; }
+        .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+        .badge-enabled { background:#dcfce7; color:#166534; }
+        .badge-disabled { background:#fee2e2; color:#991b1b; }
+        .badge-online { background:#dcfce7; color:#166534; }
+        .badge-shift { background:#dbeafe; color:#1e40af; }
+        .shift-form { display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:12px; }
+        .shift-form label { display:flex; flex-direction:column; gap:6px; }
+        .shift-form .wide { grid-column:1/-1; }
+        .shift-form button { justify-self:start; }
+        .section-gap { margin-top:28px; }
+        .profile-grid { display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:12px; }
+        .profile-grid label { display:flex; flex-direction:column; gap:6px; }
+        .profile-grid .wide { grid-column:1/-1; }
+        dialog { width:min(760px,calc(100% - 32px)); border:0; border-radius:12px; padding:24px; box-shadow:0 20px 60px #0004; }
+        dialog::backdrop { background:#0f172a99; }
+        .dialog-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; }
+        @media(max-width:900px) { header { align-items:flex-start; } nav { display:flex; flex-wrap:wrap; gap:10px; } nav a { margin-left:0; } }
+        @media(max-width:700px) { .shift-form,.profile-grid { grid-template-columns:1fr; } .shift-form .wide,.profile-grid .wide { grid-column:auto; } }
+    </style>
+</head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main>
+    <h1>Quản lý tài khoản</h1>
+    <p class="help">Tài khoản mới và tài khoản được reset phải đổi mật khẩu ở lần đăng nhập tiếp theo.</p>
+    <p class="notice" th:if="${message}" th:text="${message}"></p>
+    <p class="error-notice" th:if="${error}" th:text="${error}"></p>
+    <section class="temporary-secret" th:if="${temporaryPassword}">
+        <strong>Mật khẩu tạm — chỉ hiển thị trong lần này</strong>
+        <p>Hãy chuyển mật khẩu qua kênh an toàn và yêu cầu người dùng đổi ngay khi đăng nhập.</p>
+        <code th:text="${temporaryPassword}"></code>
+    </section>
+
+    <div id="live-sessions" th:replace="~{account-management-live :: sessions}"></div>
+
+    <section class="card">
+        <h2>Tạo tài khoản</h2>
+        <form class="profile-grid" method="post" th:action="@{/account-management/create}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <label>Tên đăng nhập
+                <input name="username" maxlength="80" autocomplete="off" required>
+            </label>
+            <label>Họ và tên
+                <input name="fullName" maxlength="160" autocomplete="name" required>
+            </label>
+            <label>Vai trò
+                <select name="roleId" required>
+                    <option value="" disabled selected>Chọn vai trò</option>
+                    <option th:each="role : ${roles}" th:value="${role.id}" th:text="${role.displayName}"></option>
+                </select>
+            </label>
+            <label>Số điện thoại
+                <input name="phone" inputmode="tel" maxlength="20" autocomplete="tel" required>
+            </label>
+            <label>Email
+                <input type="email" name="email" maxlength="160" autocomplete="email" required>
+            </label>
+            <label>CCCD/CMND
+                <input name="citizenId" inputmode="numeric" maxlength="12" autocomplete="off" required>
+            </label>
+            <label>Ngày sinh
+                <input type="date" name="dateOfBirth" autocomplete="bday" required>
+            </label>
+            <label class="wide">Địa chỉ
+                <textarea name="address" maxlength="500" rows="2" autocomplete="street-address" required></textarea>
+            </label>
+            <button type="submit">Tạo tài khoản</button>
+        </form>
+    </section>
+
+    <h2>Danh sách tài khoản</h2>
+    <div class="table-scroll">
+        <table>
+            <thead><tr><th>Mã nhân viên</th><th>Họ và tên</th><th>Tài khoản</th><th>Liên hệ</th><th>Vai trò</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <tbody>
+            <tr th:each="account : ${accounts}">
+                <td th:text="${account.employeeCode ?: 'Chưa cấp'}"></td>
+                <td th:text="${account.fullName}"></td>
+                <td><strong th:text="${account.username}"></strong><br><small th:text="${account.mustChangePassword ? 'Cần đổi mật khẩu' : 'Mật khẩu đã xác nhận'}"></small></td>
+                <td><span th:text="${account.phone ?: 'Chưa có SĐT'}"></span><br><small th:text="${account.email ?: 'Chưa có email'}"></small></td>
+                <td th:text="${account.securityRole != null ? account.securityRole.displayName : account.role.name()}"></td>
+                <td>
+                    <span class="badge" th:classappend="${account.enabled} ? ' badge-enabled' : ' badge-disabled'"
+                          th:text="${account.enabled ? 'Đang hoạt động' : 'Đã khóa'}"></span>
+                </td>
+                <td class="account-actions">
+                    <button type="button" class="edit-profile"
+                            th:attr="data-username=${account.username},data-full-name=${account.fullName},data-phone=${account.phone},data-email=${account.email},data-citizen-id=${account.citizenId},data-date-of-birth=${account.dateOfBirth},data-address=${account.address},data-role-id=${account.securityRole != null ? account.securityRole.id : ''}">Cập nhật thông tin</button>
+                    <form method="post" th:action="@{/account-management/state}">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <input type="hidden" name="username" th:value="${account.username}">
+                        <input type="hidden" name="enabled" th:value="${!account.enabled}">
+                        <button type="submit" th:class="${account.enabled ? 'btn btn-danger' : 'btn btn-primary'}"
+                                th:text="${account.enabled ? 'Khóa' : 'Mở khóa'}"></button>
+                    </form>
+                    <form method="post" th:action="@{/account-management/reset-password}"
+                          data-confirm="Mật khẩu hiện tại sẽ không còn sử dụng được. Bạn muốn cấp mật khẩu tạm mới cho tài khoản này?"
+                          data-confirm-title="Đặt lại mật khẩu">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <input type="hidden" name="username" th:value="${account.username}">
+                        <button class="btn btn-warning" type="submit">Reset mật khẩu</button>
+                    </form>
+                </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(accounts)}"><td colspan="7" class="muted">Chưa có tài khoản.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <dialog id="profile-dialog">
+        <h2>Cập nhật thông tin nhân viên</h2>
+        <p class="help">Mã nhân viên được giữ nguyên để bảo toàn lịch sử làm việc.</p>
+        <form id="profile-form" method="post" th:action="@{/account-management/profile}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input type="hidden" name="username">
+            <div class="profile-grid">
+                <label>Họ và tên<input name="fullName" maxlength="160" required></label>
+                <label>Vai trò<select name="roleId" required><option th:each="role : ${roles}" th:value="${role.id}" th:text="${role.displayName}"></option></select></label>
+                <label>Số điện thoại<input name="phone" inputmode="tel" maxlength="20" required></label>
+                <label>Email<input type="email" name="email" maxlength="160" required></label>
+                <label>CCCD/CMND<input name="citizenId" inputmode="numeric" maxlength="12" required></label>
+                <label>Ngày sinh<input type="date" name="dateOfBirth" required></label>
+                <label class="wide">Địa chỉ<textarea name="address" maxlength="500" rows="3" required></textarea></label>
+            </div>
+            <div class="dialog-actions"><button type="button" id="close-profile">Hủy</button><button type="submit">Lưu thay đổi</button></div>
+        </form>
+    </dialog>
+
+    <section class="card section-gap">
+        <h2>Phân công ca làm</h2>
+        <form class="shift-form" method="post" th:action="@{/account-management/shifts}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <label>Nhân viên
+                <select name="username" required>
+                    <option value="" disabled selected>Chọn nhân viên cổng</option>
+                    <option th:each="staff : ${gateStaff}" th:value="${staff.username}"
+                            th:text="${staff.fullName + ' (' + staff.username + ')'}"></option>
+                </select>
+            </label>
+            <label>Tên ca
+                <input name="shiftName" maxlength="80" placeholder="Ví dụ: Ca sáng" required>
+            </label>
+            <label>Bắt đầu
+                <input type="datetime-local" name="startsAt" required>
+            </label>
+            <label>Kết thúc
+                <input type="datetime-local" name="endsAt" required>
+            </label>
+            <label class="wide">Nhiệm vụ
+                <input name="duty" maxlength="240" placeholder="Ví dụ: Kiểm soát cổng vào và đối soát xe" required>
+            </label>
+            <label class="wide">Ghi chú
+                <textarea name="notes" maxlength="500" rows="2"></textarea>
+            </label>
+            <button type="submit">Phân ca</button>
+        </form>
+    </section>
+
+    <div id="live-shifts" th:replace="~{account-management-live :: shifts}"></div>
+</main>
+<script>
+(() => {
+    const dialog = document.getElementById('profile-dialog');
+    const form = document.getElementById('profile-form');
+    const profileFields = {
+        username: 'username', fullName: 'fullName', phone: 'phone', email: 'email',
+        citizenId: 'citizenId', dateOfBirth: 'dateOfBirth', address: 'address', roleId: 'roleId'
+    };
+    document.querySelectorAll('.edit-profile').forEach(button => button.addEventListener('click', () => {
+        for (const [field, key] of Object.entries(profileFields)) {
+            form.elements[field].value = button.dataset[key] || '';
+        }
+        dialog.showModal();
+    }));
+    document.getElementById('close-profile').addEventListener('click', () => dialog.close());
+    let refreshing = false;
+    async function refreshLiveData() {
+        if (refreshing || document.hidden) return;
+        refreshing = true;
+        try {
+            const response = await fetch('/account-management/live', {
+                credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (response.redirected && new URL(response.url).pathname === '/login') {
+                window.location.assign(response.url);
+                return;
+            }
+            if (!response.ok) return;
+            const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
+            for (const id of ['live-sessions', 'live-shifts']) {
+                const current = document.getElementById(id);
+                const updated = documentCopy.getElementById(id);
+                if (current && updated) current.replaceWith(updated);
+            }
+        } catch (_) {
+            // Giữ dữ liệu gần nhất khi mạng tạm thời gián đoạn.
+        } finally {
+            refreshing = false;
+        }
+    }
+    window.setInterval(refreshLiveData, 3000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLiveData(); });
+})();
+</script>
+</body>
+</html>

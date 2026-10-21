@@ -17,5 +17,5 @@ public record ResidentLookupResponse(
     boolean monthlyValid,
     String message,
     List<AuthorizedMemberResponse> authorizedMembers,
-    String guestEntryFaceImagePath
+    boolean guestEntryFaceAvailable
 ) { }

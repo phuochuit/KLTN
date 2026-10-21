@@ -5,11 +5,16 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import vn.edu.parking.domain.*;
 import vn.edu.parking.repository.*;
 import vn.edu.parking.service.PlateNormalizer;
 import vn.edu.parking.service.ResidentImageStorage;
 import vn.edu.parking.service.ParkingService;
+import vn.edu.parking.service.PaymentTransactionService;
+import vn.edu.parking.service.SecurityAuditService;
 import vn.edu.parking.web.dto.*;
 
 import java.math.BigDecimal;
@@ -36,13 +41,16 @@ public class AdminController {
     private final ResidentImageStorage imageStorage;
     private final ParkingSlotRepository slots;
     private final ParkingService parkingService;
+    private final PaymentTransactionService paymentTransactions;
+    private final SecurityAuditService audit;
 
     public AdminController(VehicleRepository vehicles, ParkingCardRepository cards,
             PricingRuleRepository prices, ParkingSessionRepository sessions,
             SubscriptionPaymentRepository payments, HouseholdRepository households,
             FamilyMemberRepository members, ParkingPolicyRepository policies,
             ResidentImageStorage imageStorage, ParkingSlotRepository slots,
-            ParkingService parkingService) {
+            ParkingService parkingService, PaymentTransactionService paymentTransactions,
+            SecurityAuditService audit) {
         this.vehicles = vehicles;
         this.cards = cards;
         this.prices = prices;
@@ -54,6 +62,8 @@ public class AdminController {
         this.imageStorage = imageStorage;
         this.slots = slots;
         this.parkingService = parkingService;
+        this.paymentTransactions = paymentTransactions;
+        this.audit = audit;
     }
 
     @GetMapping("/")
@@ -443,8 +453,35 @@ public class AdminController {
         data.put("cccdIssueDate", m.getCccdIssueDate());
         data.put("cccdIssuePlace", m.getCccdIssuePlace());
         data.put("cccdQrRaw", m.getCccdQrRaw());
-        data.put("registrationFaceImagePath", m.getRegistrationFaceImagePath());
+        boolean faceAvailable = m.getRegistrationFaceImagePath() != null
+            && !m.getRegistrationFaceImagePath().isBlank();
+        data.put("faceImageAvailable", faceAvailable);
+        data.put("faceImageUrl", faceAvailable ? "/admin-data/members/" + m.getId() + "/face-image" : null);
         return data;
+    }
+
+    @GetMapping("/admin-data/members/{id}/face-image")
+    @ResponseBody
+    ResponseEntity<byte[]> memberFaceImage(@PathVariable Long id) {
+        FamilyMember member = members.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thành viên"));
+        byte[] bytes = imageStorage.readStoredReference(member.getRegistrationFaceImagePath());
+        audit.recordCurrent("RESIDENT_FACE_VIEW", "FAMILY_MEMBER", id.toString(),
+            "SUCCESS", null, null);
+        return ResponseEntity.ok()
+            .cacheControl(CacheControl.noStore())
+            .contentType(residentImageMediaType(bytes))
+            .body(bytes);
+    }
+
+    private static MediaType residentImageMediaType(byte[] bytes) {
+        boolean png = bytes.length >= 8 && bytes[0] == (byte) 0x89 && bytes[1] == 0x50
+            && bytes[2] == 0x4e && bytes[3] == 0x47;
+        boolean jpeg = bytes.length >= 3 && bytes[0] == (byte) 0xff && bytes[1] == (byte) 0xd8
+            && bytes[2] == (byte) 0xff;
+        if (png) return MediaType.IMAGE_PNG;
+        if (jpeg) return MediaType.IMAGE_JPEG;
+        throw new IllegalStateException("Ảnh cư dân không có MIME hợp lệ");
     }
 
     @GetMapping("/settings")
@@ -626,6 +663,7 @@ public class AdminController {
         model.addAttribute("vehicles", vehicles.findAll());
         model.addAttribute("statuses", CardStatus.values());
         model.addAttribute("passTypes", PassType.values());
+        model.addAttribute("paymentMethods", PaymentMethod.values());
         model.addAttribute("today", LocalDate.now());
         model.addAttribute("payments", payments.findAllByOrderByPaidAtDesc().stream().limit(20).toList());
         model.addAttribute("selectedVehicleId", vehicleId);
@@ -633,19 +671,21 @@ public class AdminController {
     }
 
     @PostMapping("/cards")
-    String saveCard(@RequestParam String cardCode,
-            @RequestParam Long vehicleId,
+    String saveCard(@RequestParam Long vehicleId,
             @RequestParam CardStatus status,
             @RequestParam PassType passType,
             @RequestParam(required = false) LocalDate startDate,
             @RequestParam(defaultValue = "30") int durationDays,
+            @RequestParam(required = false) PaymentMethod paymentMethod,
+            @RequestParam(required = false) String paymentReference,
             RedirectAttributes redirect) {
         if (durationDays < 1 || durationDays > 366) {
             throw new IllegalArgumentException("Số ngày của gói phải từ 1 đến 366");
         }
         Vehicle vehicle = vehicles.findById(vehicleId).orElseThrow();
-        ParkingCard card = cards.findByCardCodeIgnoreCase(cardCode).orElseGet(ParkingCard::new);
-        card.setCardCode(cardCode.trim().toUpperCase());
+        String plateIdentifier = PlateNormalizer.normalize(vehicle.getPlateNumber());
+        ParkingCard card = cards.findByVehicleId(vehicleId).orElseGet(ParkingCard::new);
+        card.setCardCode(plateIdentifier);
         card.setVehicle(vehicle);
         card.setStatus(status);
         card.setPassType(passType);
@@ -672,8 +712,15 @@ public class AdminController {
             payment.setPeriodEnd(until);
             payment.setAmount(amount);
             payment.setPaidAt(LocalDateTime.now());
+            payment.setPendingPayment(true);
+            payment = payments.save(payment);
+            PaymentTransaction transaction = paymentTransactions.recordSubscription(
+                payment, paymentMethod, paymentReference);
+            payment.setPendingPayment(false);
+            payment.setPaymentTransaction(transaction);
             payments.save(payment);
-            redirect.addFlashAttribute("message", "Đã kích hoạt gói " + durationDays + " ngày đến " + until);
+            redirect.addFlashAttribute("message", "Đã kích hoạt gói " + durationDays
+                + " ngày đến " + until + ". Biên nhận: " + transaction.getReceiptNumber());
         } else {
             card.setValidFrom(null);
             card.setValidUntil(null);

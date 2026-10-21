@@ -284,7 +284,9 @@
                             <input type="hidden" name="statusOverride" id="statusOverrideVal" value="BLOCKED">
                             <button type="submit" id="btnToggleBlock" class="btn btn-outline" style="width: 100%;">🚫 Đặt làm ô Cấm đỗ / Đang bảo trì</button>
                         </form>
-                        <form method="post" th:action="@{/slots/release}" onsubmit="return confirm('Bạn có chắc chắn muốn giải phóng ô đỗ này về trạng thái trống hoàn toàn?')">
+                        <form method="post" th:action="@{/slots/release}"
+                              data-confirm="Ô đỗ sẽ được chuyển về trạng thái trống và sẵn sàng tiếp nhận xe khác. Bạn có muốn tiếp tục?"
+                              data-confirm-title="Giải phóng ô đỗ">
                             <input type="hidden" name="slotId" id="releaseSlotId">
                             <button type="submit" class="btn btn-danger" style="width: 100%;">🗑️ Giải phóng ô (Xóa toàn bộ gán xe & đỗ nhờ)</button>
                         </form>

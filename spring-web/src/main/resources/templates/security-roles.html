@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vai trò và quyền hạn</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <style>
+        .role-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:18px; }
+        .form-grid { display:grid; grid-template-columns:repeat(2,minmax(200px,1fr)); gap:12px; }
+        .form-grid label { display:flex; flex-direction:column; gap:6px; }
+        .wide { grid-column:1/-1; }
+        .permissions { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:8px; margin:12px 0; }
+        .permission { display:flex; gap:9px; align-items:flex-start; padding:10px; border:1px solid #dbe2ea; border-radius:8px; }
+        .permission input { margin-top:4px; }
+        .permission small { display:block; color:#64748b; margin-top:3px; }
+        .role-meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+        .role-meta span { background:#eef2ff; border-radius:999px; padding:4px 9px; font-size:12px; }
+        .error-notice { background:#fff1f0; color:#8a1c13; border:1px solid #efb2ad; border-radius:8px; padding:12px 16px; }
+        @media(max-width:650px) { .form-grid { grid-template-columns:1fr; } .wide { grid-column:auto; } }
+    </style>
+</head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main>
+    <h1>Vai trò và quyền hạn</h1>
+    <p class="help">Mỗi vai trò quy định công việc được phép thực hiện. Tiền tố được dùng để tự tạo mã nhân viên và không thể đổi sau khi tạo.</p>
+    <p class="notice" th:if="${message}" th:text="${message}"></p>
+    <p class="error-notice" th:if="${error}" th:text="${error}"></p>
+
+    <section class="card">
+        <h2>Tạo vai trò mới</h2>
+        <form method="post" th:action="@{/roles/create}">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <div class="form-grid">
+                <label>Tên vai trò<input name="displayName" maxlength="120" placeholder="Ví dụ: Kế toán" required></label>
+                <label>Mã vai trò<input name="code" maxlength="48" pattern="[A-Za-z][A-Za-z0-9_]{2,47}" placeholder="Ví dụ: ACCOUNTANT" required></label>
+                <label>Tiền tố mã nhân viên<input name="employeePrefix" maxlength="8" pattern="[A-Za-z]{2,8}" placeholder="Ví dụ: KT" required></label>
+                <label class="wide">Mô tả<textarea name="description" maxlength="500" rows="2"></textarea></label>
+            </div>
+            <h3>Quyền được cấp</h3>
+            <div class="permissions">
+                <label class="permission" th:each="option : ${permissionOptions}">
+                    <input type="checkbox" name="permissions" th:value="${option.permission}">
+                    <span><strong th:text="${option.label}"></strong><small th:text="${option.description}"></small></span>
+                </label>
+            </div>
+            <button type="submit">Tạo vai trò</button>
+        </form>
+    </section>
+
+    <h2>Vai trò hiện có</h2>
+    <div class="role-grid">
+        <section class="card" th:each="item : ${roles}">
+            <form method="post" th:action="@{/roles/update}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input type="hidden" name="id" th:value="${item.role.id}">
+                <div class="role-meta">
+                    <span th:text="${'Mã: ' + item.role.code}"></span>
+                    <span th:text="${'Tiền tố: ' + item.role.employeePrefix}"></span>
+                    <span th:text="${item.accountCount + ' tài khoản'}"></span>
+                    <span th:if="${item.role.systemRole}">Vai trò hệ thống</span>
+                </div>
+                <div class="form-grid">
+                    <label>Tên vai trò<input name="displayName" maxlength="120" th:value="${item.role.displayName}" required></label>
+                    <label class="wide">Mô tả<textarea name="description" maxlength="500" rows="2" th:text="${item.role.description}"></textarea></label>
+                </div>
+                <input th:if="${item.role.systemRole}" type="hidden" name="enabled" value="true">
+                <label th:unless="${item.role.systemRole}"><input type="checkbox" name="enabled" value="true" th:checked="${item.role.enabled}"> Đang sử dụng</label>
+                <h3>Quyền được cấp</h3>
+                <div class="permissions">
+                    <label class="permission" th:each="option : ${permissionOptions}">
+                        <input type="checkbox" name="permissions" th:value="${option.permission}"
+                               th:checked="${item.role.permissions.contains(option.permission)}">
+                        <span><strong th:text="${option.label}"></strong><small th:text="${option.description}"></small></span>
+                    </label>
+                </div>
+                <button type="submit">Lưu thay đổi</button>
+            </form>
+        </section>
+    </div>
+</main>
+</body>
+</html>

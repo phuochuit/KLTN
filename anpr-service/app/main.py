@@ -3,20 +3,25 @@ from __future__ import annotations
 import shutil
 import tempfile
 import base64
+import os
+import hashlib
+from urllib.parse import urlsplit
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
+from collections import defaultdict
 from threading import Lock
-from urllib.request import urlopen
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import RedirectResponse, Response
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
 from .face_engine import FaceEngine, decode_image
 from .recognizer import AnprRecognizer
 from .schemas import RecognitionResponse
+from .internal_auth import PUBLIC_PATHS, TOKEN_HEADER, configured_tokens, token_is_valid
 
 
 SERVICE_VERSION = "4.0-robust-liveness"
@@ -25,13 +30,38 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".wmv", ".m4v", ".webm"}
 
 
+@app.middleware("http")
+async def internal_service_auth(request: Request, call_next):
+    request_id = request.headers.get("x-request-id", "").strip()
+    if not request_id or len(request_id) > 128:
+        request_id = str(__import__("uuid").uuid4())
+    request.state.request_id = request_id
+    if request.url.path not in PUBLIC_PATHS:
+        tokens = configured_tokens()
+        if not tokens:
+            return JSONResponse(
+                status_code=503,
+                content={"error": "service_auth_not_configured", "requestId": request_id},
+                headers={"X-Request-ID": request_id},
+            )
+        if not token_is_valid(request.headers.get(TOKEN_HEADER), tokens):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "invalid_service_token", "requestId": request_id},
+                headers={"X-Request-ID": request_id},
+            )
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
 @lru_cache(maxsize=1)
 def recognizer() -> AnprRecognizer:
     return AnprRecognizer()
 
 
 face_engine = FaceEngine()
-camera_lock = Lock()
+camera_locks: defaultdict[str, Lock] = defaultdict(Lock)
 
 
 @app.on_event("startup")
@@ -44,15 +74,53 @@ def preload_recognizer() -> None:
     recognizer().recognize_frame(np.zeros((640, 640, 3), dtype=np.uint8))
 
 
-class CameraFaceRequest(BaseModel):
-    registeredImageUrl: str
+class CameraRecognitionRequest(BaseModel):
     cameraIndex: int = 0
+    cameraSource: str | None = None
+    frameCount: int = 8
 
 
-def capture_camera_frame(camera_index: int) -> np.ndarray:
+class CameraCaptureRequest(BaseModel):
+    cameraIndex: int = 0
+    cameraSource: str | None = None
+
+
+def normalize_camera_source(camera_index: int = 0, camera_source: str | None = None) -> int | str:
+    """Accept a local camera index or a bounded network stream URI.
+
+    The source value is never included in an exception because an RTSP URI may
+    contain credentials.
+    """
+    source = (camera_source or "").strip()
+    if not source:
+        if camera_index < 0:
+            raise ValueError("Chỉ số camera không hợp lệ")
+        return camera_index
+    if len(source) > 1024:
+        raise ValueError("Nguồn camera quá dài")
+    if source.isdecimal():
+        return int(source)
+    parsed = urlsplit(source)
+    if parsed.scheme.lower() not in {"rtsp", "http", "https"} or not parsed.hostname:
+        raise ValueError("Nguồn camera không hợp lệ")
+    return source
+
+
+def camera_lock_key(source: int | str) -> str:
+    if isinstance(source, int):
+        return f"usb:{source}"
+    return "network:" + hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
+def open_camera(source: int | str):
+    return cv2.VideoCapture(source, cv2.CAP_DSHOW) if isinstance(source, int) else cv2.VideoCapture(source)
+
+
+def capture_camera_frame(camera_index: int = 0, camera_source: str | None = None) -> np.ndarray:
     """Capture one settled frame while exclusively owning the physical camera."""
-    with camera_lock:
-        camera = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+    source = normalize_camera_source(camera_index, camera_source)
+    with camera_locks[camera_lock_key(source)]:
+        camera = open_camera(source)
         try:
             if not camera.isOpened():
                 raise ValueError("Không mở được camera")
@@ -68,10 +136,12 @@ def capture_camera_frame(camera_index: int) -> np.ndarray:
             camera.release()
 
 
-def capture_camera_frames(camera_index: int, count: int = 8) -> list[np.ndarray]:
+def capture_camera_frames(camera_index: int = 0, count: int = 8,
+                          camera_source: str | None = None) -> list[np.ndarray]:
     """Capture a short burst for liveness (motion/blink) analysis."""
-    with camera_lock:
-        camera = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+    source = normalize_camera_source(camera_index, camera_source)
+    with camera_locks[camera_lock_key(source)]:
+        camera = open_camera(source)
         try:
             if not camera.isOpened():
                 raise ValueError("Không mở được camera")
@@ -140,9 +210,10 @@ def favicon() -> Response:
 
 
 @app.post("/face/verify")
-async def verify_face(registration: UploadFile = File(...), realtime: UploadFile = File(...)) -> dict:
+async def verify_face(request: Request, registration: UploadFile = File(...), realtime: UploadFile = File(...)) -> dict:
     try:
-        return face_engine.compare(decode_image(await registration.read()), decode_image(await realtime.read()))
+        return enrich_face(face_engine.compare(
+            decode_image(await registration.read()), decode_image(await realtime.read())), request)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except RuntimeError as exc:
@@ -150,47 +221,95 @@ async def verify_face(registration: UploadFile = File(...), realtime: UploadFile
 
 
 @app.post("/face/verify-camera")
-def verify_face_camera(request: CameraFaceRequest) -> dict:
-    if not request.registeredImageUrl.startswith(("http://localhost:", "http://127.0.0.1:")):
-        raise HTTPException(400, "Ảnh đăng ký phải được lấy từ Spring API cục bộ")
+async def verify_face_camera(request: Request, registration: UploadFile = File(...),
+                             cameraIndex: int = Form(0), cameraSource: str | None = Form(None)) -> dict:
     try:
-        frames = capture_camera_frames(request.cameraIndex, count=8)
-        registered = decode_image(urlopen(request.registeredImageUrl, timeout=10).read())
+        frames = capture_camera_frames(cameraIndex, count=4, camera_source=cameraSource)
+        registered = decode_image(await registration.read())
         # Score every captured frame (plus a contrast-normalized copy)
         # and keep the clearest match instead of trusting the last frame.
         result = face_engine.compare_best(registered, frames)
         # Liveness is computed but intentionally not surfaced or allowed to
         # override a successful face match.
         liveness_score(frames)
-        frame = frames[-1]
+        best_frame_index = int(result.get("bestFrameIndex", len(frames) - 1))
+        frame = frames[max(0, min(best_frame_index, len(frames) - 1))]
         ok, encoded = cv2.imencode(".jpg", frame)
         result["realtimeImageBase64"] = base64.b64encode(encoded).decode() if ok else ""
-        return result
+        return enrich_face(result, request)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, "Không tải được ảnh đăng ký: " + str(exc)) from exc
+        raise HTTPException(502, "Không xử lý được ảnh đăng ký: " + str(exc)) from exc
+
+
+@app.post("/face/verify-image")
+async def verify_face_image(request: Request, registration: UploadFile = File(...),
+                            realtime: UploadFile = File(...)) -> dict:
+    try:
+        registered = decode_image(await registration.read())
+        frame = decode_image(await realtime.read())
+        return enrich_face_result(face_engine.compare_best(registered, [frame]), [frame], request)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, "Không xử lý được ảnh khuôn mặt: " + str(exc)) from exc
+
+
+@app.post("/face/verify-video")
+async def verify_face_video(request: Request, registration: UploadFile = File(...),
+                            realtime: UploadFile = File(...)) -> dict:
+    suffix = Path(realtime.filename or "face.mp4").suffix.lower()
+    if suffix not in VIDEO_EXTENSIONS:
+        raise HTTPException(400, "Định dạng video khuôn mặt không được hỗ trợ")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
+        shutil.copyfileobj(realtime.file, temp)
+        temp_path = Path(temp.name)
+    try:
+        capture = cv2.VideoCapture(str(temp_path))
+        if not capture.isOpened():
+            raise ValueError("Không mở được video khuôn mặt")
+        frame_count = max(1, int(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
+        frames = []
+        try:
+            for index in np.linspace(0, frame_count - 1, min(6, frame_count), dtype=int):
+                capture.set(cv2.CAP_PROP_POS_FRAMES, int(index))
+                ok, frame = capture.read()
+                if ok:
+                    frames.append(frame)
+        finally:
+            capture.release()
+        if not frames:
+            raise ValueError("Không đọc được frame khuôn mặt nào từ video")
+        registered = decode_image(await registration.read())
+        return enrich_face_result(face_engine.compare_best(registered, frames), frames, request)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, "Không xử lý được video khuôn mặt: " + str(exc)) from exc
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 @app.post("/face/capture-camera")
-def capture_face_camera() -> dict:
+def capture_face_camera(payload: CameraCaptureRequest, request: Request) -> dict:
     try:
-        frames = capture_camera_frames(0, count=8)
+        frames = capture_camera_frames(payload.cameraIndex, count=8, camera_source=payload.cameraSource)
         frame = frames[-1]
         face_engine.analyze(frame, "Ảnh realtime")
         liveness_score(frames)
         ok, encoded = cv2.imencode(".jpg", frame)
         if not ok: raise ValueError("Không mã hóa được ảnh camera")
         data = base64.b64encode(encoded).decode()
-        return {"decision":"CAPTURED","similarity":0.0,"message":"Đã chụp một khuôn mặt rõ ràng","realtimeImageBase64":data}
+        return enrich_face({"decision":"CAPTURED","similarity":0.0,"message":"Đã chụp một khuôn mặt rõ ràng","realtimeImageBase64":data}, request)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
 
 @app.post("/recognize/image", response_model=RecognitionResponse, response_model_by_alias=True)
-async def recognize_image(file: UploadFile = File(...)) -> RecognitionResponse:
+async def recognize_image(request: Request, file: UploadFile = File(...)) -> RecognitionResponse:
     suffix = Path(file.filename or "image.jpg").suffix.lower()
     if suffix not in IMAGE_EXTENSIONS:
         raise HTTPException(400, "Định dạng ảnh không được hỗ trợ")
@@ -198,13 +317,24 @@ async def recognize_image(file: UploadFile = File(...)) -> RecognitionResponse:
     if len(data) > 25 * 1024 * 1024:
         raise HTTPException(413, "Ảnh vượt quá 25 MB")
     try:
-        return recognizer().recognize_image_bytes(data)
+        return enrich_recognition(recognizer().recognize_image_bytes(data), request)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
 
+@app.post("/recognize/camera", response_model=RecognitionResponse, response_model_by_alias=True)
+def recognize_camera(payload: CameraRecognitionRequest, request: Request) -> RecognitionResponse:
+    count = max(4, min(payload.frameCount, 16))
+    try:
+        frames = capture_camera_frames(payload.cameraIndex, count=count, camera_source=payload.cameraSource)
+        indexed = [(index, frame) for index, frame in enumerate(frames)]
+        return enrich_recognition(recognizer().recognize_frames(indexed), request)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @app.post("/recognize/video", response_model=RecognitionResponse, response_model_by_alias=True)
-async def recognize_video(file: UploadFile = File(...)) -> RecognitionResponse:
+async def recognize_video(request: Request, file: UploadFile = File(...)) -> RecognitionResponse:
     suffix = Path(file.filename or "video.mp4").suffix.lower()
     if suffix not in VIDEO_EXTENSIONS:
         raise HTTPException(400, "Định dạng video không được hỗ trợ")
@@ -214,8 +344,35 @@ async def recognize_video(file: UploadFile = File(...)) -> RecognitionResponse:
     try:
         if temp_path.stat().st_size > 250 * 1024 * 1024:
             raise HTTPException(413, "Video vượt quá 250 MB")
-        return recognizer().recognize_video(temp_path)
+        return enrich_recognition(recognizer().recognize_video(temp_path), request)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     finally:
         temp_path.unlink(missing_ok=True)
+
+
+def enrich_recognition(result: RecognitionResponse, request: Request) -> RecognitionResponse:
+    return result.model_copy(update={
+        "contract_version": "1.0",
+        "request_id": request.state.request_id,
+        "model_version": SERVICE_VERSION,
+        "processed_at": datetime.now(timezone.utc),
+    })
+
+
+def enrich_face(result: dict, request: Request) -> dict:
+    return {
+        "contractVersion": "1.0",
+        "requestId": request.state.request_id,
+        "evidenceId": str(__import__("uuid").uuid4()),
+        "processedAt": datetime.now(timezone.utc).isoformat(),
+        "modelVersion": SERVICE_VERSION,
+        **result,
+    }
+
+
+def enrich_face_result(result: dict, frames: list[np.ndarray], request: Request) -> dict:
+    best_index = max(0, min(int(result.get("bestFrameIndex", 0)), len(frames) - 1))
+    ok, encoded = cv2.imencode(".jpg", frames[best_index], [cv2.IMWRITE_JPEG_QUALITY, 80])
+    result["realtimeImageBase64"] = base64.b64encode(encoded).decode() if ok else ""
+    return enrich_face(result, request)
