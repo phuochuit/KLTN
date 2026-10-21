@@ -30,7 +30,7 @@ public class DesktopApiSecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/api/parking/health").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/auth/session").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/auth/session", "/api/auth/shift-summary").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
                 .requestMatchers("/api/ai/**")
                     .hasAuthority("GATE_OPERATE")

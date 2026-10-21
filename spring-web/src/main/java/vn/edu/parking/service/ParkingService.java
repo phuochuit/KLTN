@@ -179,8 +179,10 @@ public class ParkingService {
             ? "Đã xác nhận xe ra; gói tháng còn hiệu lực nên không thu thêm"
             : "Đã xác nhận xe ra; tổng thu: " + String.format("%,d", session.getFee().longValue())
                 + " đ; biên nhận " + payment.getReceiptNumber();
-        return toResponse(session, message, false, payment.getReceiptNumber(),
-            request.paymentMethod().name(), request.paymentReference());
+        return toResponse(session, message, false,
+            payment == null ? null : payment.getReceiptNumber(),
+            payment == null ? null : request.paymentMethod().name(),
+            payment == null ? null : request.paymentReference());
     }
 
     @Transactional

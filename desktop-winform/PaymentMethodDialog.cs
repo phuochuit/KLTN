@@ -11,6 +11,7 @@ public sealed class PaymentMethodDialog : Form
         Width = 240
     };
     private readonly TextBox _reference = new() { Width = 240, Visible = false };
+    private readonly Label _referenceLabel = new() { Text = "Mã giao dịch", AutoSize = true };
     private readonly Label _fee = new() { AutoSize = true, Font = new Font("Segoe UI", 11f, FontStyle.Bold) };
 
     public PaymentMethodDialog(string plate, decimal fee)
@@ -39,7 +40,7 @@ public sealed class PaymentMethodDialog : Form
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.Controls.Add(new Label { Text = "Hình thức thu", AutoSize = true }, 0, 0);
         root.Controls.Add(_method, 1, 0);
-        root.Controls.Add(new Label { Text = "Mã giao dịch", AutoSize = true, Name = "referenceLabel" }, 0, 1);
+        root.Controls.Add(_referenceLabel, 0, 1);
         root.Controls.Add(_reference, 1, 1);
         root.Controls.Add(new Label { Text = "Áp dụng thanh toán cho lượt ra này.", AutoSize = true, MaximumSize = new Size(320, 0), ForeColor = Color.DimGray }, 0, 2);
         root.SetColumnSpan(root.GetControlFromPosition(0, 2)!, 2);
@@ -63,14 +64,19 @@ public sealed class PaymentMethodDialog : Form
 
     private void OnMethodChanged(object? sender, EventArgs e)
     {
-        var option = (PaymentOption)_method.SelectedItem!;
+        if (_method.SelectedItem is not PaymentOption option) return;
         _reference.Visible = option.RequiresReference;
-        Controls["referenceLabel"]!.Visible = option.RequiresReference;
+        _referenceLabel.Visible = option.RequiresReference;
     }
 
     private void SaveClicked(object? sender, EventArgs e)
     {
-        var option = (PaymentOption)_method.SelectedItem!;
+        if (_method.SelectedItem is not PaymentOption option)
+        {
+            MessageBox.Show(this, "Vui lòng chọn hình thức thanh toán.", "Chưa đủ thông tin",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
         SelectedMethod = option.Code;
         TransactionReference = option.RequiresReference ? _reference.Text.Trim() : null;
         if (option.RequiresReference && string.IsNullOrWhiteSpace(TransactionReference))

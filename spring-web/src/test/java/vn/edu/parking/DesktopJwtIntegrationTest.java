@@ -113,6 +113,33 @@ class DesktopJwtIntegrationTest {
     }
 
     @Test
+    void returnsCurrentAndPreviousShiftSummariesForAuthenticatedOperator() throws Exception {
+        Tokens tokens = login();
+        var account = accounts.findByUsername("gate-01").orElseThrow();
+        var previousOperator = accounts.save(new SystemAccount("gate-previous",
+            passwordEncoder.encode(PASSWORD), AccountRole.GATE_STAFF, false));
+        Instant now = Instant.now();
+        shifts.save(new GateShiftAssignment(previousOperator, "Ca trước", now.minusSeconds(7200),
+            now.minusSeconds(3600), "Bàn giao ca", null));
+        shifts.save(new GateShiftAssignment(account, "Ca hiện tại", now.minusSeconds(300),
+            now.plusSeconds(3600), "Kiểm soát cổng", null));
+
+        mvc.perform(get("/api/auth/shift-summary").param("scope", "current")
+                .header("Authorization", "Bearer " + tokens.accessToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.shiftName").value("Ca hiện tại"))
+            .andExpect(jsonPath("$.totalRevenue").value(0))
+            .andExpect(jsonPath("$.vehicleEntries").value(0))
+            .andExpect(jsonPath("$.vehiclesCurrentlyInside").value(0));
+
+        mvc.perform(get("/api/auth/shift-summary").param("scope", "previous")
+                .header("Authorization", "Bearer " + tokens.accessToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.shiftName").value("Ca trước"))
+            .andExpect(jsonPath("$.operatorName").value("gate-previous"));
+    }
+
+    @Test
     void protectsAiProxyAndPreservesCorrelationId() throws Exception {
         mvc.perform(get("/api/ai/health"))
             .andExpect(status().isUnauthorized());

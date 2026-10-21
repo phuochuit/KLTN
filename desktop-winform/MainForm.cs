@@ -58,6 +58,7 @@ public sealed class MainForm : Form
     private bool _checkingSession;
     private bool _syncingOutbox;
     private bool _vehicleBusy, _faceBusy;
+    private long? _activeShiftId;
 
     public MainForm(ParkingApiClient parkingApi, GateStationSettingsStore settingsStore, IBarrierController barrier)
     {
@@ -151,12 +152,16 @@ public sealed class MainForm : Form
     private void UpdateOperatorHeader(OperatorProfile profile)
     {
         if (InvokeRequired) { BeginInvoke(() => UpdateOperatorHeader(profile)); return; }
+        long? previousActiveShiftId = _activeShiftId;
+        _activeShiftId = profile.ActiveShift?.Id;
         string displayName = string.IsNullOrWhiteSpace(profile.FullName) ? profile.Username : profile.FullName;
         _operatorName.Text = $"Nhân viên: {displayName}";
         _operatorShift.Text = profile.ActiveShift is null
             ? "Ca trực: Chưa có ca đang hoạt động"
             : $"Ca trực: {profile.ActiveShift.Name} ({profile.ActiveShift.StartsAt.ToLocalTime():HH:mm}–{profile.ActiveShift.EndsAt.ToLocalTime():HH:mm})";
         _operatorShift.ForeColor = profile.ActiveShift is null ? Color.Firebrick : Color.SeaGreen;
+        if (_activeShiftId.HasValue && _activeShiftId != previousActiveShiftId)
+            BeginInvoke((MethodInvoker)async delegate { await ShowShiftSummaryAsync(previous: true); });
     }
 
     private void UpdateClock() => _currentTime.Text = $"Thời gian: {DateTime.Now:dd/MM/yyyy HH:mm:ss}";
@@ -438,9 +443,26 @@ public sealed class MainForm : Form
     {
         try
         {
-            if (_lastPreview == null || !_lastPreview.PlateNumber.Equals(NormalizePlate(_exitPlate.Text), StringComparison.OrdinalIgnoreCase))
+            if (_lastPreview == null)
             {
                 MessageBox.Show("Hãy bấm Xem trước phí trước khi xác nhận.", "Chưa xem trước", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            string previewPlate = NormalizePlate(_lastPreview.PlateNumber ?? "");
+            if (string.IsNullOrWhiteSpace(previewPlate))
+            {
+                _lastPreview = null;
+                MessageBox.Show(this,
+                    "Dữ liệu xem trước phí không có biển số hợp lệ. Vui lòng bấm Xem trước phí lại.",
+                    "Dữ liệu xem trước không hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (!string.Equals(previewPlate, NormalizePlate(_exitPlate.Text),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(this,
+                    "Biển số hiện tại khác với lần xem trước phí. Vui lòng bấm Xem trước phí lại.",
+                    "Biển số đã thay đổi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             ConfigureApis();
@@ -797,6 +819,7 @@ public sealed class MainForm : Form
         if (_closingAfterLogout) return;
         _closingAfterLogout = true;
         _explicitLogout = true;
+        await ShowShiftSummaryAsync(previous: false);
         Enabled = false;
         try { await _parkingApi.LogoutAsync(); }
         catch { /* Token is always cleared locally; the server session will expire if unreachable. */ }
@@ -804,6 +827,26 @@ public sealed class MainForm : Form
         {
             LogoutCompleted?.Invoke();
             Close();
+        }
+    }
+
+    private async Task ShowShiftSummaryAsync(bool previous)
+    {
+        try
+        {
+            ShiftSummary? summary = await _parkingApi.GetShiftSummaryAsync(previous);
+            if (summary is null || !_parkingApi.MarkShiftSummaryShown(summary.ShiftId)) return;
+            int outboxCount = await _parkingApi.GetOfflineQueueCountAsync();
+            using var dialog = new ShiftSummaryDialog(summary, outboxCount, previous);
+            dialog.ShowDialog(this);
+        }
+        catch (DesktopAuthenticationException) { }
+        catch (Exception ex)
+        {
+            if (!previous)
+                MessageBox.Show(this,
+                    "Không tải được báo cáo ca, nhưng bạn vẫn có thể đăng xuất.\r\n\r\n" + ex.Message,
+                    "Chưa tải được tổng kết ca", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -888,6 +931,8 @@ public sealed class MainForm : Form
 
     private void ShowError(Exception ex)
     {
+        string errorId = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss-fff");
+        WriteDiagnosticError(errorId, ex);
         string message = ex switch
         {
             DesktopAuthenticationException => "Phiên đăng nhập hết hạn hoặc bị thu hồi. Hãy đăng nhập lại.",
@@ -897,11 +942,39 @@ public sealed class MainForm : Form
             System.Text.Json.JsonException => "Máy chủ trả về dữ liệu không đúng định dạng. Có thể đang chạy phiên bản dịch vụ cũ.\r\n\r\nHãy đóng các cửa sổ Parking Web/ANPR cũ và chạy lại run-all-laragon.cmd.",
             _ => ex.Message
         };
+        if (ex is NullReferenceException)
+            message = "Ứng dụng gặp dữ liệu không hợp lệ khi xử lý thao tác. "
+                + "Mã lỗi: " + errorId + ". Vui lòng gửi file desktop-error.log để kiểm tra.";
         _result.BackColor = Color.MistyRose;
         _result.ForeColor = Color.Firebrick;
         _result.Text = "KHÔNG THỂ THỰC HIỆN\r\n\r\n" + message;
         _aiStatus.Text = "Nhận dạng thất bại - có thể nhập biển số thủ công";
         _aiStatus.ForeColor = Color.Firebrick;
+    }
+
+    private static void WriteDiagnosticError(string errorId, Exception ex)
+    {
+        try
+        {
+            string directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "ParkingGateDesktop");
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, "desktop-error.log");
+            string entry = $"[{DateTimeOffset.Now:O}] errorId={errorId}\r\n"
+                + $"type={ex.GetType().FullName}\r\nmessage={ex.Message}\r\n"
+                + $"stack={ex.StackTrace}\r\n"
+                + (ex.InnerException is null ? "" :
+                    $"innerType={ex.InnerException.GetType().FullName}\r\n"
+                    + $"innerMessage={ex.InnerException.Message}\r\n"
+                    + $"innerStack={ex.InnerException.StackTrace}\r\n")
+                + "---\r\n";
+            File.AppendAllText(path, entry);
+        }
+        catch
+        {
+            // Diagnostic logging must never hide the original application error.
+        }
     }
 
     private void ShowLocalImage(string path)

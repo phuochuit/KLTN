@@ -16,6 +16,8 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
     List<ParkingSession> findAllByOrderByEntryTimeDesc();
     List<ParkingSession> findByStatusOrderByEntryTimeDesc(SessionStatus status);
     List<ParkingSession> findByStatusAndExitTimeBetween(SessionStatus status, LocalDateTime from, LocalDateTime to);
+    long countByEntryTimeBetween(LocalDateTime from, LocalDateTime to);
+    long countByStatusAndExitTimeBetween(SessionStatus status, LocalDateTime from, LocalDateTime to);
     long countByStatus(SessionStatus status);
 
     @Query("select count(s) from ParkingSession s where s.entryTime < :end " +

@@ -99,6 +99,9 @@ class ParkingFlowIntegrationTest {
 
     @Test
     void monthlyPassKeepsOwnerAndMakesVisitFeeZero() throws Exception {
+        long paymentCountBefore = paymentTransactions.count();
+        int completedCountBefore = parkingSessions
+            .findByStatusOrderByEntryTimeDesc(SessionStatus.COMPLETED).size();
         Vehicle vehicle = new Vehicle();
         vehicle.setPlateNumber("29A006131");
         vehicle.setOwnerName("Cư dân A1-1205");
@@ -127,6 +130,17 @@ class ParkingFlowIntegrationTest {
         mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.fee", is(0)));
+        mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status", is("COMPLETED")))
+            .andExpect(jsonPath("$.fee", is(0)))
+            .andExpect(jsonPath("$.message",
+                org.hamcrest.Matchers.containsString("gói tháng còn hiệu lực")))
+            .andExpect(jsonPath("$.receiptNumber").doesNotExist())
+            .andExpect(jsonPath("$.paymentMethod").doesNotExist());
+        assertThat(paymentTransactions.count()).isEqualTo(paymentCountBefore);
+        assertThat(parkingSessions.findByStatusOrderByEntryTimeDesc(SessionStatus.COMPLETED))
+            .hasSize(completedCountBefore + 1);
     }
 
     @Test

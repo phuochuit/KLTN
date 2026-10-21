@@ -12,6 +12,7 @@ public sealed class ParkingApiClient : IDisposable
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SemaphoreSlim _outboxGate = new(1, 1);
     private readonly OfflineOutboxStore _outbox;
+    private readonly HashSet<long> _shownShiftSummaries = new();
     private string? _accessToken;
     private string? _refreshToken;
     private string? _authenticatedBaseUrl;
@@ -85,6 +86,20 @@ public sealed class ParkingApiClient : IDisposable
         UpdateOperator(profile);
         return profile;
     }
+
+    public async Task<ShiftSummary?> GetShiftSummaryAsync(bool previous)
+    {
+        string scope = previous ? "previous" : "current";
+        using var response = await SendProtectedAsync(
+            $"/api/auth/shift-summary?scope={scope}", HttpMethod.Get, retrySafeRead: true);
+        if (response.StatusCode == HttpStatusCode.NoContent) return null;
+        return await ApiResponseReader.ReadAsync<ShiftSummary>(response, _json,
+            "Spring Web", "tải tổng kết ca");
+    }
+
+    public async Task<int> GetOfflineQueueCountAsync() => (await _outbox.ReadAsync()).Count;
+
+    public bool MarkShiftSummaryShown(long shiftId) => _shownShiftSummaries.Add(shiftId);
 
     public async Task<bool> AiHealthAsync()
     {

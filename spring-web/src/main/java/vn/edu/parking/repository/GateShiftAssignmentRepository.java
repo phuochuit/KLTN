@@ -2,6 +2,7 @@ package vn.edu.parking.repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
@@ -19,4 +20,10 @@ public interface GateShiftAssignmentRepository extends JpaRepository<GateShiftAs
 
     @EntityGraph(attributePaths = "account")
     List<GateShiftAssignment> findTop50ByOrderByStartsAtDesc();
+
+    Optional<GateShiftAssignment> findFirstByAccount_IdAndEndsAtLessThanEqualOrderByEndsAtDesc(
+        Long accountId, Instant endsAt);
+
+    @EntityGraph(attributePaths = "account")
+    Optional<GateShiftAssignment> findFirstByEndsAtLessThanEqualOrderByEndsAtDesc(Instant endsAt);
 }

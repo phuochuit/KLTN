@@ -12,10 +12,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import vn.edu.parking.service.DesktopAuthenticationService;
 import vn.edu.parking.service.LoginAttemptThrottle;
 import vn.edu.parking.service.SecurityAuditService;
+import vn.edu.parking.service.ShiftSummaryService;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,12 +26,15 @@ public class DesktopAuthController {
     private final DesktopAuthenticationService authenticationService;
     private final SecurityAuditService audit;
     private final LoginAttemptThrottle loginThrottle;
+    private final ShiftSummaryService shiftSummaries;
 
     public DesktopAuthController(DesktopAuthenticationService authenticationService,
-            SecurityAuditService audit, LoginAttemptThrottle loginThrottle) {
+            SecurityAuditService audit, LoginAttemptThrottle loginThrottle,
+            ShiftSummaryService shiftSummaries) {
         this.authenticationService = authenticationService;
         this.audit = audit;
         this.loginThrottle = loginThrottle;
+        this.shiftSummaries = shiftSummaries;
     }
 
     @PostMapping("/login")
@@ -82,6 +87,22 @@ public class DesktopAuthController {
         try {
             return ResponseEntity.ok(toResponse(authenticationService.profile(
                 Long.parseLong(jwt.getToken().getSubject()))));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+    }
+
+    @GetMapping("/shift-summary")
+    ResponseEntity<?> shiftSummary(Authentication authentication,
+            @RequestParam(defaultValue = "current") String scope) {
+        if (!(authentication instanceof JwtAuthenticationToken jwt))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            long accountId = Long.parseLong(jwt.getToken().getSubject());
+            var summary = "previous".equalsIgnoreCase(scope)
+                ? shiftSummaries.previous() : shiftSummaries.current(accountId);
+            return summary.<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }

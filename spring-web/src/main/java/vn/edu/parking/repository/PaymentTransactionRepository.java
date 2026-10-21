@@ -24,4 +24,8 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
         "gateShiftAssignment", "reconciledBy" })
     List<PaymentTransaction> findByStatusAndPaidAtBetweenOrderByPaidAtDesc(
         PaymentStatus status, Instant from, Instant to);
+
+    @EntityGraph(attributePaths = { "parkingSession", "subscriptionPayment", "collectedBy",
+        "gateShiftAssignment", "reconciledBy" })
+    List<PaymentTransaction> findByGateShiftAssignment_IdOrderByPaidAtAsc(Long shiftId);
 }

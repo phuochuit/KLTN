@@ -123,7 +123,7 @@ internal sealed class DesktopLoginDialog : Form
         }
         catch (InvalidOperationException)
         {
-            _error.Text = "Không thể đăng nhập với địa chỉ Spring API hiện tại.";
+            _error.Text = "Sai thông tin đăng nhập hoặc mật khẩu.";
         }
         finally
         {

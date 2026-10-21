@@ -14,6 +14,26 @@ public record OperatorProfile(
     [property: JsonPropertyName("fullName")] string FullName,
     [property: JsonPropertyName("activeShift")] OperatorShift? ActiveShift);
 
+public record ShiftSummary(
+    [property: JsonPropertyName("shiftId")] long ShiftId,
+    [property: JsonPropertyName("shiftName")] string ShiftName,
+    [property: JsonPropertyName("operatorName")] string OperatorName,
+    [property: JsonPropertyName("startsAt")] DateTimeOffset StartsAt,
+    [property: JsonPropertyName("endsAt")] DateTimeOffset EndsAt,
+    [property: JsonPropertyName("summarizedAt")] DateTimeOffset SummarizedAt,
+    [property: JsonPropertyName("duty")] string Duty,
+    [property: JsonPropertyName("totalRevenue")] decimal TotalRevenue,
+    [property: JsonPropertyName("cashRevenue")] decimal CashRevenue,
+    [property: JsonPropertyName("bankTransferRevenue")] decimal BankTransferRevenue,
+    [property: JsonPropertyName("posRevenue")] decimal PosRevenue,
+    [property: JsonPropertyName("vehicleEntries")] long VehicleEntries,
+    [property: JsonPropertyName("vehicleExits")] long VehicleExits,
+    [property: JsonPropertyName("vehiclesCurrentlyInside")] long VehiclesCurrentlyInside,
+    [property: JsonPropertyName("occupiedSlots")] long OccupiedSlots,
+    [property: JsonPropertyName("availableSlots")] long AvailableSlots,
+    [property: JsonPropertyName("pendingReconciliation")] long PendingReconciliation,
+    [property: JsonPropertyName("manualOverrides")] long ManualOverrides);
+
 public record ParkingRequest(
     [property: JsonPropertyName("plateNumber")] string PlateNumber,
     [property: JsonPropertyName("cardCode")] string CardCode,
