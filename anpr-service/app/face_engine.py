@@ -139,8 +139,13 @@ class FaceEngine:
             best_score = -1.0
             best_warnings = []
             best_details = None
-            for candidate in candidates:
-                for variant in (candidate, self._clahe_variant(candidate)):
+            best_frame_index = 0
+            for frame_index, candidate in enumerate(candidates):
+                variants = [candidate]
+                brightness = float(np.mean(cv2.cvtColor(candidate, cv2.COLOR_BGR2GRAY)))
+                if brightness < 70 or brightness > 205:
+                    variants.append(self._clahe_variant(candidate))
+                for variant in variants:
                     try:
                         feature, warnings, details = self.analyze(variant, "Ảnh realtime")
                     except ValueError:
@@ -150,6 +155,7 @@ class FaceEngine:
                         best_score = score
                         best_warnings = warnings
                         best_details = details
+                        best_frame_index = frame_index
             if best_details is None:
                 raise ValueError("Ảnh realtime: cần đúng một khuôn mặt rõ ràng (đã thấy 0)")
             score = round(best_score, 4)
@@ -162,7 +168,9 @@ class FaceEngine:
                 message = "Điểm nằm gần ngưỡng; nhân viên cần kiểm tra hoặc chụp lại"
             else:
                 message = "Khuôn mặt không khớp ảnh đăng ký"
-            return {"decision": decision, "similarity": score, "matchThreshold": MATCH_THRESHOLD, "warnings": best_warnings, "face": best_details, "message": message}
+            return {"decision": decision, "similarity": score, "matchThreshold": MATCH_THRESHOLD,
+                    "warnings": best_warnings, "face": best_details,
+                    "bestFrameIndex": best_frame_index, "message": message}
 
 
 def decode_image(raw: bytes):

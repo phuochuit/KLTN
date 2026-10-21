@@ -58,7 +58,7 @@ public sealed class SlotDetailDialog : Form
         };
         var subtitle = new Label
         {
-            Text = $"Trạng thái: {_slot.StatusDescription ?? _slot.Status} | Loại xe: {(_slot.AllowedVehicleType == "MOTORBIKE" ? "Xe máy" : "Ô tô")}",
+            Text = $"Trạng thái: {_slot.StatusDescription ?? _slot.Status} | Loại xe: {DisplayAllowedVehicleType(_slot.AllowedVehicleType)}",
             Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
             ForeColor = Color.FromArgb(220, 235, 252),
             Dock = DockStyle.Top,
@@ -107,10 +107,7 @@ public sealed class SlotDetailDialog : Form
 
         // 3. Action Tabs
         var tabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f) };
-        tabs.TabPages.Add(BuildResidentTab());
-        tabs.TabPages.Add(BuildBorrowTab());
         tabs.TabPages.Add(BuildGuestTab());
-        tabs.TabPages.Add(BuildManagementTab());
 
         mainLayout.Controls.Add(tabs, 0, 2);
         Controls.Add(mainLayout);
@@ -230,17 +227,7 @@ public sealed class SlotDetailDialog : Form
     {
         try
         {
-            // 1. Xe cư dân chưa có ô
-            var unassignedVehicles = await _api.GetUnassignedVehiclesAsync();
-            _cboResidentVehicles.Items.Clear();
-            _cboResidentVehicles.Items.Add("-- Chọn xe cư dân --");
-            foreach (var v in unassignedVehicles)
-            {
-                _cboResidentVehicles.Items.Add(new ComboBoxItem(v.Id, $"{v.PlateNumber} - {v.OwnerName} ({v.ApartmentNumber})"));
-            }
-            _cboResidentVehicles.SelectedIndex = 0;
-
-            // 2. Xe vừa vào trạm chưa có ô
+            // Desktop trạm gác chỉ điều phối lượt xe vừa vào.
             var recentSessions = await _api.GetRecentUnassignedSessionsAsync();
             _cboRecentSessions.Items.Clear();
             _cboRecentSessions.Items.Add("-- Chọn xe vừa vào trạm --");
@@ -250,18 +237,19 @@ public sealed class SlotDetailDialog : Form
             }
             _cboRecentSessions.SelectedIndex = 0;
 
-            // Điền trước thông tin đỗ nhờ nếu có
-            if (!string.IsNullOrWhiteSpace(_slot.BorrowedPlate))
-            {
-                _txtBorrowPlate.Text = _slot.BorrowedPlate;
-                _txtBorrowNotes.Text = _slot.BorrowNotes ?? "";
-            }
         }
         catch (Exception ex)
         {
             MessageBox.Show("Lỗi tải dữ liệu: " + ex.Message, "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
+
+    private static string DisplayAllowedVehicleType(string? value) => value switch
+    {
+        "MOTORBIKE" => "Xe máy",
+        "CAR" => "Ô tô",
+        _ => "Dùng chung"
+    };
 
     private async Task AssignResidentAsync()
     {

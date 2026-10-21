@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div id="live-sessions" th:fragment="sessions">
+    <section class="card section-gap">
+        <h2>Nhân viên đang đăng nhập Desktop</h2>
+        <p class="help">Theo dõi nhân viên đang làm việc, ca trực và nhiệm vụ được giao.</p>
+        <div class="table-scroll"><table>
+            <thead><tr><th>Tài khoản</th><th>Thiết bị</th><th>Đăng nhập lúc</th><th>Hoạt động gần nhất</th><th>Ca hiện tại</th><th>Nhiệm vụ</th><th>Thao tác</th></tr></thead>
+            <tbody>
+            <tr th:each="desktopSession : ${activeDesktopSessions}">
+                <td><span class="badge badge-online">Trực tuyến</span> <strong th:text="${desktopSession.username}"></strong></td>
+                <td th:text="${desktopSession.deviceLabel ?: 'Không xác định'}"></td>
+                <td th:text="${#temporals.format(desktopSession.loggedInAt, 'dd/MM/yyyy HH:mm')}"></td>
+                <td th:text="${#temporals.format(desktopSession.lastSeenAt, 'dd/MM/yyyy HH:mm')}"></td>
+                <td th:text="${desktopSession.shiftName ?: 'Chưa phân ca'}"></td>
+                <td th:text="${desktopSession.duty ?: 'Nhân viên trạm gác'}"></td>
+                <td><form method="post" th:action="@{/account-management/sessions/desktop/revoke}"
+                          data-confirm="Nhân viên sẽ được đưa về màn hình đăng nhập trên thiết bị này. Bạn có muốn tiếp tục?"
+                          data-confirm-title="Đăng xuất thiết bị">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <input type="hidden" name="sessionId" th:value="${desktopSession.sessionId}">
+                    <button class="btn btn-danger" type="submit">Đăng xuất</button>
+                </form></td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(activeDesktopSessions)}"><td colspan="7" class="muted">Không có nhân viên Desktop đang đăng nhập.</td></tr>
+            </tbody>
+        </table></div>
+    </section>
+    <section class="card section-gap">
+        <h2>Tài khoản đang đăng nhập Web</h2>
+        <p class="help">Các tài khoản quản trị đang sử dụng hệ thống.</p>
+        <div class="table-scroll"><table>
+            <thead><tr><th>Tài khoản</th><th>Hoạt động gần nhất</th><th>Thao tác</th></tr></thead>
+            <tbody>
+            <tr th:each="webLogin : ${activeWebSessions}">
+                <td><span class="badge badge-online">Trực tuyến</span> <strong th:text="${webLogin.username}"></strong></td>
+                <td th:text="${#temporals.format(webLogin.lastSeenAt, 'dd/MM/yyyy HH:mm')}"></td>
+                <td><form method="post" th:action="@{/account-management/sessions/web/revoke}"
+                          data-confirm="Tài khoản này sẽ phải đăng nhập lại trên trình duyệt đang sử dụng. Bạn có muốn tiếp tục?"
+                          data-confirm-title="Kết thúc phiên làm việc">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <input type="hidden" name="sessionId" th:value="${webLogin.sessionId}">
+                    <button class="btn btn-danger" type="submit">Kết thúc phiên</button>
+                </form></td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(activeWebSessions)}"><td colspan="3" class="muted">Không có phiên Web nào được ghi nhận.</td></tr>
+            </tbody>
+        </table></div>
+    </section>
+</div>
+
+<div id="live-shifts" th:fragment="shifts">
+    <section class="section-gap">
+        <h2>Lịch phân công gần đây</h2>
+        <p class="help">Danh sách ca làm việc và nhiệm vụ đã được phân công.</p>
+        <div class="table-scroll"><table>
+            <thead><tr><th>Nhân viên</th><th>Ca</th><th>Bắt đầu</th><th>Kết thúc</th><th>Nhiệm vụ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <tbody>
+            <tr th:each="shift : ${shiftAssignments}">
+                <td th:text="${shift.username}"></td><td th:text="${shift.shiftName}"></td>
+                <td th:text="${#temporals.format(shift.startsAt, 'dd/MM/yyyy HH:mm')}"></td>
+                <td th:text="${#temporals.format(shift.endsAt, 'dd/MM/yyyy HH:mm')}"></td>
+                <td><span th:text="${shift.duty}"></span><small class="muted" th:if="${shift.notes}" th:text="${' — ' + shift.notes}"></small></td>
+                <td><span class="badge" th:classappend="${shift.active} ? ' badge-shift' : ''" th:text="${shift.active ? 'Đang diễn ra' : 'Đã/Sắp xếp'}"></span></td>
+                <td><form method="post" th:action="@{/account-management/shifts/delete}"
+                          data-confirm="Phân công ca này sẽ bị xóa khỏi lịch làm việc. Bạn có muốn tiếp tục?"
+                          data-confirm-title="Xóa phân công ca">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <input type="hidden" name="id" th:value="${shift.id}">
+                    <button class="btn btn-danger" type="submit">Xóa</button>
+                </form></td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(shiftAssignments)}"><td colspan="7" class="muted">Chưa có phân công ca.</td></tr>
+            </tbody>
+        </table></div>
+    </section>
+</div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Không thể xử lý yêu cầu</title>
+    <style>
+        body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px; font-family:Segoe UI,Arial,sans-serif; background:#f4f7fb; color:#172033; }
+        main { width:min(100%,560px); padding:34px; background:#fff; border:1px solid #dce4ee; border-radius:16px; box-shadow:0 18px 45px rgba(23,54,93,.12); text-align:center; }
+        .status { margin:0; color:#2e74b5; font-size:56px; font-weight:800; }
+        h1 { margin:8px 0 10px; color:#17365d; }
+        p { color:#5b687a; line-height:1.55; }
+        .actions { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:24px; }
+        a { padding:11px 17px; border-radius:8px; text-decoration:none; font-weight:700; }
+        .primary { background:#2e74b5; color:#fff; }
+        .secondary { border:1px solid #bac7d7; color:#17365d; }
+    </style>
+</head>
+<body>
+<main>
+    <p class="status" th:text="${status ?: 'Lỗi'}"></p>
+    <h1>Không thể xử lý yêu cầu</h1>
+    <p th:if="${status == 404}">Trang bạn yêu cầu không tồn tại hoặc đã được di chuyển.</p>
+    <p th:if="${status == 403}">Bạn không có quyền thực hiện thao tác này.</p>
+    <p th:unless="${status == 404 or status == 403}">Đã xảy ra lỗi. Vui lòng thử lại hoặc liên hệ quản trị viên.</p>
+    <div class="actions">
+        <a class="primary" th:href="@{/}">Về trang chính</a>
+        <a class="secondary" th:href="@{/login}">Đăng nhập</a>
+    </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>Giao dịch và đối soát</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
+<body><header th:replace="~{fragments :: header}"></header><main>
+<h1>Giao dịch và đối soát</h1>
+<p class="notice" th:if="${message}" th:text="${message}"></p>
+<div class="stats-grid">
+  <div class="stats-item"><div class="label">Chờ đối soát</div><div class="value" th:text="${paidCount}">0</div></div>
+  <div class="stats-item"><div class="label">Số tiền chờ</div><div class="value" th:text="${#numbers.formatDecimal(paidAmount,0,'COMMA',0,'POINT') + ' đ'}">0 đ</div></div>
+</div>
+<div class="card">
+  <h2>Giao dịch gần đây</h2>
+  <table><thead><tr><th>Biên nhận</th><th>Loại</th><th>Hình thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thời gian</th><th>Người thu</th><th>Đối soát</th></tr></thead>
+  <tbody>
+    <tr th:each="item:${transactions}">
+      <td><strong th:text="${item.receiptNumber}"></strong><div class="muted" th:text="${item.externalReference ?: '-'}"></div></td>
+      <td th:text="${item.paymentType.displayName}"></td>
+      <td th:text="${item.paymentMethod.displayName}"></td>
+      <td th:text="${#numbers.formatDecimal(item.amount,0,'COMMA',0,'POINT') + ' đ'}"></td>
+      <td th:text="${item.status.displayName}" th:class="${item.status.name() == 'RECONCILED' ? 'status-active' : 'status-open'}"></td>
+      <td th:text="${#temporals.format(item.paidAt,'dd/MM/yyyy HH:mm')}"></td>
+      <td th:text="${item.collectedBy.fullName ?: item.collectedBy.username}"></td>
+      <td>
+        <form th:if="${item.status.name() == 'PAID'}" method="post" th:action="@{/payments/{id}/reconcile(id=${item.id})}">
+          <input name="note" placeholder="Ghi chú đối soát" required maxlength="500">
+          <button class="btn btn-primary">Chốt đối soát</button>
+        </form>
+        <span th:if="${item.status.name() != 'PAID'}" class="muted" th:text="${item.reconciliationNote ?: 'Đã chốt'}"></span>
+      </td>
+    </tr>
+    <tr th:if="${#lists.isEmpty(transactions)}"><td colspan="8" class="muted">Chưa có giao dịch.</td></tr>
+  </tbody></table>
+</div>
+</main></body></html>

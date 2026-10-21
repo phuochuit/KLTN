@@ -1,1 +1,66 @@
-<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><header th:fragment="header"><strong>Parking ANPR Demo</strong><nav><a th:href="@{/}">Dashboard</a><a th:href="@{/registrations}">Đăng ký hồ sơ</a><a th:href="@{/households}">Hộ gia đình</a><a th:href="@{/vehicles}">Phương tiện</a><a th:href="@{/cards}">Thẻ &amp; gói</a><a th:href="@{/pricing}">Bảng giá</a><a th:href="@{/settings}">Hạn mức</a><a th:href="@{/slots}">Sơ đồ bãi</a><a th:href="@{/sessions}">Lịch sử</a><form class="logout-form" th:action="@{/logout}" method="post"><button class="nav-logout" type="submit">Đăng xuất</button></form></nav></header></body></html>
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<header class="site-header" th:fragment="header">
+    <a class="site-brand" th:href="@{/}">Parking ANPR</a>
+    <nav class="main-nav" aria-label="Điều hướng chính">
+        <a class="nav-link" th:href="@{/}"
+           th:if="${#sets.contains(currentAuthorities, 'DASHBOARD_VIEW') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Tổng quan</a>
+        <details class="nav-group"
+                 th:if="${#sets.contains(currentAuthorities, 'RESIDENT_MANAGE') or #sets.contains(currentAuthorities, 'VEHICLE_MANAGE') or #sets.contains(currentAuthorities, 'CARD_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">
+            <summary>Hồ sơ</summary>
+            <div class="nav-menu">
+                <a th:href="@{/registrations}" th:if="${#sets.contains(currentAuthorities, 'VEHICLE_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Đăng ký hồ sơ</a>
+                <a th:href="@{/households}" th:if="${#sets.contains(currentAuthorities, 'RESIDENT_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Hộ gia đình</a>
+                <a th:href="@{/vehicles}" th:if="${#sets.contains(currentAuthorities, 'VEHICLE_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Phương tiện</a>
+                <a th:href="@{/cards}" th:if="${#sets.contains(currentAuthorities, 'CARD_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Thẻ &amp; gói</a>
+            </div>
+        </details>
+        <details class="nav-group"
+                 th:if="${#sets.contains(currentAuthorities, 'SLOT_MANAGE') or #sets.contains(currentAuthorities, 'HISTORY_VIEW') or #sets.contains(currentAuthorities, 'PAYMENT_RECONCILE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">
+            <summary>Vận hành</summary>
+            <div class="nav-menu">
+                <a th:href="@{/slots}" th:if="${#sets.contains(currentAuthorities, 'SLOT_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Sơ đồ bãi</a>
+                <a th:href="@{/sessions}" th:if="${#sets.contains(currentAuthorities, 'HISTORY_VIEW') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Lịch sử xe</a>
+                <a th:href="@{/payments}" th:if="${#sets.contains(currentAuthorities, 'PAYMENT_RECONCILE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Giao dịch &amp; đối soát</a>
+            </div>
+        </details>
+        <details class="nav-group"
+                 th:if="${#sets.contains(currentAuthorities, 'PRICING_MANAGE') or #sets.contains(currentAuthorities, 'SLOT_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">
+            <summary>Cấu hình</summary>
+            <div class="nav-menu">
+                <a th:href="@{/pricing}" th:if="${#sets.contains(currentAuthorities, 'PRICING_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Bảng giá</a>
+                <a th:href="@{/settings}" th:if="${#sets.contains(currentAuthorities, 'SLOT_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Hạn mức</a>
+            </div>
+        </details>
+        <details class="nav-group"
+                 th:if="${#sets.contains(currentAuthorities, 'ACCOUNT_MANAGE') or #sets.contains(currentAuthorities, 'SHIFT_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGE') or #sets.contains(currentAuthorities, 'SECURITY_AUDIT_VIEW') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">
+            <summary>Quản trị</summary>
+            <div class="nav-menu nav-menu-right">
+                <a th:href="@{/account-management}" th:if="${#sets.contains(currentAuthorities, 'ACCOUNT_MANAGE') or #sets.contains(currentAuthorities, 'SHIFT_MANAGE') or #sets.contains(currentAuthorities, 'SECURITY_AUDIT_VIEW') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Tài khoản</a>
+                <a th:href="@{/roles}" th:if="${#sets.contains(currentAuthorities, 'ROLE_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Vai trò &amp; quyền hạn</a>
+                <a th:href="@{/security-audit}" th:if="${#sets.contains(currentAuthorities, 'SECURITY_AUDIT_VIEW') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Nhật ký bảo mật</a>
+            </div>
+        </details>
+        <span class="account-greeting" th:if="${currentAccountDisplayName}"
+              th:text="${'Xin chào, ' + currentAccountDisplayName}"></span>
+        <form class="logout-form" th:action="@{/logout}" method="post"
+              data-confirm="Bạn muốn đăng xuất khỏi hệ thống?" data-confirm-title="Đăng xuất">
+            <button class="nav-logout" type="submit">Đăng xuất</button>
+        </form>
+    </nav>
+    <dialog id="app-dialog" class="app-dialog" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+        <div class="app-dialog-icon" aria-hidden="true">?</div>
+        <div class="app-dialog-content">
+            <h2 id="app-dialog-title">Xác nhận thao tác</h2>
+            <p id="app-dialog-message"></p>
+        </div>
+        <div class="app-dialog-actions">
+            <button id="app-dialog-cancel" type="button" class="btn btn-outline">Hủy</button>
+            <button id="app-dialog-confirm" type="button" class="btn btn-primary">Xác nhận</button>
+        </div>
+    </dialog>
+    <script th:src="@{/js/app-dialog.js}" defer></script>
+</header>
+</body>
+</html>

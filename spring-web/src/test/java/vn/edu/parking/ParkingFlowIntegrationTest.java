@@ -9,11 +9,17 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 import vn.edu.parking.domain.*;
+import vn.edu.parking.domain.AccountRole;
 import vn.edu.parking.repository.ParkingCardRepository;
 import vn.edu.parking.repository.VehicleRepository;
 import vn.edu.parking.repository.HouseholdRepository;
 import vn.edu.parking.repository.FamilyMemberRepository;
 import vn.edu.parking.repository.PricingRuleRepository;
+import vn.edu.parking.repository.SecurityAuditRepository;
+import vn.edu.parking.repository.PaymentTransactionRepository;
+import vn.edu.parking.repository.ParkingSessionRepository;
+import vn.edu.parking.repository.SystemAccountRepository;
+import vn.edu.parking.service.ResidentImageStorage;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,6 +33,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.anyOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -38,7 +45,9 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 @TestPropertySource(properties = {
     "spring.datasource.url=jdbc:h2:mem:parking-test;DB_CLOSE_DELAY=-1",
     "spring.jpa.hibernate.ddl-auto=create-drop",
-    "parking.upload-dir=target/test-uploads"
+    "parking.upload-dir=target/test-uploads",
+    "parking.private-storage-path=target/test-private",
+    "parking.evidence.required=false"
 })
 class ParkingFlowIntegrationTest {
     @Autowired MockMvc mvc;
@@ -47,11 +56,18 @@ class ParkingFlowIntegrationTest {
     @Autowired HouseholdRepository households;
     @Autowired FamilyMemberRepository members;
     @Autowired PricingRuleRepository prices;
+    @Autowired SecurityAuditRepository audits;
+    @Autowired ResidentImageStorage residentImages;
+    @Autowired PaymentTransactionRepository paymentTransactions;
+    @Autowired ParkingSessionRepository parkingSessions;
+    @Autowired SystemAccountRepository systemAccounts;
 
     @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void completesEntryPreviewAndExitFlow() throws Exception {
+        seedCollectorAccount();
         String body = """
-            {"plateNumber":"59A1-123.45","cardCode":"CARD001","vehicleType":"MOTORBIKE","manualOverride":false}
+            {"plateNumber":"59A1-123.45","cardCode":"59A112345","vehicleType":"MOTORBIKE","manualOverride":false}
             """;
 
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
@@ -66,9 +82,19 @@ class ParkingFlowIntegrationTest {
             .andExpect(jsonPath("$.fee", anyOf(is(5000), is(8000))));
 
         mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(body))
+            .andExpect(status().isBadRequest());
+        assertThat(parkingSessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN)).hasSize(1);
+        assertThat(paymentTransactions.count()).isZero();
+
+        String paidBody = """
+            {"plateNumber":"59A1-123.45","cardCode":"59A112345","vehicleType":"MOTORBIKE","manualOverride":false,"paymentMethod":"CASH"}
+            """;
+        mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(paidBody))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status", is("COMPLETED")))
-            .andExpect(jsonPath("$.fee", anyOf(is(5000), is(8000))));
+            .andExpect(jsonPath("$.fee", anyOf(is(5000), is(8000))))
+            .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("biên nhận")));
+        assertThat(paymentTransactions.count()).isEqualTo(1);
     }
 
     @Test
@@ -82,7 +108,7 @@ class ParkingFlowIntegrationTest {
         vehicle = vehicles.save(vehicle);
 
         ParkingCard card = new ParkingCard();
-        card.setCardCode("CARD030");
+        card.setCardCode("29A006131");
         card.setVehicle(vehicle);
         card.setStatus(CardStatus.ACTIVE);
         card.setPassType(PassType.MONTHLY);
@@ -92,7 +118,7 @@ class ParkingFlowIntegrationTest {
         cards.save(card);
 
         String body = """
-            {"plateNumber":"29A0-061.31","cardCode":"CARD030","vehicleType":"MOTORBIKE","manualOverride":false}
+            {"plateNumber":"29A0-061.31","cardCode":"29A006131","vehicleType":"MOTORBIKE","manualOverride":false}
             """;
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
             .andExpect(status().isOk())
@@ -104,7 +130,34 @@ class ParkingFlowIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = "ADMIN")
+    void ignoresForeignCardCodeAndUsesRecognizedPlateAsIdentifier() throws Exception {
+        Vehicle subscribedVehicle = new Vehicle();
+        subscribedVehicle.setPlateNumber("30A999999");
+        subscribedVehicle.setOwnerName("Chủ xe có gói");
+        subscribedVehicle.setVehicleType(VehicleType.CAR);
+        subscribedVehicle = vehicles.save(subscribedVehicle);
+
+        ParkingCard monthly = new ParkingCard();
+        monthly.setCardCode("30A999999");
+        monthly.setVehicle(subscribedVehicle);
+        monthly.setStatus(CardStatus.ACTIVE);
+        monthly.setPassType(PassType.MONTHLY);
+        monthly.setValidFrom(LocalDate.now());
+        monthly.setValidUntil(LocalDate.now().plusDays(30));
+        cards.save(monthly);
+
+        String body = """
+            {"plateNumber":"77A888888","cardCode":"30A999999","vehicleType":"MOTORBIKE","manualOverride":false}
+            """;
+        mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.plateNumber", is("77A888888")))
+            .andExpect(jsonPath("$.cardCode", is("77A888888")))
+            .andExpect(jsonPath("$.ownerName", is("Khách vãng lai")));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void rendersAllAdminPages() throws Exception {
         for (String path : new String[]{"/", "/registrations", "/households", "/vehicles", "/cards", "/pricing", "/settings", "/slots", "/sessions"}) {
             mvc.perform(get(path)).andExpect(status().isOk());
@@ -112,11 +165,13 @@ class ParkingFlowIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void guestFaceIsStoredAtEntryAndRequiredAtExit() throws Exception {
+        seedCollectorAccount();
         String onePixelPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
         String entry = "{\"plateNumber\":\"77A123456\",\"vehicleType\":\"MOTORBIKE\",\"realtimeFaceImageBase64\":\"" + onePixelPng + "\"}";
         String exitWithoutFace = "{\"plateNumber\":\"77A123456\",\"vehicleType\":\"MOTORBIKE\"}";
-        String exitWithFace = "{\"plateNumber\":\"77A123456\",\"vehicleType\":\"MOTORBIKE\",\"faceVerified\":true}";
+        String exitWithFace = "{\"plateNumber\":\"77A123456\",\"vehicleType\":\"MOTORBIKE\",\"faceVerified\":true,\"paymentMethod\":\"CASH\"}";
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(entry))
             .andExpect(status().isOk()).andExpect(jsonPath("$.warning", is(false)));
         mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(exitWithoutFace))
@@ -126,7 +181,7 @@ class ParkingFlowIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = "ADMIN")
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void combinedRegistrationCreatesHouseholdMemberVehicleThenOpensPackageStep() throws Exception {
         byte[] image = java.util.Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
@@ -147,10 +202,57 @@ class ParkingFlowIntegrationTest {
         Vehicle vehicle = vehicles.findByPlateNumberIgnoreCase("61A123456").orElseThrow();
         assertEquals("HH-COMBINED-01", vehicle.getHousehold().getHouseholdCode());
         assertEquals("Cư dân đăng ký tổng hợp", vehicle.getRegisteredOwner().getFullName());
-        assertTrue(vehicle.getRegisteredOwner().getRegistrationFaceImagePath().startsWith("/uploads/residents/"));
+        assertTrue(vehicle.getRegisteredOwner().getRegistrationFaceImagePath().startsWith("resident:"));
     }
 
     @Test
+    void legacyUploadUrlIsNotPublic() throws Exception {
+        mvc.perform(get("/uploads/residents/123e4567-e89b-42d3-a456-426614174000.jpg"))
+            .andExpect(status().is3xxRedirection());
+    }
+
+    @Test
+    void residentFaceImageRequiresManagementRoleAndCreatesAuditEvent() throws Exception {
+        byte[] image = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        String suffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        Household household = new Household();
+        household.setHouseholdCode("HH-FACE-" + suffix);
+        household.setApartmentNumber("FACE-" + suffix);
+        household = households.save(household);
+        FamilyMember member = new FamilyMember();
+        member.setHousehold(household);
+        member.setFullName("Private Face Test");
+        member.setCitizenId("FACE" + suffix);
+        member.setRegistrationFaceImagePath(residentImages.save(
+            new MockMultipartFile("face", "face.png", "image/png", image), null));
+        member = members.save(member);
+        Long memberId = member.getId();
+        String path = "/admin-data/members/" + memberId + "/face-image";
+
+        mvc.perform(get(path).with(
+                org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous()))
+            .andExpect(status().is3xxRedirection());
+
+        long before = audits.findAll().stream()
+            .filter(event -> "RESIDENT_FACE_VIEW".equals(event.getAction())).count();
+        mvc.perform(get(path).with(
+                org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                    .user("admin").roles("MANAGEMENT")))
+            .andExpect(status().isOk())
+            .andExpect(content().contentType("image/jpeg"))
+            .andExpect(header().string("Cache-Control",
+                org.hamcrest.Matchers.containsString("no-store")))
+            .andExpect(content().bytes(residentImages.readStoredReference(
+                member.getRegistrationFaceImagePath())));
+        long after = audits.findAll().stream()
+            .filter(event -> "RESIDENT_FACE_VIEW".equals(event.getAction())
+                && memberId.toString().equals(event.getTargetReference())).count();
+        assertEquals(before + 1, after);
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void scansVietnameseCitizenCardQrOnServerWithoutBrowserBarcodeDetector() throws Exception {
         String raw = "079205019200|123456789|TRUONG TO DINH PHUOC|19032005|Nam|57 Vuon Chuoi, TP HCM|19032030";
         var matrix = new QRCodeWriter().encode(raw, BarcodeFormat.QR_CODE, 500, 500,
@@ -158,7 +260,7 @@ class ParkingFlowIntegrationTest {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         MatrixToImageWriter.writeToStream(matrix, "PNG", output);
         MockMultipartFile qr = new MockMultipartFile("file", "cccd-qr.png", "image/png", output.toByteArray());
-        mvc.perform(multipart("/api/cccd/scan-qr").file(qr))
+        mvc.perform(multipart("/api/cccd/scan-qr").file(qr).with(csrf()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.citizenId", is("079205019200")))
             .andExpect(jsonPath("$.fullName", is("TRUONG TO DINH PHUOC")))
@@ -176,7 +278,7 @@ class ParkingFlowIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = "ADMIN")
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void familyMembersCanBeAuthorizedForTheSameVehicle() throws Exception {
         Household household = new Household();
         household.setHouseholdCode("HH-TEST-SHARED");
@@ -215,5 +317,13 @@ class ParkingFlowIntegrationTest {
         assertEquals(2, vehicle.getAuthorizedMembers().size());
         assertTrue(vehicle.getAuthorizedMemberNames().contains("Người chồng kiểm thử"));
         assertTrue(vehicle.getAuthorizedMemberNames().contains("Người vợ kiểm thử"));
+    }
+
+    private void seedCollectorAccount() {
+        if (systemAccounts.findByUsername("admin").isPresent()) return;
+        var account = new SystemAccount("admin", "Test Administrator",
+            "test-password-hash", AccountRole.MANAGEMENT, false);
+        account.setEnabled(true);
+        systemAccounts.save(account);
     }
 }

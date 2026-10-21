@@ -73,7 +73,7 @@ public sealed class SlotControl : UserControl
     public void Update(ParkingSlotResponse slot)
     {
         Slot = slot;
-        string vIcon = slot.AllowedVehicleType == "MOTORBIKE" ? "🛵" : "🚗";
+        string vIcon = slot.AllowedVehicleType switch { "MOTORBIKE" => "🛵", "CAR" => "🚗", _ => "🅿" };
         _zoneHeader.Text = $"{vIcon} {slot.ZoneName}";
         _title.Text = slot.SlotCode;
 

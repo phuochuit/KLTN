@@ -1,7 +1,12 @@
 spring-web/target/
 spring-web/data/
+spring-web/uploads/
+spring-web/private-data/
+anpr-service/app/__pycache__/
 desktop-winform/bin/
 desktop-winform/obj/
+desktop-winform.Tests/bin/
+desktop-winform.Tests/obj/
 .dotnet-cli-home/
 tools/apache-maven-*/
 tools/apache-maven-*.zip
@@ -12,7 +17,11 @@ anpr-service/.venv.incompatible.*/
 anpr-service/*.pt
 anpr-service/.EasyOCR/
 anpr-service/.ultralytics/
+__pycache__/
+*.py[cod]
 *.log
+tmp/
 qa_*
-spring-web/src/main/resources/application.properties
-spring-web/src/main/resources/application-laragon.properties
+scripts/security/keys/
+*.pem
+.env.local

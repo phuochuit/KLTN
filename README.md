@@ -2,9 +2,9 @@
 
 ## Chức năng đã ghép
 
-- Web Spring Boot lưu hộ gia đình, thành viên, ảnh khuôn mặt đăng ký, phương tiện, thẻ/gói tháng, bảng giá, lượt xe và 50 vị trí đỗ trong database.
+- Web Spring Boot lưu hộ gia đình, thành viên, ảnh khuôn mặt đăng ký, phương tiện, gói gửi xe, bảng giá, lượt xe và sơ đồ vị trí đỗ trong database.
 - Form đăng ký cư dân cho phép tải ảnh hoặc chụp webcam; QR CCCD dùng để tự điền thông tin, không dùng ảnh CCCD để so khớp khuôn mặt.
-- WinForms nhận diện biển số/loại xe, hiển thị sơ đồ vị trí đỗ ngay trên form và có cửa sổ sơ đồ lớn.
+- WinForms có hai nguồn `XE / BIỂN SỐ` và `NGƯỜI / KHUÔN MẶT`, hỗ trợ ảnh, video, camera, xử lý song song và hiển thị sơ đồ vị trí đỗ.
 - Cư dân: chọn người được phép lái xe và so ảnh đăng ký với ảnh realtime. Người cùng hộ có thể lấy xe nếu đã được cấp quyền cho xe đó.
 - Khách vãng lai: chụp một khuôn mặt lúc vào, lưu tạm theo lượt; lúc ra chụp lại và so với ảnh vào.
 - Barrier có nút mở/đóng, trạng thái trực quan và tự mở 5 giây sau khi lượt vào/ra hợp lệ. Đây là mô phỏng phần mềm, chưa điều khiển barrier vật lý.
@@ -24,13 +24,21 @@ $env:PARKING_PYTHON = 'E:\Python312\python.exe'
 
 Hệ thống gồm ba ứng dụng:
 
-- `spring-web`: Java Spring Boot + Thymeleaf + H2 cho quản trị và REST API nghiệp vụ.
+- `spring-web`: Java Spring Boot + Thymeleaf + MySQL Aiven cho quản trị và REST API nghiệp vụ.
 - `anpr-service`: Python FastAPI, YOLO chuyên phát hiện biển số, YOLO COCO phân loại xe và EasyOCR đọc ký tự.
 - `desktop-winform`: C# WinForms cho trạm gác, tự điền biển số và loại xe từ ANPR.
 
+## Kiến trúc và quyết định kỹ thuật
+
+Spring Boot là backend nghiệp vụ trung tâm, FastAPI cung cấp năng lực AI độc lập và WinForms là client vận hành tại cổng. Bối cảnh, phương án thay thế và hệ quả của các quyết định quan trọng được lưu trong [Architecture Decision Records](docs/decisions/README.md).
+
+Các ADR có trạng thái `Proposed` mô tả hướng thiết kế chưa được tích hợp hoàn chỉnh; không được xem là bằng chứng tính năng hiện đang hoạt động.
+
+Hướng dẫn triển khai tài khoản database, bootstrap quản trị viên, audit retention và migration MySQL được ghi tại [Vận hành bảo mật Giai đoạn 1](docs/operations/security-phase1.md). Hướng dẫn JWT Desktop, RSA key, migration session và smoke test được ghi tại [Vận hành bảo mật Giai đoạn 2](docs/operations/security-phase2.md).
+
 ## Chạy hệ thống
 
-Cách dễ nhất trên Windows là bấm đúp `run-all.cmd`. File này mở Web, ANPR và Desktop.
+Cách dễ nhất trên Windows là bấm đúp `run-all.cmd`. File này mở Web, ANPR và Desktop, sử dụng database chính Aiven `parking_anpr`.
 
 Muốn chạy riêng từng phần, bấm đúp lần lượt:
 
@@ -48,32 +56,44 @@ Hoặc chạy trong ba terminal PowerShell tại `D:\Code\KhoaLuan`:
 .\run-desktop.ps1
 ```
 
-### Chạy với MySQL của Laragon
+### Cấu hình Aiven
 
-1. Mở Laragon tại `D:\laragon_new` và bấm **Start All**.
-2. Đóng bản Parking Web đang chạy bằng H2 nếu có.
-3. Bấm đúp `run-all-laragon.cmd`.
-4. Nhập mật khẩu MySQL `root` khi được hỏi.
+Aiven `parking_anpr` là database chính cho cả `run-all.cmd`, `run-web.cmd` và launcher tương thích tên cũ `run-all-laragon.cmd`. Launcher tên cũ không kết nối MySQL local.
 
-Spring tự tạo database `parking_anpr` và các bảng lần đầu chạy. Dữ liệu từ thời điểm này được lưu trong MySQL của Laragon, không còn ghi vào file H2. Có thể xem bằng HeidiSQL hoặc phpMyAdmin của Laragon.
+Sao chép `.env.local.example` thành `.env.local`, sau đó điền ba giá trị:
+
+```text
+PARKING_DB_URL=jdbc:mysql://<host>:<port>/parking_anpr?sslMode=REQUIRED&allowPublicKeyRetrieval=TRUE
+PARKING_DB_USERNAME=<username>
+PARKING_DB_PASSWORD=<password>
+```
+
+`.env.local` bị Git ignore. Biến môi trường hệ thống cùng tên được ưu tiên hơn file local. Không lưu credential trong `application.properties`.
+
+Launcher tự tạo service token nội bộ 256-bit bị Git ignore để Spring gọi FastAPI. Có thể ghi đè bằng `PARKING_INTERNAL_SERVICE_TOKEN` trong môi trường triển khai. Chi tiết tại [Vận hành bảo mật Giai đoạn 3](docs/operations/security-phase3.md).
+
+Thiết kế Gate Evidence, private storage, chống replay và xử lý ngoại lệ có kiểm soát được ghi tại [Vận hành bảo mật Giai đoạn 4](docs/operations/security-phase4.md). Nhân viên cổng đang trong ca có thể chỉnh kết quả AI sau khi có evidence; hệ thống lưu dữ liệu trước/sau và audit đầy đủ. RBAC động cho phép quản trị tạo vai trò, chọn quyền và tiền tố mã nhân viên; tài khoản mới bắt buộc có hồ sơ đầy đủ. Toàn bộ schema và hai ảnh resident PNG đã được migrate sang Aiven với backup trước thay đổi.
+
+Hướng dẫn đóng gói, backup, monitoring và checklist nghiệm thu Giai đoạn 5 nằm tại [Đóng gói và nghiệm thu Giai đoạn 5](docs/operations/phase5-deployment-acceptance.md). Các lệnh dành cho người vận hành đều có file `.cmd` trong `scripts\operations`.
 
 ## Cách dùng Desktop
 
-1. Chờ Web chạy ở cổng `8080` và ANPR chạy ở cổng `8001`.
-2. Mở Desktop và bấm **Kiểm tra**. Kết quả đúng là `Spring + ANPR đang hoạt động`.
-3. Chọn tab **XE VÀO** hoặc **XE RA**.
-4. Bấm **Nhận dạng ảnh** hoặc **Nhận dạng video**.
-5. YOLO khoanh biển số, EasyOCR đọc ký tự và YOLO COCO xác định ô tô/xe máy.
-6. Kiểm tra dữ liệu được tự điền rồi xác nhận nghiệp vụ.
+1. Chờ Web chạy ở cổng `8080`; launcher tự kết nối dịch vụ ANPR nội bộ ở cổng `8001`.
+2. Mở Desktop và đăng nhập bằng tài khoản có quyền **Vận hành trạm gác** đã tạo trên Web.
+3. Bấm **Kiểm tra**. Kết quả đúng là `Hệ thống đang hoạt động`.
+4. Chọn tab **XE VÀO** hoặc **XE RA**.
+5. Trong mỗi cột, chọn ảnh, video hoặc camera; nút **XỬ LÝ SONG SONG** điều phối đồng thời nguồn xe và khuôn mặt.
+6. Hệ thống nhận dạng biển số, tự tra cứu gói, chụp/xác thực khuôn mặt và cấp ô đỗ phù hợp.
+7. Kiểm tra dữ liệu được tự điền rồi xác nhận nghiệp vụ; không cần nhập mã thẻ.
 
-Với ảnh quá cận chỉ thấy biển số, hệ thống dự phòng phân loại theo hình dạng biển. Với video, dịch vụ lấy mẫu tối đa 24 frame và chọn kết quả tốt nhất.
+Với ảnh quá cận chỉ thấy biển số, hệ thống dự phòng phân loại theo hình dạng biển. Với video, pipeline quét tối đa 12 frame, OCR/phân loại 3 frame tốt nhất và dùng frame tốt nhất làm ảnh chính.
 
 ## Web quản trị
 
 Mở `http://localhost:8080`:
 
-- Tài khoản: `admin`
-- Mật khẩu: `admin123`
+- Tài khoản: tài khoản quản trị đã tạo trong `system_accounts`
+- Mật khẩu: mật khẩu sau khi đăng nhập lần đầu và đổi mật khẩu bắt buộc
 
 Quy trình đăng ký hộ gia đình/gói tháng:
 
@@ -81,9 +101,9 @@ Quy trình đăng ký hộ gia đình/gói tháng:
 2. Vào **Phương tiện**, chọn hộ gia đình, chủ xe đứng tên và tất cả thành viên được phép dùng chung xe; nhập biển số, đăng ký xe, hãng, mẫu, màu, số khung, số máy, số chỗ, phân khối và loại nhiên liệu.
 3. Vào **Hạn mức**, đặt số xe hai bánh và ô tô mặc định cho mỗi hộ. Có thể ghi đè hạn mức riêng tại màn hình **Hộ gia đình**.
 4. Vào **Bảng giá**, điều chỉnh giá ban ngày, ban đêm, qua đêm, gói 30 ngày và cách tính theo khung giờ.
-5. Vào **Thẻ & gói**, gán mã thẻ cho xe, chọn **Gói 30 ngày** và ngày bắt đầu.
+5. Vào **Thẻ & gói**, chọn xe, chọn **Gói 30 ngày** và ngày bắt đầu. Biển số chuẩn hóa tự động là mã nhận diện, không nhập mã thẻ riêng.
 6. Hệ thống ghi nhận tiền gói khi kích hoạt/gia hạn. Trong thời hạn, phí mỗi lượt ra là `0 đ`.
-7. Gói hết hạn, thẻ sai xe hoặc không quét thẻ thì hệ thống cảnh báo và áp dụng giá khách vãng lai.
+7. Gói hết hạn thì hệ thống cảnh báo và áp dụng giá khách vãng lai. Khách cũng dùng biển số làm mã nhận diện lượt xe.
 
 Giá mặc định lấy từ tài liệu khảo sát và quản trị viên có thể thay đổi:
 
@@ -92,8 +112,8 @@ Giá mặc định lấy từ tài liệu khảo sát và quản trị viên có
 
 Dữ liệu mẫu:
 
-- Xe máy: `59A112345`, thẻ `CARD001`
-- Ô tô: `51H88888`, thẻ `CARD002`
+- Xe máy: `59A112345`, mã nhận diện `59A112345`
+- Ô tô: `51H88888`, mã nhận diện `51H88888`
 
 ## API
 
@@ -103,13 +123,28 @@ Spring Boot:
 - `POST /api/parking/entry`
 - `POST /api/parking/exit-preview`
 - `POST /api/parking/exit-confirm`
+- `GET /api/ai/health`
+- `POST /api/ai/recognize/image`
+- `POST /api/ai/recognize/video`
+- `POST /api/ai/recognize/camera`
+- `POST /api/ai/face/verify-image`
+- `POST /api/ai/face/verify-video`
+- `POST /api/ai/face/verify-camera`
+- `POST /api/ai/face/capture-camera`
 
-ANPR:
+ANPR nội bộ (Desktop không gọi trực tiếp):
 
 - `GET http://localhost:8001/health`
 - `POST http://localhost:8001/recognize/image`
 - `POST http://localhost:8001/recognize/video`
+- `POST http://localhost:8001/recognize/camera`
+- `POST http://localhost:8001/face/verify-image`
+- `POST http://localhost:8001/face/verify-video`
+- `POST http://localhost:8001/face/verify-camera`
+- `POST http://localhost:8001/face/capture-camera`
 - Swagger: `http://localhost:8001/docs`
+
+Ngoại trừ `/health`, endpoint FastAPI yêu cầu `X-Parking-Service-Token`. Endpoint `/api/ai/**` của Spring yêu cầu Desktop JWT.
 
 ## Cấu hình mô hình
 
@@ -133,4 +168,9 @@ Ngưỡng mặc định có thể đổi qua `ANPR_PLATE_CONFIDENCE` và `ANPR_V
 - Chạy CPU nên nhận dạng video có thể chậm.
 - Ảnh cần đủ sáng, biển số không bị che và không quá mờ/nghiêng.
 - Phân loại dự phòng theo hình dạng biển chỉ dùng khi ảnh quá cận, vì vậy nhân viên vẫn cần kiểm tra trước khi xác nhận.
-- Bản triển khai thật cần JWT/API key, HTTPS, audit log và chính sách lưu ảnh.
+- Desktop đã có đăng nhập JWT RS256, refresh rotation và thu hồi phiên; bật bằng `PARKING_SECURITY_JWT_ENABLED=true`.
+- Desktop chỉ kết nối Spring; Spring proxy yêu cầu AI sang FastAPI bằng service token nội bộ.
+- Trang quản lý tài khoản hiển thị phiên Web/Desktop đang hoạt động, cho phép thu hồi từng phiên và phân ca cho `GATE_STAFF`.
+- Danh sách phiên và ca trên Web tự cập nhật; Desktop tự quay về đăng nhập khi phiên bị quản trị viên kết thúc.
+- Các xác nhận quan trọng dùng hộp thoại Parking ANPR với nội dung hướng người dùng thay cho hộp thoại mặc định của trình duyệt.
+- Bản triển khai thật cần HTTPS, bảo vệ private key, audit log và chính sách lưu ảnh.

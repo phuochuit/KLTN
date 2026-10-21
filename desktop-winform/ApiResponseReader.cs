@@ -37,6 +37,13 @@ public static class ApiResponseReader
         }
     }
 
+    public static async Task EnsureSuccessAsync(HttpResponseMessage response,
+        string serviceName, string action)
+    {
+        if (response.IsSuccessStatusCode) return;
+        await ReadAsync<object>(response, new JsonSerializerOptions(), serviceName, action);
+    }
+
     private static bool LooksLikeHtml(string body)
     {
         string value = body.TrimStart();

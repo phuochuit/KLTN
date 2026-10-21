@@ -13,6 +13,7 @@ import vn.edu.parking.repository.VehicleRepository;
 import vn.edu.parking.repository.ParkingSlotRepository;
 import vn.edu.parking.service.PlateNormalizer;
 import vn.edu.parking.service.ParkingService;
+import vn.edu.parking.service.ParkingIdempotencyService;
 import vn.edu.parking.web.dto.*;
 
 import java.util.Map;
@@ -31,26 +32,35 @@ public class ParkingApiController {
     private final ParkingCardRepository cards;
     private final DataSource dataSource;
     private final ParkingSlotRepository slots;
+    private final ParkingIdempotencyService idempotency;
 
     public ParkingApiController(ParkingService parkingService, ParkingSessionRepository sessions,
                                 VehicleRepository vehicles, ParkingCardRepository cards,
-                                DataSource dataSource, ParkingSlotRepository slots) {
+                                 DataSource dataSource, ParkingSlotRepository slots,
+                                 ParkingIdempotencyService idempotency) {
         this.parkingService = parkingService;
         this.sessions = sessions;
         this.vehicles = vehicles;
         this.cards = cards;
         this.dataSource = dataSource;
         this.slots = slots;
+        this.idempotency = idempotency;
     }
 
     @PostMapping("/entry")
-    public ParkingResponse entry(@Valid @RequestBody EntryRequest request) { return parkingService.enter(request); }
+    public ParkingResponse entry(@Valid @RequestBody EntryRequest request) {
+        return idempotency.execute(request.operationId(), "ENTRY", request,
+            () -> parkingService.enter(request));
+    }
 
     @PostMapping("/exit-preview")
     public ParkingResponse preview(@Valid @RequestBody ExitRequest request) { return parkingService.previewExit(request); }
 
     @PostMapping("/exit-confirm")
-    public ParkingResponse confirm(@Valid @RequestBody ExitRequest request) { return parkingService.confirmExit(request); }
+    public ParkingResponse confirm(@Valid @RequestBody ExitRequest request) {
+        return idempotency.execute(request.operationId(), "EXIT_CONFIRM", request,
+            () -> parkingService.confirmExit(request));
+    }
 
     @GetMapping("/open")
     public Object openSessions() { return sessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN); }
@@ -61,17 +71,20 @@ public class ParkingApiController {
         String normalizedPlate = PlateNormalizer.normalize(plate);
         var vehicle = normalizedPlate.isBlank() ? null
             : vehicles.findByPlateNumberIgnoreCase(normalizedPlate).orElse(null);
-        var card = cardCode.isBlank() ? null
-            : cards.findByCardCodeIgnoreCase(cardCode.trim()).orElse(null);
+        String identifier = cardCode.isBlank() ? normalizedPlate : PlateNormalizer.normalize(cardCode);
+        var card = identifier.isBlank() ? null
+            : cards.findByCardCodeIgnoreCase(identifier).orElse(null);
 
         if (vehicle == null && card != null) vehicle = card.getVehicle();
         if (vehicle == null) {
-            String guestFace = normalizedPlate.isBlank() ? "" : sessions
+            boolean guestFaceAvailable = !normalizedPlate.isBlank() && sessions
                 .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(normalizedPlate, SessionStatus.OPEN)
-                .map(s -> s.getEntryFaceImagePath() == null ? "" : s.getEntryFaceImagePath()).orElse("");
+                .map(s -> s.getEntryFaceImagePath() != null && !s.getEntryFaceImagePath().isBlank())
+                .orElse(false);
             return new ResidentLookupResponse(false, card == null, normalizedPlate,
                 "Khách vãng lai", "", "", "", cardCode.trim().toUpperCase(),
-                "", null, false, "Biển số chưa được đăng ký trong danh sách cư dân", java.util.List.of(), guestFace);
+                "", null, false, "Biển số chưa được đăng ký trong danh sách cư dân", java.util.List.of(),
+                guestFaceAvailable);
         }
 
         boolean cardMatched = card == null || (card.getVehicle() != null
@@ -92,13 +105,13 @@ public class ParkingApiController {
 
         var authorized = vehicle.getAuthorizedMembers().stream().filter(vn.edu.parking.domain.FamilyMember::isActive)
             .map(m -> new AuthorizedMemberResponse(m.getId(), m.getFullName(), m.getRelationshipToHead(),
-                m.getRegistrationFaceImagePath(), m.getRegistrationFaceImagePath() != null && !m.getRegistrationFaceImagePath().isBlank()))
+                m.getRegistrationFaceImagePath() != null && !m.getRegistrationFaceImagePath().isBlank()))
             .toList();
         return new ResidentLookupResponse(true, cardMatched, vehicle.getPlateNumber(),
             vehicle.getEffectiveOwnerName(), vehicle.getOwnerPhone(), vehicle.getEffectiveApartmentNumber(),
             vehicle.getVehicleType().name(), card == null ? "" : card.getCardCode(),
             card == null ? "" : card.getPassType().name(), card == null ? null : card.getValidUntil(),
-            monthlyValid, message, authorized, "");
+            monthlyValid, message, authorized, false);
     }
 
     @GetMapping("/slots")

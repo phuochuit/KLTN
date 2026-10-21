@@ -9,6 +9,8 @@ $env:EASYOCR_MODULE_PATH = Join-Path $service '.EasyOCR'
 $env:YOLO_CONFIG_DIR = Join-Path $service '.ultralytics'
 $env:PYTHONUTF8 = '1'
 
+. (Join-Path $workspace 'scripts\security\ensure-internal-service-token.ps1')
+
 function Resolve-BasePython {
     $candidates = New-Object System.Collections.Generic.List[object]
     if ($env:PARKING_PYTHON) {
@@ -28,7 +30,7 @@ function Resolve-BasePython {
     }
     foreach ($candidate in $candidates) {
         try {
-            & $candidate.Command @($candidate.Prefix) -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)" 2>$null
+            & $candidate.Command @($candidate.Prefix) -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
             if ($LASTEXITCODE -eq 0) { return $candidate }
         } catch { }
     }

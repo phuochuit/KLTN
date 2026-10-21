@@ -138,37 +138,59 @@ class AnprRecognizer:
             message=message,
         )
 
-    def recognize_video(self, path: Path, max_frames: int = 12) -> RecognitionResponse:
+    def recognize_video(self, path: Path, max_frames: int = 12, finalist_count: int = 3) -> RecognitionResponse:
         capture = cv2.VideoCapture(str(path))
         if not capture.isOpened():
             raise ValueError("Không mở được video")
         frame_count = max(1, int(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
         indexes = np.linspace(0, frame_count - 1, min(max_frames, frame_count), dtype=int)
-        best: Candidate | None = None
+        frames: list[tuple[int, np.ndarray]] = []
         try:
             for index in indexes:
                 capture.set(cv2.CAP_PROP_POS_FRAMES, int(index))
                 ok, frame = capture.read()
                 if not ok:
                     continue
-                response = self.recognize_frame(frame, int(index))
-                score = (
-                    response.detection_confidence * 0.45
-                    + response.ocr_confidence * 0.45
-                    + response.vehicle_confidence * 0.10
-                )
-                if response.plate_text:
-                    score += min(len(response.plate_text), 10) / 100
-                if best is None or score > best.score:
-                    best = Candidate(response, score)
-
-                # Early stop for video if we have a highly confident plate
-                if best.score > 0.85 and 7 <= len(best.response.plate_text) <= 10:
-                    break
+                frames.append((int(index), frame))
         finally:
             capture.release()
+
+        return self.recognize_frames(frames, finalist_count)
+
+    def recognize_frames(self, frames: list[tuple[int, np.ndarray]], finalist_count: int = 3) -> RecognitionResponse:
+        """Select sharp plate candidates, then run expensive OCR only on finalists."""
+        finalists: list[tuple[float, int, np.ndarray]] = []
+        for index, frame in frames:
+            with self._lock:
+                plate_result = self.plate_model.predict(
+                    frame, conf=self.plate_confidence, imgsz=640, verbose=False
+                )[0]
+            plate_confidence = max((score for score, _ in self._all_boxes(plate_result)), default=0.0)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            sharpness = min(float(cv2.Laplacian(gray, cv2.CV_64F).var()) / 1000.0, 1.0)
+            finalists.append((plate_confidence * 0.9 + sharpness * 0.1, index, frame))
+
+        if not finalists:
+            raise ValueError("Không đọc được frame nào để nhận dạng")
+
+        best: Candidate | None = None
+        for _, index, frame in sorted(finalists, key=lambda item: item[0], reverse=True)[:max(1, finalist_count)]:
+            response = self.recognize_frame(frame, index)
+            score = (
+                response.detection_confidence * 0.45
+                + response.ocr_confidence * 0.45
+                + response.vehicle_confidence * 0.10
+            )
+            if response.plate_text:
+                score += min(len(response.plate_text), 10) / 100
+            if best is None or score > best.score:
+                best = Candidate(response, score)
+
+            # Early stop for video if we have a highly confident plate.
+            if best.score > 0.85 and 7 <= len(best.response.plate_text) <= 10:
+                break
         if best is None:
-            raise ValueError("Không đọc được frame nào từ video")
+            raise ValueError("Không phân tích được frame ứng viên từ video")
         return best.response
 
     def _read_plate(self, crop: np.ndarray) -> tuple[str, float]:
@@ -328,7 +350,13 @@ class AnprRecognizer:
 
     @staticmethod
     def _encode_image(image: np.ndarray) -> str:
-        ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 88])
+        height, width = image.shape[:2]
+        max_dimension = 1280
+        if max(height, width) > max_dimension:
+            scale = max_dimension / max(height, width)
+            image = cv2.resize(image, (max(1, round(width * scale)), max(1, round(height * scale))),
+                               interpolation=cv2.INTER_AREA)
+        ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 78])
         if not ok:
             return ""
         return base64.b64encode(encoded.tobytes()).decode("ascii")

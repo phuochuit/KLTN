@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nhật ký bảo mật</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <style>
+        .audit-success { color:var(--green); font-weight:700; }
+        .audit-failure { color:var(--red); font-weight:700; }
+        .pagination { display:flex; justify-content:space-between; align-items:center; margin-top:16px; }
+        .pagination a { text-decoration:none; }
+        td { vertical-align:top; overflow-wrap:anywhere; }
+        @media(max-width:900px) { header { align-items:flex-start; } nav { display:flex; flex-wrap:wrap; gap:10px; } nav a { margin-left:0; } }
+    </style>
+</head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main>
+    <h1>Nhật ký bảo mật</h1>
+    <p class="help">Các sự kiện đăng nhập, thay đổi tài khoản và quyết định bảo mật được lưu để truy vết.</p>
+    <div class="table-scroll">
+        <table>
+            <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Đối tượng</th><th>Kết quả</th><th>Lý do</th></tr></thead>
+            <tbody>
+            <tr th:each="event : ${events.content}">
+                <td th:text="${#temporals.format(event.occurredAt, 'dd/MM/yyyy HH:mm:ss')}"></td>
+                <td th:text="${event.actorUsername ?: 'Hệ thống/ẩn danh'}"></td>
+                <td th:text="${event.action}"></td>
+                <td th:text="${(event.targetType ?: '') + (event.targetReference != null ? ' / ' + event.targetReference : '')}"></td>
+                <td th:class="${event.outcome == 'SUCCESS' ? 'audit-success' : 'audit-failure'}" th:text="${event.outcome}"></td>
+                <td th:text="${event.reason ?: '-'}"></td>
+            </tr>
+            <tr th:if="${events.empty}"><td colspan="6" class="muted">Chưa có sự kiện bảo mật.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <nav class="pagination" aria-label="Phân trang nhật ký">
+        <a class="btn btn-outline" th:if="${events.hasPrevious()}" th:href="@{/security-audit(page=${events.number - 1})}">Trang trước</a>
+        <span th:text="${'Trang ' + (events.number + 1) + ' / ' + (events.totalPages == 0 ? 1 : events.totalPages)}"></span>
+        <a class="btn btn-outline" th:if="${events.hasNext()}" th:href="@{/security-audit(page=${events.number + 1})}">Trang sau</a>
+    </nav>
+</main>
+</body>
+</html>

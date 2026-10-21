@@ -20,6 +20,11 @@ public class SubscriptionPayment {
     private BigDecimal amount;
     @Column(nullable = false)
     private LocalDateTime paidAt;
+    @Column(name = "pending_payment", nullable = false, columnDefinition = "boolean default false")
+    private boolean pendingPayment;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_transaction_id")
+    private PaymentTransaction paymentTransaction;
 
     public Long getId() { return id; }
     public ParkingCard getParkingCard() { return parkingCard; }
@@ -32,4 +37,10 @@ public class SubscriptionPayment {
     public void setAmount(BigDecimal amount) { this.amount = amount; }
     public LocalDateTime getPaidAt() { return paidAt; }
     public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
+    public boolean isPendingPayment() { return pendingPayment; }
+    public void setPendingPayment(boolean pendingPayment) { this.pendingPayment = pendingPayment; }
+    public PaymentTransaction getPaymentTransaction() { return paymentTransaction; }
+    public void setPaymentTransaction(PaymentTransaction paymentTransaction) {
+        this.paymentTransaction = paymentTransaction;
+    }
 }

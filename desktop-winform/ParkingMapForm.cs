@@ -147,7 +147,7 @@ public sealed class ParkingMapForm : Form
         {
             var control = new SlotControl();
             control.Update(slot);
-            control.SlotClicked += async (_, s) =>
+            control.SlotClicked += (_, s) =>
             {
                 using var dlg = new SlotDetailDialog(_api, s);
                 if (dlg.ShowDialog(this) == DialogResult.OK)
