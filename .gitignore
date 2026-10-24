@@ -25,3 +25,8 @@ qa_*
 scripts/security/keys/
 *.pem
 .env.local
+
+e2e_screenshots/
+test_e2e_full.py
+scripts/operations/Benchmark/bin/
+scripts/operations/Benchmark/obj/
