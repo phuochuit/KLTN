@@ -24,5 +24,12 @@ public interface GateEvidenceRepository extends JpaRepository<GateEvidence, Stri
     Optional<GateEvidence> findFirstByParkingSessionIdAndEvidenceTypeAndOperationAndStatusOrderByConsumedAtDesc(
         Long parkingSessionId, EvidenceType evidenceType, EvidenceOperation operation, EvidenceStatus status);
 
+    @Query("select e from GateEvidence e where e.evidenceType = :type and e.faceDecision in :decisions and e.createdAt between :from and :to order by e.createdAt desc")
+    List<GateEvidence> findRecentFaceExceptions(
+        @Param("type") EvidenceType type,
+        @Param("decisions") List<String> decisions,
+        @Param("from") Instant from,
+        @Param("to") Instant to);
+
     List<GateEvidence> findTop100ByDeletedAtIsNullAndCreatedAtBeforeOrderByCreatedAtAsc(Instant cutoff);
 }
