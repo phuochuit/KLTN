@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 
 namespace ParkingGateDesktop;
 
@@ -38,6 +38,7 @@ public sealed class MainForm : Form
         Text = "Chưa tra cứu cư dân"
     };
     private readonly Button _editAiResult = new() { Text = "CHỈNH SỬA KẾT QUẢ AI", AutoSize = true, Enabled = false };
+    private readonly Button _compareEvidenceBtn = new() { Text = "ĐỐI CHIẾU ẢNH VÀO / RA", AutoSize = true };
     private readonly Label _editAiHint = new() { Text = "Chỉ sử dụng sau khi đã có ảnh nhận diện từ camera/AI.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 12, 0, 0) };
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
     private readonly ComboBox _entryMember = new() { Width = 250, DropDownStyle = ComboBoxStyle.DropDownList };
@@ -96,9 +97,21 @@ public sealed class MainForm : Form
         root.Controls.Add(BuildBody(), 0, 1);
         var editPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
         editPanel.Controls.Add(_editAiResult);
+        editPanel.Controls.Add(_compareEvidenceBtn);
         editPanel.Controls.Add(_editAiHint);
         root.Controls.Add(editPanel, 0, 2);
         _editAiResult.Click += (_, _) => EditAiResult();
+        _compareEvidenceBtn.Click += async (_, _) => await OpenEvidenceComparisonAsync();
+        _vehiclePreview.Cursor = Cursors.Hand;
+        _facePreview.Cursor = Cursors.Hand;
+        _vehiclePreview.Click += (_, _) => {
+            if (_vehiclePreview.Image != null)
+                EvidenceComparisonDialog.ShowZoomDialog("Ảnh xe / biển số hiện tại", _vehiclePreview.Image, this);
+        };
+        _facePreview.Click += (_, _) => {
+            if (_facePreview.Image != null)
+                EvidenceComparisonDialog.ShowZoomDialog("Ảnh khuôn mặt hiện tại", _facePreview.Image, this);
+        };
         _tabs.SelectedIndexChanged += (_, _) => UpdateManualEditState();
 
         this.Shown += async (_, _) =>
@@ -214,6 +227,7 @@ public sealed class MainForm : Form
         flow.Controls.Add(Field("Biển số AI tự điền", _exitPlate));
         flow.Controls.Add(CreateButton("TRA CỨU NGƯỜI ĐƯỢC PHÉP", async (_, _) => await LookupResidentAsync(false)));
         flow.Controls.Add(ComboField("Người đang lấy xe", _exitMember));
+        flow.Controls.Add(CreateButton("ĐỐI CHIẾU ẢNH VÀO / RA", async (_, _) => await OpenEvidenceComparisonAsync()));
         flow.Controls.Add(CreateButton("XEM TRƯỚC PHÍ", async (_, _) => await PreviewExitAsync()));
         flow.Controls.Add(CreateButton("XÁC NHẬN XE RA", async (_, _) => await ConfirmExitAsync()));
         tab.Controls.Add(flow);
@@ -665,6 +679,58 @@ public sealed class MainForm : Form
         }
         _editAiHint.Text = "Đã chỉnh sửa kết quả AI; thao tác sẽ được lưu trong nhật ký.";
         _editAiHint.ForeColor = Color.DarkOrange;
+    }
+
+    private async Task OpenEvidenceComparisonAsync()
+    {
+        try
+        {
+            ConfigureApis();
+            bool entry = _tabs.SelectedIndex == 0;
+            string plate = (entry ? _entryPlate.Text : _exitPlate.Text).Trim();
+            long? sessionId = !entry && _lastPreview is { SessionId: > 0 } ? _lastPreview.SessionId : null;
+            if (string.IsNullOrWhiteSpace(plate) && sessionId is null)
+            {
+                MessageBox.Show(this,
+                    "Hãy nhập hoặc nhận diện biển số xe cần đối chiếu ảnh vào/ra.",
+                    "Thiếu thông tin lượt gửi",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+            string currentType = entry ? _entryDetectedType : _exitDetectedType;
+            var comparison = await _parkingApi.GetEvidenceComparisonAsync(
+                plate,
+                currentType,
+                _exitVehicleEvidenceId,
+                _exitFaceEvidenceId,
+                sessionId);
+            bool hasActiveShift = _activeShiftId.HasValue || _parkingApi.CurrentOperator?.ActiveShift is not null;
+            using var dlg = new EvidenceComparisonDialog(comparison, hasActiveShift, plate, currentType);
+            if (dlg.ShowDialog(this) == DialogResult.OK && dlg.OverrideApplied)
+            {
+                if (entry)
+                {
+                    _entryPlate.Text = dlg.CorrectedPlate;
+                    _entryDetectedType = dlg.CorrectedVehicleType;
+                    _entryOverrideReasonCode = dlg.OverrideReasonCode;
+                    _entryOverrideReasonText = dlg.OverrideReasonText;
+                    _vehicleType.Text = DisplayVehicleType(_entryDetectedType);
+                }
+                else
+                {
+                    _exitPlate.Text = dlg.CorrectedPlate;
+                    _exitDetectedType = dlg.CorrectedVehicleType;
+                    _exitOverrideReasonCode = dlg.OverrideReasonCode;
+                    _exitOverrideReasonText = dlg.OverrideReasonText;
+                }
+                UpdateManualEditState();
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+        }
     }
 
     private void UpdateManualEditState()
