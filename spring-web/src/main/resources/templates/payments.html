@@ -9,7 +9,12 @@
   <div class="stats-item"><div class="label">Số tiền chờ</div><div class="value" th:text="${#numbers.formatDecimal(paidAmount,0,'COMMA',0,'POINT') + ' đ'}">0 đ</div></div>
 </div>
 <div class="card">
-  <h2>Giao dịch gần đây</h2>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2 style="margin:0;">Giao dịch gần đây</h2>
+    <div>
+      <a th:href="@{/payments/reports/reconciliation.csv}" class="btn btn-outline" style="background:#0284c7;color:white;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600;display:inline-block;">📥 Xuất CSV Đối soát (30 ngày)</a>
+    </div>
+  </div>
   <table><thead><tr><th>Biên nhận</th><th>Loại</th><th>Hình thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thời gian</th><th>Người thu</th><th>Đối soát</th></tr></thead>
   <tbody>
     <tr th:each="item:${transactions}">
