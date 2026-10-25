@@ -184,14 +184,58 @@ public class ExceptionReportService {
             ));
         }
 
+        // 5. AI Quality Warnings (blur, glare, low light, tilt, small crop)
+        List<GateEvidence> qualityEvidences = gateEvidences.findRecentQualityWarnings(effectiveFrom, effectiveTo);
+        for (GateEvidence qe : qualityEvidences) {
+            String status = qe.getQualityStatus() != null ? qe.getQualityStatus() : "WARNING";
+            List<String> codes = Arrays.stream(qe.getQualityWarnings().split(","))
+                .map(String::trim)
+                .filter(code -> !code.isBlank())
+                .toList();
+            if (codes.isEmpty()) continue;
+
+            String readable = String.join("; ",
+                codes.stream().map(ExceptionReportService::translateQualityWarning).toList());
+            Map<String, String> details = new LinkedHashMap<>();
+            details.put("Mức chất lượng", status);
+            details.put("Mã cảnh báo", String.join(", ", codes));
+            details.put("Diễn giải", readable);
+            if (qe.getQualityVersion() != null) details.put("Phiên bản chấm chất lượng", qe.getQualityVersion());
+            if (qe.getLivenessStatus() != null) details.put("Liveness", qe.getLivenessStatus().name());
+
+            String opUser = qe.getAccount() != null ? qe.getAccount().getUsername() : "UNKNOWN";
+            String opName = qe.getAccount() != null && qe.getAccount().getFullName() != null
+                ? qe.getAccount().getFullName() : opUser;
+
+            allItems.add(new ExceptionReportItemResponse(
+                "QUA-" + qe.getId().substring(0, Math.min(qe.getId().length(), 12)),
+                qe.getCreatedAt(),
+                "AI_QUALITY",
+                "Cảnh báo chất lượng AI",
+                "REJECT".equalsIgnoreCase(status) ? "CRITICAL" : "WARNING",
+                qe.getPlateNumber() != null ? qe.getPlateNumber() : "-",
+                opUser,
+                opName,
+                null,
+                qe.getOperation() != null ? qe.getOperation().name() : "GATE",
+                status,
+                "AI cảnh báo chất lượng ảnh: " + readable,
+                status,
+                qe.getParkingSession() != null ? qe.getParkingSession().getId() : null,
+                details
+            ));
+        }
+
         // Compute overall summary statistics BEFORE filtering
         long totalExceptions = allItems.size();
         long manualOverridesCount = allItems.stream().filter(i -> "MANUAL_OVERRIDE".equals(i.category())).count();
         long securityAlertsCount = allItems.stream().filter(i -> "SECURITY_ALERT".equals(i.category())).count();
         long paymentIssuesCount = allItems.stream().filter(i -> "PAYMENT_ISSUE".equals(i.category())).count();
         long faceRejectsCount = allItems.stream().filter(i -> "FACE_REJECT".equals(i.category())).count();
+        long qualityWarningsCount = allItems.stream().filter(i -> "AI_QUALITY".equals(i.category())).count();
         ExceptionReportSummary summary = new ExceptionReportSummary(
-            totalExceptions, manualOverridesCount, securityAlertsCount, paymentIssuesCount, faceRejectsCount);
+            totalExceptions, manualOverridesCount, securityAlertsCount, paymentIssuesCount,
+            faceRejectsCount, qualityWarningsCount);
 
         // Apply filters
         var filteredStream = allItems.stream();
@@ -232,6 +276,19 @@ public class ExceptionReportService {
             case "FACE_REVIEW" -> "Khuôn mặt cần xem xét lại";
             case "FACE_FAILED" -> "Đối chiếu khuôn mặt thất bại";
             case "REGISTRATION_IMAGE_MISSING" -> "Thiếu ảnh đăng ký cư dân";
+            default -> code;
+        };
+    }
+
+    private static String translateQualityWarning(String code) {
+        if (code == null) return "-";
+        return switch (code) {
+            case "FACE_DARK", "PLATE_DARK" -> "Ảnh quá tối";
+            case "FACE_OVEREXPOSED", "PLATE_OVEREXPOSED" -> "Ảnh quá sáng";
+            case "FACE_GLARE", "PLATE_GLARE" -> "Bị lóa sáng";
+            case "FACE_BLURRY", "PLATE_BLURRY" -> "Ảnh bị mờ";
+            case "FACE_TOO_SMALL", "PLATE_TOO_SMALL" -> "Vùng ảnh quá nhỏ";
+            case "PLATE_TILTED" -> "Biển số bị nghiêng";
             default -> code;
         };
     }

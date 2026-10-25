@@ -130,6 +130,45 @@ class GateEvidenceConsumptionServiceTest {
         assertTrue(error.getMessage().contains("yêu cầu Gate Evidence"));
     }
 
+    @Test
+    void spoofedFaceIsNotTreatedAsVerified() {
+        GateEvidence vehicle = vehicle(EvidenceOperation.ENTRY, Instant.now().plusSeconds(60));
+        GateEvidence face = face(7L, EvidenceOperation.ENTRY, Instant.now().plusSeconds(60));
+        when(face.getLivenessStatus()).thenReturn(LivenessStatus.FAIL);
+        lock(VEHICLE_ID, vehicle);
+        lock(FACE_ID, face);
+
+        var resolved = service.resolveForConsumption(VEHICLE_ID, FACE_ID, EvidenceOperation.ENTRY, 7L);
+
+        assertFalse(resolved.faceVerified());
+    }
+
+    @Test
+    void livenessReviewRequiresManualConfirmation() {
+        GateEvidence vehicle = vehicle(EvidenceOperation.ENTRY, Instant.now().plusSeconds(60));
+        GateEvidence face = face(7L, EvidenceOperation.ENTRY, Instant.now().plusSeconds(60));
+        when(face.getLivenessStatus()).thenReturn(LivenessStatus.REVIEW);
+        lock(VEHICLE_ID, vehicle);
+        lock(FACE_ID, face);
+
+        var resolved = service.resolveForConsumption(VEHICLE_ID, FACE_ID, EvidenceOperation.ENTRY, 7L);
+
+        assertFalse(resolved.faceVerified());
+    }
+
+    @Test
+    void liveFaceStaysVerified() {
+        GateEvidence vehicle = vehicle(EvidenceOperation.ENTRY, Instant.now().plusSeconds(60));
+        GateEvidence face = face(7L, EvidenceOperation.ENTRY, Instant.now().plusSeconds(60));
+        when(face.getLivenessStatus()).thenReturn(LivenessStatus.PASS);
+        lock(VEHICLE_ID, vehicle);
+        lock(FACE_ID, face);
+
+        var resolved = service.resolveForConsumption(VEHICLE_ID, FACE_ID, EvidenceOperation.ENTRY, 7L);
+
+        assertTrue(resolved.faceVerified());
+    }
+
     private GateEvidence vehicle(EvidenceOperation operation, Instant expiresAt) {
         GateEvidence evidence = baseEvidence(EvidenceType.VEHICLE, operation, expiresAt);
         when(evidence.getPlateNumber()).thenReturn("59A112345");

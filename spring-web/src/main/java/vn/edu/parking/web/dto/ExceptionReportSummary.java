@@ -5,5 +5,6 @@ public record ExceptionReportSummary(
     long manualOverridesCount,
     long securityAlertsCount,
     long paymentIssuesCount,
-    long faceRejectsCount
+    long faceRejectsCount,
+    long qualityWarningsCount
 ) {}

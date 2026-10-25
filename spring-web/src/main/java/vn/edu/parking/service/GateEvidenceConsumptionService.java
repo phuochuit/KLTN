@@ -62,7 +62,11 @@ public class GateEvidenceConsumptionService {
             face = load(faceId, lock);
             validate(face, EvidenceType.FACE, operation, identity, familyMemberId);
         }
-        boolean facePassed = face != null && "PASS".equals(face.getFaceDecision());
+        LivenessStatus liveness = face == null ? null : face.getLivenessStatus();
+        boolean livenessAllowsPass = liveness == null
+            || liveness == LivenessStatus.NOT_EVALUATED
+            || liveness == LivenessStatus.PASS;
+        boolean facePassed = face != null && "PASS".equals(face.getFaceDecision()) && livenessAllowsPass;
         Double similarity = face == null || face.getFaceSimilarity() == null
             ? null : face.getFaceSimilarity().doubleValue();
         return new ResolvedEvidence(false, identity.accountId(), vehicle, face,

@@ -74,16 +74,28 @@ class ExceptionReportServiceTest {
         when(gateEvidences.findRecentFaceExceptions(eq(EvidenceType.FACE), anyList(), any(), any()))
             .thenReturn(List.of(faceEv));
 
+        // 5. Mock AI quality warning
+        GateEvidence qualityEv = new GateEvidence(
+            "qe-123456789012", EvidenceType.VEHICLE, EvidenceOperation.ENTRY,
+            EvidenceSourceKind.IMAGE, staff, ds, "req-2", "v1", "sha-2",
+            now.minus(5, ChronoUnit.HOURS), now.plusSeconds(3600));
+        qualityEv.setQuality("WARNING", "PLATE_BLURRY,PLATE_TILTED", "quality/1.0");
+
+        when(gateEvidences.findRecentQualityWarnings(any(), any()))
+            .thenReturn(List.of(qualityEv));
+
         // Execute
         ExceptionReportPageResponse res = service.getExceptionReport(from, now, "ALL", "ALL", null, null);
 
         // Verify
-        assertEquals(4, res.totalItems());
-        assertEquals(4, res.summary().totalExceptions());
+        assertEquals(5, res.totalItems());
+        assertEquals(5, res.summary().totalExceptions());
         assertEquals(1, res.summary().manualOverridesCount());
         assertEquals(1, res.summary().securityAlertsCount());
         assertEquals(1, res.summary().paymentIssuesCount());
         assertEquals(1, res.summary().faceRejectsCount());
+        assertEquals(1, res.summary().qualityWarningsCount());
+        assertTrue(res.items().stream().anyMatch(i -> "AI_QUALITY".equals(i.category())));
 
         // Verify sorting by timestamp desc
         assertTrue(res.items().get(0).timestamp().isAfter(res.items().get(1).timestamp()));
@@ -107,6 +119,8 @@ class ExceptionReportServiceTest {
         when(paymentTransactions.findByPaidAtBetweenOrderByPaidAtDesc(any(), any()))
             .thenReturn(Collections.emptyList());
         when(gateEvidences.findRecentFaceExceptions(any(), anyList(), any(), any()))
+            .thenReturn(Collections.emptyList());
+        when(gateEvidences.findRecentQualityWarnings(any(), any()))
             .thenReturn(Collections.emptyList());
 
         var res = service.getExceptionReport(now.minus(1, ChronoUnit.DAYS), now, "MANUAL_OVERRIDE", "ALL", null, null);

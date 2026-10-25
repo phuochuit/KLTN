@@ -31,5 +31,10 @@ public interface GateEvidenceRepository extends JpaRepository<GateEvidence, Stri
         @Param("from") Instant from,
         @Param("to") Instant to);
 
+    @Query("select e from GateEvidence e where e.qualityWarnings is not null and e.createdAt between :from and :to order by e.createdAt desc")
+    List<GateEvidence> findRecentQualityWarnings(
+        @Param("from") Instant from,
+        @Param("to") Instant to);
+
     List<GateEvidence> findTop100ByDeletedAtIsNullAndCreatedAtBeforeOrderByCreatedAtAsc(Instant cutoff);
 }

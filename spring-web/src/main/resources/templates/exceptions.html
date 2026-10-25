@@ -80,7 +80,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <div>
             <h1>Khung báo cáo ngoại lệ và can thiệp vận hành</h1>
-            <p style="color: #6b7280; margin: 4px 0 0 0;">Tổng hợp can thiệp thủ công, cảnh báo an ninh, lỗi thanh toán và bất thường nhận diện AI.</p>
+            <p style="color: #6b7280; margin: 4px 0 0 0;">Tổng hợp can thiệp thủ công, cảnh báo an ninh, lỗi thanh toán, bất thường nhận diện AI và cảnh báo chất lượng ảnh.</p>
         </div>
         <div>
             <a th:href="@{/exceptions/export-csv(fromDate=${fromDate}, toDate=${toDate}, category=${category}, severity=${severity}, operator=${operator}, keyword=${keyword})}"
@@ -110,6 +110,10 @@
             <div class="label">Khuôn mặt bất thường</div>
             <div class="value" style="color: #ea580c;" th:text="${summary.faceRejectsCount}">0</div>
         </div>
+        <div class="stats-item">
+            <div class="label">Chất lượng ảnh AI</div>
+            <div class="value" style="color: #7c3aed;" th:text="${summary.qualityWarningsCount}">0</div>
+        </div>
     </div>
 
     <!-- Filter Card -->
@@ -132,6 +136,7 @@
                         <option value="SECURITY_ALERT" th:selected="${category == 'SECURITY_ALERT'}">Cảnh báo bảo mật (Security Alert)</option>
                         <option value="PAYMENT_ISSUE" th:selected="${category == 'PAYMENT_ISSUE'}">Lỗi thanh toán / Đối soát</option>
                         <option value="FACE_REJECT" th:selected="${category == 'FACE_REJECT'}">Khuôn mặt bất thường (Face Reject/Review)</option>
+                        <option value="AI_QUALITY" th:selected="${category == 'AI_QUALITY'}">Chất lượng ảnh AI (Mờ, lóa, tối, nghiêng)</option>
                     </select>
                 </div>
                 <div class="filter-item">
