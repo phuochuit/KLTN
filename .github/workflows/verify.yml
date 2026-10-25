@@ -1,0 +1,99 @@
+name: Verify
+
+on: [workflow_dispatch]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: ${{ matrix.suite }}
+    runs-on: windows-2022
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [spring, desktop, anpr, tooling]
+    defaults:
+      run:
+        shell: powershell
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+      PIP_CACHE_DIR: ${{ github.workspace }}/.cache/pip
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Check tracked local-only paths
+        run: |
+          $files = @(git ls-files)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $blocked = @($files | Where-Object {
+            $_ -match '^(AGENTS\.md$|\.opencode/|\.codegraph/|tasks/|\.cache/|\.artifacts/)' -or
+            $_ -match '\.(pem|key|pfx|p12)$' -or
+            ($_ -match '(^|/)\.env($|\.)' -and $_ -notmatch '\.example$')
+          })
+          if ($blocked.Count -gt 0) {
+            $blocked | ForEach-Object { Write-Host "Blocked tracked path: $_" }
+            exit 1
+          }
+
+      - name: Set up Java 21
+        if: matrix.suite == 'spring'
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up .NET 8
+        if: matrix.suite == 'desktop'
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set up Python 3.12
+        if: matrix.suite == 'anpr'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Prepare ANPR test environment
+        if: matrix.suite == 'anpr'
+        run: |
+          python -m venv anpr-service/.venv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./anpr-service/.venv/Scripts/python.exe -m pip install -r anpr-service/requirements-test.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run suite with fresh reports
+        run: ./scripts/test/run-tests.ps1 -Suite ${{ matrix.suite }}
+
+      - name: Build Desktop Release
+        if: matrix.suite == 'desktop'
+        env:
+          DOTNET_CLI_HOME: ${{ github.workspace }}/.cache/dotnet-cli
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+          DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+        run: dotnet build desktop-winform/ParkingGateDesktop.csproj --configuration Release --no-restore
+
+      - name: Check tracked files after tests
+        run: git diff --exit-code
+
+      - name: Retain test reports even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-results-${{ matrix.suite }}
+          path: |
+            .artifacts/test-runs/**/summary.json
+            .artifacts/test-runs/**/reports/*.xml
+            .artifacts/test-runs/**/reports/*.trx
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
