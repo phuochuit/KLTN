@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <header class="site-header" th:fragment="header">
@@ -23,6 +23,7 @@
                 <a th:href="@{/slots}" th:if="${#sets.contains(currentAuthorities, 'SLOT_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Sơ đồ bãi</a>
                 <a th:href="@{/sessions}" th:if="${#sets.contains(currentAuthorities, 'HISTORY_VIEW') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Lịch sử xe</a>
                 <a th:href="@{/payments}" th:if="${#sets.contains(currentAuthorities, 'PAYMENT_RECONCILE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Giao dịch &amp; đối soát</a>
+                <a th:href="@{/exceptions}" th:if="${#sets.contains(currentAuthorities, 'HISTORY_VIEW') or #sets.contains(currentAuthorities, 'SECURITY_AUDIT_VIEW') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Báo cáo ngoại lệ</a>
             </div>
         </details>
         <details class="nav-group"

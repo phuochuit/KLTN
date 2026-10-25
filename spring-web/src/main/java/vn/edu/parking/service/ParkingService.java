@@ -494,7 +494,7 @@ public class ParkingService {
             throw new IllegalStateException("Khách vãng lai phải xác thực khuôn mặt ra với ảnh đã chụp lúc vào");
     }
 
-    private BigDecimal calculateFee(ParkingSession session, LocalDateTime exitTime) {
+    BigDecimal calculateFee(ParkingSession session, LocalDateTime exitTime) {
         if (hasValidMonthlyPass(session)) return BigDecimal.ZERO;
         VehicleType type = session.getDetectedVehicleType();
         PricingRule rule = pricingRules.findByVehicleType(type)
@@ -522,7 +522,7 @@ public class ParkingService {
         LocalTime dayStart = LocalTime.of(6, 0);
         LocalTime nightStart = LocalTime.of(18, 0);
         boolean entirelyDaytime = !session.getEntryTime().toLocalTime().isBefore(dayStart)
-            && !exitTime.toLocalTime().isAfter(nightStart)
+            && exitTime.toLocalTime().isBefore(nightStart)
             && session.getEntryTime().toLocalDate().isEqual(exitTime.toLocalDate());
         return entirelyDaytime ? rule.getBasePrice() : rule.getNightPrice();
     }

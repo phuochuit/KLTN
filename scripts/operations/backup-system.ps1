@@ -25,7 +25,7 @@ $uri = [Uri]$env:PARKING_DB_URL.Substring(5)
 $database = $uri.AbsolutePath.TrimStart('/').Split('?')[0]
 $dump = (Get-Command mysqldump.exe -ErrorAction SilentlyContinue).Source
 if (-not $dump) {
-    $dump = Get-ChildItem 'C:\laragon','D:\laragon_new' -Recurse -Filter mysqldump.exe `
+    $dump = Get-ChildItem 'D:\2001230931_LucXuanThinh\file_laragon','C:\laragon','D:\laragon_new' -Recurse -Filter mysqldump.exe `
         -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
 }
 if (-not $dump) { throw 'mysqldump.exe was not found.' }

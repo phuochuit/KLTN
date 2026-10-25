@@ -20,6 +20,9 @@ import vn.edu.parking.web.dto.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.HttpHeaders;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -853,6 +856,102 @@ public class AdminController {
         data.put("payments", paymentList);
         return data;
     }
+
+    @GetMapping(value = {"/api/parking/revenue/export-csv", "/revenue/export-csv"}, produces = "text/csv; charset=UTF-8")
+    @ResponseBody
+    public ResponseEntity<byte[]> exportRevenueCsv(@RequestParam(defaultValue = "month") String type,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
+        LocalDateTime fromTime;
+        LocalDateTime toTime;
+        String periodLabel;
+        if ("month".equals(type) && year != null && month != null) {
+            fromTime = LocalDate.of(year, month, 1).atStartOfDay();
+            toTime = fromTime.plusMonths(1);
+            periodLabel = "thang_" + month + "_" + year;
+        } else if ("year".equals(type) && year != null) {
+            fromTime = LocalDate.of(year, 1, 1).atStartOfDay();
+            toTime = fromTime.plusYears(1);
+            periodLabel = "nam_" + year;
+        } else if ("range".equals(type) && from != null && to != null) {
+            fromTime = from.atStartOfDay();
+            toTime = to.plusDays(1).atStartOfDay();
+            periodLabel = "tu_" + from + "_den_" + to;
+        } else {
+            fromTime = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            toTime = fromTime.plusMonths(1);
+            periodLabel = "thang_" + LocalDate.now().getMonthValue() + "_" + LocalDate.now().getYear();
+        }
+
+        var sessionList = sessions
+                .findByStatusAndExitTimeBetween(SessionStatus.COMPLETED, fromTime, toTime).stream()
+                .sorted((a, b) -> b.getExitTime().compareTo(a.getExitTime()))
+                .toList();
+        var paymentList = payments.findByPaidAtBetween(fromTime, toTime).stream()
+                .sorted((a, b) -> b.getPaidAt().compareTo(a.getPaidAt()))
+                .toList();
+
+        StringBuilder csv = new StringBuilder(CsvUtils.UTF_8_BOM);
+        csv.append("Mã giao dịch / Phiên,Phân loại doanh thu,Biển số xe,Thời gian bắt đầu / Vào,Thời gian kết thúc / Ra / Thu,Thời lượng / Kỳ hạn,Số tiền (VNĐ),Trạng thái,Phương thức / Loại xe\r\n");
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        BigDecimal totalVisit = BigDecimal.ZERO;
+
+        for (ParkingSession s : sessionList) {
+            BigDecimal fee = s.getFee() != null ? s.getFee() : BigDecimal.ZERO;
+            totalVisit = totalVisit.add(fee);
+            String duration = "";
+            if (s.getEntryTime() != null && s.getExitTime() != null) {
+                long minutes = java.time.Duration.between(s.getEntryTime(), s.getExitTime()).toMinutes();
+                duration = (minutes / 60) + "h " + (minutes % 60) + "m";
+            }
+            csv.append(CsvUtils.escape(s.getId())).append(",")
+               .append("Vé lượt").append(",")
+               .append(CsvUtils.escape(s.getEntryPlate())).append(",")
+               .append(CsvUtils.escape(s.getEntryTime() != null ? s.getEntryTime().format(dtf) : "")).append(",")
+               .append(CsvUtils.escape(s.getExitTime() != null ? s.getExitTime().format(dtf) : "")).append(",")
+               .append(CsvUtils.escape(duration)).append(",")
+               .append(fee.toPlainString()).append(",")
+               .append(CsvUtils.escape(s.getStatus().getDisplayName())).append(",")
+               .append(CsvUtils.escape(s.getDetectedVehicleType() != null ? s.getDetectedVehicleType().name() : "")).append("\r\n");
+        }
+
+        BigDecimal totalSub = BigDecimal.ZERO;
+        for (SubscriptionPayment p : paymentList) {
+            BigDecimal amount = p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO;
+            totalSub = totalSub.add(amount);
+            String plate = (p.getParkingCard() != null && p.getParkingCard().getVehicle() != null)
+                ? p.getParkingCard().getVehicle().getPlateNumber()
+                : (p.getParkingCard() != null ? p.getParkingCard().getCardCode() : "");
+            String period = (p.getPeriodStart() != null ? p.getPeriodStart().toString() : "") + " -> " +
+                            (p.getPeriodEnd() != null ? p.getPeriodEnd().toString() : "");
+            csv.append(CsvUtils.escape(p.getId())).append(",")
+               .append("Vé tháng cư dân").append(",")
+               .append(CsvUtils.escape(plate)).append(",")
+               .append(CsvUtils.escape(p.getPaidAt() != null ? p.getPaidAt().format(dtf) : "")).append(",")
+               .append(CsvUtils.escape(p.getPeriodEnd() != null ? p.getPeriodEnd().toString() : "")).append(",")
+               .append(CsvUtils.escape(period)).append(",")
+               .append(amount.toPlainString()).append(",")
+               .append("Đã thanh toán").append(",")
+               .append(CsvUtils.escape("Gói tháng thẻ " + (p.getParkingCard() != null ? p.getParkingCard().getCardCode() : ""))).append("\r\n");
+        }
+
+        BigDecimal grandTotal = totalVisit.add(totalSub);
+        csv.append("TỔNG CỘNG,Tất cả nguồn,,,,,")
+           .append(grandTotal.toPlainString())
+           .append(",,Vé lượt: ").append(totalVisit.toPlainString())
+           .append(" | Vé tháng: ").append(totalSub.toPlainString())
+           .append("\r\n");
+
+        byte[] bytes = csv.toString().getBytes(StandardCharsets.UTF_8);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"doanh_thu_" + periodLabel + ".csv\"")
+                .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                .body(bytes);
+    }
+
 
     @GetMapping("/api/parking/revenue/monthly/{year}/{month}")
     @ResponseBody

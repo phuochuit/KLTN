@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khung báo cáo ngoại lệ - Parking ANPR</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <style>
+        .badge-critical {
+            background-color: #fee2e2;
+            color: #991b1b;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            display: inline-block;
+        }
+        .badge-warning {
+            background-color: #fef3c7;
+            color: #92400e;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            display: inline-block;
+        }
+        .badge-info {
+            background-color: #e0f2fe;
+            color: #0369a1;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            display: inline-block;
+        }
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: end;
+        }
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .filter-item label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        .filter-item input, .filter-item select {
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .detail-row {
+            font-size: 0.85rem;
+            color: #4b5563;
+            margin-top: 3px;
+        }
+        .stats-grid-5 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<header th:replace="~{fragments :: header}"></header>
+<main>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+            <h1>Khung báo cáo ngoại lệ và can thiệp vận hành</h1>
+            <p style="color: #6b7280; margin: 4px 0 0 0;">Tổng hợp can thiệp thủ công, cảnh báo an ninh, lỗi thanh toán và bất thường nhận diện AI.</p>
+        </div>
+        <div>
+            <a th:href="@{/exceptions/export-csv(fromDate=${fromDate}, toDate=${toDate}, category=${category}, severity=${severity}, operator=${operator}, keyword=${keyword})}"
+               class="btn btn-outline" style="text-decoration: none;">📥 Xuất file CSV</a>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid-5">
+        <div class="stats-item">
+            <div class="label">Tổng ngoại lệ</div>
+            <div class="value" th:text="${summary.totalExceptions}">0</div>
+        </div>
+        <div class="stats-item">
+            <div class="label">Can thiệp thủ công</div>
+            <div class="value" style="color: #d97706;" th:text="${summary.manualOverridesCount}">0</div>
+        </div>
+        <div class="stats-item">
+            <div class="label">Cảnh báo bảo mật</div>
+            <div class="value" style="color: #dc2626;" th:text="${summary.securityAlertsCount}">0</div>
+        </div>
+        <div class="stats-item">
+            <div class="label">Lỗi thanh toán / đối soát</div>
+            <div class="value" style="color: #b91c1c;" th:text="${summary.paymentIssuesCount}">0</div>
+        </div>
+        <div class="stats-item">
+            <div class="label">Khuôn mặt bất thường</div>
+            <div class="value" style="color: #ea580c;" th:text="${summary.faceRejectsCount}">0</div>
+        </div>
+    </div>
+
+    <!-- Filter Card -->
+    <div class="card" style="margin-bottom: 20px;">
+        <form method="get" th:action="@{/exceptions}">
+            <div class="filter-grid">
+                <div class="filter-item">
+                    <label for="fromDate">Từ ngày</label>
+                    <input type="date" id="fromDate" name="fromDate" th:value="${fromDate}">
+                </div>
+                <div class="filter-item">
+                    <label for="toDate">Đến ngày</label>
+                    <input type="date" id="toDate" name="toDate" th:value="${toDate}">
+                </div>
+                <div class="filter-item">
+                    <label for="category">Phân loại ngoại lệ</label>
+                    <select id="category" name="category">
+                        <option value="ALL" th:selected="${category == 'ALL'}">-- Tất cả phân loại --</option>
+                        <option value="MANUAL_OVERRIDE" th:selected="${category == 'MANUAL_OVERRIDE'}">Can thiệp thủ công (Manual Override)</option>
+                        <option value="SECURITY_ALERT" th:selected="${category == 'SECURITY_ALERT'}">Cảnh báo bảo mật (Security Alert)</option>
+                        <option value="PAYMENT_ISSUE" th:selected="${category == 'PAYMENT_ISSUE'}">Lỗi thanh toán / Đối soát</option>
+                        <option value="FACE_REJECT" th:selected="${category == 'FACE_REJECT'}">Khuôn mặt bất thường (Face Reject/Review)</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="severity">Mức độ cảnh báo</label>
+                    <select id="severity" name="severity">
+                        <option value="ALL" th:selected="${severity == 'ALL'}">-- Tất cả mức độ --</option>
+                        <option value="WARNING" th:selected="${severity == 'WARNING'}">Cảnh báo (WARNING)</option>
+                        <option value="CRITICAL" th:selected="${severity == 'CRITICAL'}">Nghiêm trọng (CRITICAL)</option>
+                        <option value="INFO" th:selected="${severity == 'INFO'}">Thông tin (INFO)</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="operator">Nhân viên / Tài khoản</label>
+                    <input type="text" id="operator" name="operator" placeholder="Username hoặc họ tên" th:value="${operator}">
+                </div>
+                <div class="filter-item">
+                    <label for="keyword">Biển số / Từ khóa</label>
+                    <input type="text" id="keyword" name="keyword" placeholder="Nhập biển số hoặc nội dung" th:value="${keyword}">
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary">Lọc dữ liệu</button>
+                <a th:href="@{/exceptions}" class="btn btn-outline" style="text-decoration: none;">Đặt lại</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2>Danh sách ngoại lệ ghi nhận (<span th:text="${totalItems}">0</span> bản ghi)</h2>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width: 110px;">Mã</th>
+                <th style="width: 140px;">Thời gian</th>
+                <th style="width: 150px;">Phân loại</th>
+                <th style="width: 110px;">Mức độ</th>
+                <th style="width: 120px;">Biển số</th>
+                <th>Người xử lý</th>
+                <th style="width: 100px;">Thao tác</th>
+                <th>Lý do &amp; Mô tả chi tiết</th>
+                <th style="width: 110px;">Trạng thái</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${items}">
+                <td><strong th:text="${item.id}"></strong></td>
+                <td th:text="${#temporals.format(item.timestamp, 'dd/MM/yyyy HH:mm:ss', 'Asia/Ho_Chi_Minh')}"></td>
+                <td>
+                    <span th:text="${item.categoryLabel}"></span>
+                </td>
+                <td>
+                    <span th:if="${item.severity == 'CRITICAL'}" class="badge-critical">Nghiêm trọng</span>
+                    <span th:if="${item.severity == 'WARNING'}" class="badge-warning">Cảnh báo</span>
+                    <span th:if="${item.severity == 'INFO'}" class="badge-info">Thông tin</span>
+                </td>
+                <td><strong th:text="${item.plateNumber}"></strong></td>
+                <td>
+                    <span th:text="${item.operatorFullName}"></span>
+                    <div class="muted" style="font-size: 0.8rem;" th:text="${item.operatorUsername}"></div>
+                </td>
+                <td><code th:text="${item.operation}"></code></td>
+                <td>
+                    <strong style="color: #1f2937;" th:text="${item.reasonCode}"></strong>
+                    <div style="color: #4b5563; font-size: 0.9rem;" th:text="${item.description}"></div>
+                    <div th:if="${item.details != null and not #maps.isEmpty(item.details)}" class="detail-row">
+                        <span th:each="entry, stat : ${item.details}">
+                            <small><b th:text="${entry.key} + ': '"></b><span th:text="${entry.value}"></span><span th:if="${!stat.last}"> | </span></small>
+                        </span>
+                    </div>
+                </td>
+                <td>
+                    <span th:text="${item.statusOrOutcome}"></span>
+                </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(items)}">
+                <td colspan="9" class="muted" style="text-align: center; padding: 24px;">Không tìm thấy sự kiện ngoại lệ nào trong khoảng thời gian đã chọn.</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+</body>
+</html>

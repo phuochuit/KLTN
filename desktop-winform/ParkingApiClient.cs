@@ -223,6 +223,19 @@ public sealed class ParkingApiClient : IDisposable
             "Spring Web", "tra cứu cư dân/phương tiện");
     }
 
+    public async Task<EvidenceComparisonResponse> GetEvidenceComparisonAsync(
+        string plate, string exitVehicleType, string exitVehicleEvidenceId, string exitFaceEvidenceId, long? sessionId = null)
+    {
+        string query = $"?plate={Uri.EscapeDataString(plate ?? "")}"
+            + $"&exitVehicleType={Uri.EscapeDataString(exitVehicleType ?? "")}"
+            + $"&exitVehicleEvidenceId={Uri.EscapeDataString(exitVehicleEvidenceId ?? "")}"
+            + $"&exitFaceEvidenceId={Uri.EscapeDataString(exitFaceEvidenceId ?? "")}"
+            + (sessionId.HasValue ? $"&sessionId={sessionId.Value}" : "");
+        using var response = await SendProtectedAsync("/api/parking/evidence-comparison" + query, HttpMethod.Get, retrySafeRead: true);
+        return await ApiResponseReader.ReadAsync<EvidenceComparisonResponse>(response, _json,
+            "Spring Web", "đối chiếu bằng chứng ảnh vào/ra");
+    }
+
     public async Task<List<ParkingSlotResponse>> GetSlotsAsync()
     {
         using var response = await SendProtectedAsync("/api/parking/slots", HttpMethod.Get, retrySafeRead: true);

@@ -52,6 +52,7 @@
       <input type="date" id="filterTo" />
     </label>
     <button onclick="applyFilter()">Áp dụng</button>
+    <button type="button" onclick="exportRevenueCsv()" style="background:#0284c7;color:white;border:none;margin-left:8px;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:600;">📥 Xuất CSV Doanh thu</button>
   </div>
   <div class="stats-grid">
     <div class="stats-item"><div class="label">Hộ gia đình</div><div class="value" id="statHouseholds" th:text="${householdCount}">0</div></div>
@@ -126,6 +127,14 @@ function fmtMoney(v) { return fmtNum(v).toLocaleString('vi-VN') + ' đ'; }
     labelYear.style.display = (t === 'month' || t === 'year') ? '' : 'none';
     labelFrom.style.display = t === 'range' ? '' : 'none';
     labelTo.style.display = t === 'range' ? '' : 'none';
+  };
+  window.exportRevenueCsv = function() {
+    const t = typeSel.value;
+    let url = '/api/parking/revenue/export-csv?type=' + t;
+    if (t === 'month') url += '&year=' + yearSel.value + '&month=' + monthSel.value;
+    else if (t === 'year') url += '&year=' + yearSel.value;
+    else if (t === 'range') url += '&from=' + document.getElementById('filterFrom').value + '&to=' + document.getElementById('filterTo').value;
+    window.location.href = url;
   };
   window.applyFilter = function() {
     const t = typeSel.value;

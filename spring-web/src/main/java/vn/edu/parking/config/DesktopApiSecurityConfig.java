@@ -37,7 +37,9 @@ public class DesktopApiSecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/parking/entry", "/api/parking/exit-preview",
                     "/api/parking/exit-confirm").hasAuthority("GATE_OPERATE")
                 .requestMatchers(HttpMethod.GET, "/api/parking/open", "/api/parking/lookup",
-                    "/api/parking/slots", "/api/parking/recent-unassigned")
+                    "/api/parking/slots", "/api/parking/recent-unassigned",
+                    "/api/parking/evidence-comparison", "/api/parking/exceptions",
+                    "/api/parking/exceptions/export-csv")
                     .hasAuthority("GATE_OPERATE")
                 .requestMatchers(HttpMethod.GET, "/api/parking/vehicles-unassigned")
                     .hasAuthority("VEHICLE_MANAGE")
