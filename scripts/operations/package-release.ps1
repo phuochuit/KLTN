@@ -7,8 +7,8 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $env:LOCALAPPDATA "ParkingANPR\releases"
 }
 $release = Join-Path $OutputRoot "parking-anpr-$stamp"
-$maven = Join-Path $workspace 'tools\apache-maven-3.9.11\bin\mvn.cmd'
-if (-not (Test-Path $maven)) { $maven = 'mvn' }
+. (Join-Path $workspace 'scripts\tool-paths.ps1')
+$maven = Resolve-ParkingMaven $workspace
 
 New-Item -ItemType Directory -Force -Path $release | Out-Null
 & $maven -f (Join-Path $workspace 'spring-web\pom.xml') clean package -DskipTests

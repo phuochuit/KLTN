@@ -2,7 +2,6 @@ spring-web/target/
 spring-web/data/
 spring-web/uploads/
 spring-web/private-data/
-anpr-service/app/__pycache__/
 desktop-winform/bin/
 desktop-winform/obj/
 desktop-winform.Tests/bin/
@@ -12,8 +11,6 @@ tools/apache-maven-*/
 tools/apache-maven-*.zip
 tools/dotnet/
 tools/dotnet-install.ps1
-anpr-service/.venv/
-anpr-service/.venv.incompatible.*/
 anpr-service/*.pt
 anpr-service/.EasyOCR/
 anpr-service/.ultralytics/
@@ -24,4 +21,39 @@ tmp/
 qa_*
 scripts/security/keys/
 *.pem
-.env.local
+
+# Reproducible local state and retained outputs (not backups)
+/.cache/
+/.artifacts/
+/.test-tmp/
+/.test-tmp-*/
+/spring-web/.test-tmp/
+/spring-web/.idea/
+/desktop-winform.Tests/TestResults/
+**/.venv/
+**/.venv.*/
+node_modules/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Local agent instructions, tooling and task tracking
+/AGENTS.md
+/.opencode/
+/.codegraph/
+/tasks/
+
+# Local secrets; examples contain placeholders only
+.env
+.env.*
+!.env.example
+!.env.local.example
+*.key
+*.pfx
+*.p12
+
+# Runtime storage when a supported command is launched from the workspace root
+/private-data/
+/uploads/
+/spring-web/var/

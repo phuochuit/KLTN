@@ -1,0 +1,4 @@
+# Test environment only; runtime requirements remain owned by requirements.txt.
+-r requirements.txt
+pytest==8.4.2
+httpx==0.28.1
