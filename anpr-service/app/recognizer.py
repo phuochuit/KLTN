@@ -18,10 +18,24 @@ from .schemas import BoundingBox, RecognitionResponse
 CAR_CLASS = "car"
 MOTORCYCLE_CLASSES = {"motorcycle", "motorbike"}
 VIETNAM_PLATE_PATTERN = re.compile(r"^\d{2}[A-Z]{1,2}\d{4,6}$")
+STANDARD_PLATE_WITH_EXTRA_LETTER = re.compile(r"^(\d{2})[A-Z]([A-Z]\d{6})$")
 
 
 def normalize_plate(value: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", (value or "").upper())
+
+
+def canonicalize_plate(value: str) -> str:
+    """Normalize a standard Vietnamese plate and remove one OCR-only prefix letter.
+
+    Resident motorcycle/car plates handled by this system use a two-digit province
+    code followed by one series letter. EasyOCR can hallucinate a letter between
+    the province code and the real series (for example 59HF241578). In the narrow
+    two-letter + six-digit shape, discard only that inserted first letter.
+    """
+    text = normalize_plate(value)
+    match = STANDARD_PLATE_WITH_EXTRA_LETTER.fullmatch(text)
+    return "".join(match.groups()) if match else text
 
 
 def plate_format_score(value: str) -> float:
@@ -78,11 +92,13 @@ class AnprRecognizer:
             raise ValueError("Không đọc được dữ liệu ảnh")
         return self.recognize_frame(image, frame_index)
 
-    def recognize_frame(self, image: np.ndarray, frame_index: int = 0) -> RecognitionResponse:
+    def recognize_frame(self, image: np.ndarray, frame_index: int = 0,
+                        plate_result=None) -> RecognitionResponse:
         with self._lock:
-            plate_result = self.plate_model.predict(
-                image, conf=self.plate_confidence, imgsz=640, verbose=False
-            )[0]
+            if plate_result is None:
+                plate_result = self.plate_model.predict(
+                    image, conf=self.plate_confidence, imgsz=640, verbose=False
+                )[0]
             vehicle_result = self.vehicle_model.predict(
                 image, conf=self.vehicle_confidence, imgsz=640, verbose=False,
                 classes=[2, 3],
@@ -162,7 +178,7 @@ class AnprRecognizer:
 
     def recognize_frames(self, frames: list[tuple[int, np.ndarray]], finalist_count: int = 3) -> RecognitionResponse:
         """Select sharp plate candidates, then run expensive OCR only on finalists."""
-        finalists: list[tuple[float, int, np.ndarray]] = []
+        finalists: list[tuple[float, int, np.ndarray, object]] = []
         for index, frame in frames:
             with self._lock:
                 plate_result = self.plate_model.predict(
@@ -171,14 +187,14 @@ class AnprRecognizer:
             plate_confidence = max((score for score, _ in self._all_boxes(plate_result)), default=0.0)
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             sharpness = min(float(cv2.Laplacian(gray, cv2.CV_64F).var()) / 1000.0, 1.0)
-            finalists.append((plate_confidence * 0.9 + sharpness * 0.1, index, frame))
+            finalists.append((plate_confidence * 0.9 + sharpness * 0.1, index, frame, plate_result))
 
         if not finalists:
             raise ValueError("Không đọc được frame nào để nhận dạng")
 
         best: Candidate | None = None
-        for _, index, frame in sorted(finalists, key=lambda item: item[0], reverse=True)[:max(1, finalist_count)]:
-            response = self.recognize_frame(frame, index)
+        for _, index, frame, plate_result in sorted(finalists, key=lambda item: item[0], reverse=True)[:max(1, finalist_count)]:
+            response = self.recognize_frame(frame, index, plate_result=plate_result)
             score = (
                 response.detection_confidence * 0.45
                 + response.ocr_confidence * 0.45
@@ -225,7 +241,7 @@ class AnprRecognizer:
                     allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
                 )
                 ordered = self._order_ocr_results(results)
-                text = normalize_plate("".join(str(item[1]) for item in ordered))
+                text = canonicalize_plate("".join(str(item[1]) for item in ordered))
                 token_lengths = [max(1, len(normalize_plate(str(item[1])))) for item in ordered]
                 confidence = (sum(float(item[2]) * length for item, length in zip(ordered, token_lengths))
                               / sum(token_lengths)) if ordered else 0.0

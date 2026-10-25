@@ -281,7 +281,7 @@ public sealed class MainForm : Form
             ConfigureApis();
             SetVehicleBusy(true, "Đang chụp các frame biển số...");
             var started = System.Diagnostics.Stopwatch.StartNew();
-            var response = await _parkingApi.RecognizeCameraAsync(CurrentOperation(), frameCount: 8);
+            var response = await _parkingApi.RecognizeCameraAsync(CurrentOperation());
             started.Stop();
             ApplyRecognition(response, started.Elapsed);
         }

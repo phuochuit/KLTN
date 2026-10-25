@@ -374,7 +374,9 @@ def recognize_camera(payload: CameraRecognitionRequest, request: Request) -> Rec
     try:
         frames = capture_camera_frames(payload.cameraIndex, count=count, camera_source=payload.cameraSource)
         indexed = [(index, frame) for index, frame in enumerate(frames)]
-        return enrich_recognition(recognizer().recognize_frames(indexed), request)
+        # Hai frame tốt nhất đủ dự phòng khi frame đầu OCR kém, đồng thời tránh
+        # kéo dài thao tác tại trạm quá mục tiêu 5 giây trên máy chỉ dùng CPU.
+        return enrich_recognition(recognizer().recognize_frames(indexed, finalist_count=2), request)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
