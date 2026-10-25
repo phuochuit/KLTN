@@ -159,15 +159,15 @@ def capture_camera_frames(camera_index: int = 0, count: int = 8,
             camera.release()
 
 
-def liveness_score(frames: list[np.ndarray]) -> float:
-    """Score liveness from inter-frame motion and eye-region change.
+LIVENESS_MODEL = "motion-blink/1.1"
+LIVENESS_LIVE_MIN = 0.55
+LIVENESS_SPOOF_MAX = 0.25
 
-    A printed photo or static replay has near-zero local motion, while a live
-    person exhibits subtle head movement and blinking.  We compare consecutive
-    frames in the central face region and require a minimum amount of change.
-    """
+
+def _frame_motion(frames: list[np.ndarray]) -> float | None:
+    """Return the mean ratio of changed pixels between consecutive frames."""
     if len(frames) < 3:
-        return 0.0
+        return None
     diffs = []
     for previous, current in zip(frames[:-1], frames[1:]):
         h = min(previous.shape[0], current.shape[0])
@@ -180,12 +180,55 @@ def liveness_score(frames: list[np.ndarray]) -> float:
         _, thresh = cv2.threshold(diff, 12, 255, cv2.THRESH_BINARY)
         ratio = float(np.count_nonzero(thresh)) / max(thresh.size, 1)
         diffs.append(ratio)
-    mean_diff = float(np.mean(diffs))
-    # Live motion is typically between 0.2% and 15% of pixels changing.
-    if mean_diff > 0.20:
+    return float(np.mean(diffs))
+
+
+def liveness_score(frames: list[np.ndarray]) -> float:
+    """Score liveness from inter-frame motion and eye-region change.
+
+    A printed photo or static replay has near-zero local motion, while a live
+    person exhibits subtle head movement and blinking.  We compare consecutive
+    frames in the central face region and require a minimum amount of change.
+    """
+    motion = _frame_motion(frames)
+    if motion is None or motion > 0.20:
         return 0.0
-    score = min(1.0, mean_diff / 0.03)
-    return round(score, 4)
+    return round(min(1.0, motion / 0.03), 4)
+
+
+def evaluate_liveness(frames: list[np.ndarray]) -> dict:
+    """Classify captured frames as LIVE, SPOOF or REVIEW.
+
+    The verdict is informational for callers: SPOOF must disable automatic
+    barrier opening, REVIEW requires an authorised manual decision, and LIVE
+    keeps the normal face-matching flow.
+    """
+    motion = _frame_motion(frames)
+    if motion is None:
+        return {"decision": "REVIEW", "confidence": 0.0,
+                "model": LIVENESS_MODEL, "reason": "insufficient_frames"}
+    if motion > 0.20:
+        return {"decision": "REVIEW", "confidence": 0.0,
+                "model": LIVENESS_MODEL, "reason": "excessive_motion"}
+    confidence = round(min(1.0, motion / 0.03), 4)
+    if confidence >= LIVENESS_LIVE_MIN:
+        return {"decision": "LIVE", "confidence": confidence,
+                "model": LIVENESS_MODEL, "reason": "ok"}
+    if confidence <= LIVENESS_SPOOF_MAX:
+        return {"decision": "SPOOF", "confidence": confidence,
+                "model": LIVENESS_MODEL, "reason": "static_scene"}
+    return {"decision": "REVIEW", "confidence": confidence,
+            "model": LIVENESS_MODEL, "reason": "insufficient_motion"}
+
+
+def attach_liveness(result: dict, frames: list[np.ndarray]) -> dict:
+    """Add the liveness contract fields to a face-verification result."""
+    verdict = evaluate_liveness(frames)
+    result["livenessDecision"] = verdict["decision"]
+    result["livenessConfidence"] = verdict["confidence"]
+    result["livenessModel"] = verdict["model"]
+    result["livenessReason"] = verdict["reason"]
+    return result
 
 
 @app.get("/health")
@@ -229,9 +272,7 @@ async def verify_face_camera(request: Request, registration: UploadFile = File(.
         # Score every captured frame (plus a contrast-normalized copy)
         # and keep the clearest match instead of trusting the last frame.
         result = face_engine.compare_best(registered, frames)
-        # Liveness is computed but intentionally not surfaced or allowed to
-        # override a successful face match.
-        liveness_score(frames)
+        attach_liveness(result, frames)
         best_frame_index = int(result.get("bestFrameIndex", len(frames) - 1))
         frame = frames[max(0, min(best_frame_index, len(frames) - 1))]
         ok, encoded = cv2.imencode(".jpg", frame)
@@ -251,7 +292,9 @@ async def verify_face_image(request: Request, registration: UploadFile = File(..
     try:
         registered = decode_image(await registration.read())
         frame = decode_image(await realtime.read())
-        return enrich_face_result(face_engine.compare_best(registered, [frame]), [frame], request)
+        result = face_engine.compare_best(registered, [frame])
+        attach_liveness(result, [frame])
+        return enrich_face_result(result, [frame], request)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
@@ -284,7 +327,9 @@ async def verify_face_video(request: Request, registration: UploadFile = File(..
         if not frames:
             raise ValueError("Không đọc được frame khuôn mặt nào từ video")
         registered = decode_image(await registration.read())
-        return enrich_face_result(face_engine.compare_best(registered, frames), frames, request)
+        result = face_engine.compare_best(registered, frames)
+        attach_liveness(result, frames)
+        return enrich_face_result(result, frames, request)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
@@ -299,11 +344,12 @@ def capture_face_camera(payload: CameraCaptureRequest, request: Request) -> dict
         frames = capture_camera_frames(payload.cameraIndex, count=8, camera_source=payload.cameraSource)
         frame = frames[-1]
         face_engine.analyze(frame, "Ảnh realtime")
-        liveness_score(frames)
         ok, encoded = cv2.imencode(".jpg", frame)
         if not ok: raise ValueError("Không mã hóa được ảnh camera")
         data = base64.b64encode(encoded).decode()
-        return enrich_face({"decision":"CAPTURED","similarity":0.0,"message":"Đã chụp một khuôn mặt rõ ràng","realtimeImageBase64":data}, request)
+        result = {"decision":"CAPTURED","similarity":0.0,"message":"Đã chụp một khuôn mặt rõ ràng","realtimeImageBase64":data}
+        attach_liveness(result, frames)
+        return enrich_face(result, request)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 

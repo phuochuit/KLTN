@@ -80,7 +80,16 @@ function renderResult(data) {
   `).join("");
   document.querySelector("#threshold-note").textContent =
     `Ngưỡng demo: khớp ≥ ${data.thresholds.match}; cần xem xét từ ${data.thresholds.review} đến dưới ${data.thresholds.match}. ` +
-    "Điểm là cosine similarity, không phải phần trăm xác suất. Liveness: chưa kiểm tra.";
+    "Điểm là cosine similarity, không phải phần trăm xác suất. " +
+    (data.livenessChecked
+      ? `Liveness: ${data.liveness.decision} (${data.liveness.confidence.toFixed(3)}).`
+      : "Liveness: chưa kiểm tra (không có video).");
+  const livenessStatus = document.querySelector("#liveness-status");
+  if (livenessStatus) {
+    livenessStatus.textContent = data.livenessChecked
+      ? `Liveness ${data.liveness.decision} · Tin cậy ${(data.liveness.confidence * 100).toFixed(1)}% · ${data.liveness.reason}`
+      : "";
+  }
   renderQuality(data.quality);
   result.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -115,6 +124,8 @@ form.addEventListener("reset", () => {
     });
     result.hidden = true;
     errorBox.hidden = true;
+    const livenessStatus = document.querySelector("#liveness-status");
+    if (livenessStatus) livenessStatus.textContent = "";
   });
 });
 

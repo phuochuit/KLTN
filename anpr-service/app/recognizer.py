@@ -105,6 +105,8 @@ class AnprRecognizer:
         if vehicle_type == "UNKNOWN":
             vehicle_type, vehicle_conf = self._vehicle_type_from_plate_shape(xyxy)
         crop = image[y1:y2, x1:x2]
+        from .quality import assess_plate
+        plate_quality = assess_plate(image, (x1, y1, x2 - x1, y2 - y1))
         plate_text, ocr_conf = self._read_plate(crop)
 
         annotated = image.copy()
@@ -135,6 +137,7 @@ class AnprRecognizer:
             boundingBox=BoundingBox(x=x1, y=y1, width=x2 - x1, height=y2 - y1),
             frameIndex=frame_index,
             annotatedImageBase64=self._encode_image(annotated),
+            quality=plate_quality,
             message=message,
         )
 
@@ -198,13 +201,19 @@ class AnprRecognizer:
             return "", 0.0
         scale = max(1.0, 420 / max(1, crop.shape[1]))
         enlarged = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-        gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
+        from .quality import deskew
+        straightened = deskew(enlarged)
+        gray = cv2.cvtColor(straightened, cv2.COLOR_BGR2GRAY)
         equalized = cv2.equalizeHist(gray)
         denoised = cv2.bilateralFilter(equalized, 7, 35, 35)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
 
         # Ảnh cân bằng + khử nhiễu thường tốt nhất với biển số ngoài trời.
         # Chạy nó trước để đa số trường hợp chỉ cần một lượt OCR.
         variants = [denoised, equalized, enlarged]
+        if straightened is not enlarged:
+            variants.insert(1, straightened)
+        variants.append(clahe)
 
         best_text, best_conf, best_quality = "", 0.0, -1.0
         with self._lock:

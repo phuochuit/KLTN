@@ -16,6 +16,7 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import vn.edu.parking.domain.*;
@@ -80,6 +81,39 @@ class GateEvidenceServiceTest {
     void requiresDesktopJwt() {
         assertThrows(IllegalArgumentException.class, () -> service.createVehicle(null,
             EvidenceOperation.ENTRY, EvidenceSourceKind.IMAGE, "request", "{}".getBytes()));
+    }
+
+    @Test
+    void storesFaceLivenessVerdictFromUpstream() throws Exception {
+        String requestId = UUID.randomUUID().toString();
+        byte[] upstream = json.writeValueAsBytes(Map.ofEntries(
+            Map.entry("contractVersion", "1.0"), Map.entry("requestId", requestId),
+            Map.entry("evidenceId", "upstream-face"), Map.entry("modelVersion", "face-v1"),
+            Map.entry("decision", "PASS"), Map.entry("similarity", 0.91),
+            Map.entry("matchThreshold", 0.363), Map.entry("reviewThreshold", 0.30),
+            Map.entry("livenessDecision", "SPOOF"), Map.entry("livenessConfidence", 0.12),
+            Map.entry("livenessModel", "motion-blink/1.1"),
+            Map.entry("quality", Map.of(
+                "status", "WARNING",
+                "version", "quality/1.0",
+                "warnings", java.util.List.of(
+                    Map.of("code", "FACE_BLURRY", "severity", "warning")))),
+            Map.entry("realtimeImageBase64", Base64.getEncoder().encodeToString(png()))));
+
+        var created = service.createFace(authentication, EvidenceOperation.ENTRY,
+            EvidenceSourceKind.IMAGE, null, requestId, upstream);
+
+        var captor = ArgumentCaptor.forClass(GateEvidence.class);
+        verify(evidences, times(2)).save(captor.capture());
+        GateEvidence saved = captor.getValue();
+        assertEquals(created.evidenceId(), saved.getId());
+        assertEquals(LivenessStatus.FAIL, saved.getLivenessStatus());
+        assertEquals(0.12, saved.getLivenessScore().doubleValue(), 0.0001);
+        assertEquals("anpr-service", saved.getLivenessProvider());
+        assertEquals("motion-blink/1.1", saved.getLivenessModelVersion());
+        assertEquals("WARNING", saved.getQualityStatus());
+        assertEquals("FACE_BLURRY", saved.getQualityWarnings());
+        assertEquals("quality/1.0", saved.getQualityVersion());
     }
 
     private static byte[] png() throws Exception {

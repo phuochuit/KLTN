@@ -204,6 +204,77 @@ def make_decision(enrollment: float, live_registration: float, live_id: float, h
     return "PASS", "Cả ba nguồn ảnh nhất quán theo ngưỡng thử nghiệm."
 
 
+LIVENESS_MODEL = "motion-blink/1.1"
+LIVENESS_LIVE_MIN = 0.55
+LIVENESS_SPOOF_MAX = 0.25
+
+
+def _motion_ratio(frames: list[np.ndarray]) -> float | None:
+    if len(frames) < 3:
+        return None
+    diffs = []
+    for previous, current in zip(frames[:-1], frames[1:]):
+        height = min(previous.shape[0], current.shape[0])
+        width = min(previous.shape[1], current.shape[1])
+        gray_a = cv2.cvtColor(previous[:height, :width], cv2.COLOR_BGR2GRAY)
+        gray_b = cv2.cvtColor(current[:height, :width], cv2.COLOR_BGR2GRAY)
+        diff = cv2.absdiff(cv2.GaussianBlur(gray_a, (21, 21), 0),
+                           cv2.GaussianBlur(gray_b, (21, 21), 0))
+        _, threshold = cv2.threshold(diff, 12, 255, cv2.THRESH_BINARY)
+        diffs.append(float(np.count_nonzero(threshold)) / max(threshold.size, 1))
+    return float(np.mean(diffs))
+
+
+def classify_liveness(frames: list[np.ndarray]) -> dict:
+    """Classify sampled video frames as LIVE, SPOOF or REVIEW."""
+    motion = _motion_ratio(frames)
+    if motion is None:
+        return {"decision": "REVIEW", "confidence": 0.0,
+                "model": LIVENESS_MODEL, "reason": "insufficient_frames"}
+    if motion > 0.20:
+        return {"decision": "REVIEW", "confidence": 0.0,
+                "model": LIVENESS_MODEL, "reason": "excessive_motion"}
+    confidence = round(min(1.0, motion / 0.03), 4)
+    if confidence >= LIVENESS_LIVE_MIN:
+        return {"decision": "LIVE", "confidence": confidence,
+                "model": LIVENESS_MODEL, "reason": "ok"}
+    if confidence <= LIVENESS_SPOOF_MAX:
+        return {"decision": "SPOOF", "confidence": confidence,
+                "model": LIVENESS_MODEL, "reason": "static_scene"}
+    return {"decision": "REVIEW", "confidence": confidence,
+            "model": LIVENESS_MODEL, "reason": "insufficient_motion"}
+
+
+def evaluate_liveness_video(data: bytes) -> dict:
+    """Sample frames from an uploaded clip and score motion liveness."""
+    import tempfile
+
+    if len(data) > MAX_UPLOAD_BYTES * 4:
+        raise ValueError("Video liveness vượt quá dung lượng cho phép.")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp:
+        temp.write(data)
+        path = Path(temp.name)
+    try:
+        capture = cv2.VideoCapture(str(path))
+        if not capture.isOpened():
+            raise ValueError("Không mở được video liveness.")
+        count = max(1, int(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
+        frames = []
+        try:
+            for index in np.linspace(0, count - 1, min(12, count), dtype=int):
+                capture.set(cv2.CAP_PROP_POS_FRAMES, int(index))
+                ok, frame = capture.read()
+                if ok:
+                    frames.append(frame)
+        finally:
+            capture.release()
+        if not frames:
+            raise ValueError("Không đọc được khung hình nào từ video liveness.")
+        return classify_liveness(frames)
+    finally:
+        path.unlink(missing_ok=True)
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
@@ -225,6 +296,7 @@ async def compare_faces(
     cccd: UploadFile = File(...),
     registration: UploadFile = File(...),
     realtime: UploadFile = File(...),
+    liveness_video: UploadFile | None = File(None),
 ) -> dict:
     labels = {"cccd": "Ảnh CCCD", "registration": "Ảnh đăng ký", "realtime": "Ảnh realtime"}
     uploads = {"cccd": cccd, "registration": registration, "realtime": realtime}
@@ -244,10 +316,22 @@ async def compare_faces(
         has_warning = any(item.warnings for item in analyses.values())
         decision, message = make_decision(enrollment, live_registration, live_id, has_warning)
 
+        liveness = {"decision": "REVIEW", "confidence": 0.0,
+                    "model": LIVENESS_MODEL, "reason": "not_provided"}
+        liveness_checked = False
+        if liveness_video is not None and liveness_video.filename:
+            liveness = evaluate_liveness_video(await liveness_video.read())
+            liveness_checked = True
+            if liveness["decision"] == "SPOOF":
+                decision = "REVIEW"
+                message = ("Liveness nghi vấn ảnh in/ảnh phát lại; cần nhân viên kiểm tra trực tiếp. "
+                           + message)
+
         return {
             "decision": decision,
             "message": message,
-            "livenessChecked": False,
+            "livenessChecked": liveness_checked,
+            "liveness": liveness,
             "thresholds": {"match": MATCH_THRESHOLD, "review": REVIEW_THRESHOLD},
             "comparisons": {
                 "cccdVsRegistration": {"score": enrollment, "status": classify(enrollment)},

@@ -101,7 +101,10 @@ class FaceEngine:
                 warnings.append("Ảnh mờ")
             aligned = self.recognizer.alignCrop(image, face)
             feature = self.recognizer.feature(aligned)
-            return feature, warnings, {"box": [x, y, fw, fh], "confidence": round(float(face[14]), 4), "brightness": round(brightness, 1), "sharpness": round(sharpness, 1)}
+            from .quality import assess_face
+            return feature, warnings, {"box": [x, y, fw, fh], "confidence": round(float(face[14]), 4),
+                                      "brightness": round(brightness, 1), "sharpness": round(sharpness, 1),
+                                      "quality": assess_face(image, (x, y, fw, fh))}
 
     def compare(self, registered, realtime):
         with self._lock:
@@ -117,7 +120,7 @@ class FaceEngine:
                 message = "Điểm nằm gần ngưỡng; nhân viên cần kiểm tra hoặc chụp lại"
             else:
                 message = "Khuôn mặt không khớp ảnh đăng ký"
-            return {"decision": decision, "similarity": score, "matchThreshold": MATCH_THRESHOLD, "warnings": warnings, "face": details, "message": message}
+            return {"decision": decision, "similarity": score, "matchThreshold": MATCH_THRESHOLD, "warnings": warnings, "face": details, "quality": details.get("quality"), "message": message}
 
     @staticmethod
     def _clahe_variant(image):
@@ -170,7 +173,8 @@ class FaceEngine:
                 message = "Khuôn mặt không khớp ảnh đăng ký"
             return {"decision": decision, "similarity": score, "matchThreshold": MATCH_THRESHOLD,
                     "warnings": best_warnings, "face": best_details,
-                    "bestFrameIndex": best_frame_index, "message": message}
+                    "bestFrameIndex": best_frame_index,
+                    "quality": (best_details or {}).get("quality"), "message": message}
 
 
 def decode_image(raw: bytes):

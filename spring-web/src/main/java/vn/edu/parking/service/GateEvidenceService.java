@@ -77,11 +77,33 @@ public class GateEvidenceService {
             sha256(upstreamJson), now, now.plus(ttl));
         evidence.setFaceResult(text(result, "evidenceId"), member, requiredText(result, "decision"),
             number(result, "similarity"), number(result, "matchThreshold"), number(result, "reviewThreshold"));
+        evidence.setLivenessResult(
+            vn.edu.parking.domain.LivenessStatus.fromDecision(text(result, "livenessDecision")),
+            number(result, "livenessConfidence"), "anpr-service", text(result, "livenessModel"));
         return persistWithImage(evidence, result, "realtimeImageBase64", EvidenceAssetRole.REALTIME_FACE);
+    }
+
+    private void applyQuality(GateEvidence evidence, ObjectNode result) {
+        com.fasterxml.jackson.databind.JsonNode quality = result.get("quality");
+        if (quality == null || !quality.isObject()) return;
+        String status = quality.path("status").asText("");
+        String version = quality.path("version").asText("");
+        StringBuilder codes = new StringBuilder();
+        for (com.fasterxml.jackson.databind.JsonNode warning : quality.path("warnings")) {
+            String code = warning.path("code").asText("");
+            if (code.isBlank()) continue;
+            if (codes.length() > 0) codes.append(',');
+            codes.append(code);
+        }
+        if (status.isBlank() && codes.length() == 0) return;
+        String warnings = codes.length() > 400 ? codes.substring(0, 400) : codes.toString();
+        evidence.setQuality(status.isBlank() ? null : status,
+            warnings.isBlank() ? null : warnings, version.isBlank() ? null : version);
     }
 
     private CreatedEvidence persistWithImage(GateEvidence evidence, ObjectNode result,
             String imageField, EvidenceAssetRole role) {
+        applyQuality(evidence, result);
         PrivateEvidenceStorage.StoredAsset stored = null;
         try {
             String encoded = requiredText(result, imageField);

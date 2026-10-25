@@ -18,8 +18,9 @@
     </header>
 
     <section class="notice">
-      <strong>Phạm vi:</strong> demo này kiểm tra độ tương đồng từ ba ảnh tĩnh. Nó chưa kiểm tra người thật
-      (liveness), vì vậy không được dùng kết quả để tự động mở barrier trong môi trường thực tế.
+      <strong>Phạm vi:</strong> demo này kiểm tra độ tương đồng từ ba ảnh tĩnh. Nếu cung cấp thêm video
+      liveness 2–3 giây, hệ thống chấm thêm chuyển động để phát hiện ảnh in/ảnh phát lại. Kết quả vẫn
+      chỉ mang tính thử nghiệm, không được dùng để tự động mở barrier.
     </section>
 
     <form id="compare-form">
@@ -58,6 +59,11 @@
             <span>Chụp/chọn ảnh realtime</span>
           </label>
           <div id="quality-realtime" class="quality"></div>
+          <label class="liveness-video">
+            Video liveness (tuỳ chọn – quay 2–3 giây, giữ khuôn mặt trong khung)
+            <input id="liveness_video" name="liveness_video" type="file" accept="video/*">
+          </label>
+          <div id="liveness-status" class="quality"></div>
         </article>
       </section>
 
