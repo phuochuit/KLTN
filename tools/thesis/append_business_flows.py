@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 
 from docx import Document
 from docx.enum.section import WD_SECTION
@@ -11,8 +10,7 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
 
-SOURCE = Path(r"D:\Kết quả tổng hợp mức phí khảo sát.docx")
-OUTPUT = Path(r"D:\Code\KhoaLuan\Ket_qua_muc_phi_va_flow_nghiep_vu_hoan_chinh.docx")
+from tool_cli import parse_paths
 
 FONT = "Times New Roman"
 NAVY = "17365D"
@@ -333,8 +331,8 @@ def remove_paragraph(paragraph):
     paragraph._p = paragraph._element = None
 
 
-def build():
-    doc = Document(SOURCE)
+def build(source, output):
+    doc = Document(source)
 
     # Keep the existing FLOW title and replace only its four placeholder lines.
     for paragraph in list(doc.paragraphs[149:]):
@@ -746,9 +744,11 @@ def build():
     doc.core_properties.subject = "Quản lý bãi đỗ xe chung cư tích hợp ANPR và đối chiếu khuôn mặt"
     doc.core_properties.author = ""
     doc.core_properties.last_modified_by = ""
-    doc.save(OUTPUT)
-    print(OUTPUT)
+    with open(output, 'xb') as target:
+        doc.save(target)
+    print(output)
 
 
 if __name__ == "__main__":
-    build()
+    args = parse_paths('Ket_qua_muc_phi_va_flow_nghiep_vu_hoan_chinh.docx')
+    build(args.input, args.output)

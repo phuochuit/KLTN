@@ -1,6 +1,6 @@
 # Tài liệu hệ thống quản lý bãi đỗ xe ANPR
 
-Đây là điểm vào chính cho người đọc và AI. Bộ tài liệu giải thích nghiệp vụ và kỹ thuật độc lập bằng Markdown; không cần mở PDF/DOCX/ảnh render để hiểu dự án. [ADR-001](decisions/0001-docs-as-project-reference.md) quy định cách tổ chức này. Tài liệu không chứng nhận hệ thống đã hoàn thiện hoặc sẵn sàng production.
+Đây là điểm vào chính cho người đọc và AI. Bộ tài liệu giải thích nghiệp vụ và kỹ thuật độc lập bằng Markdown; không cần mở PDF/DOCX/ảnh render để hiểu dự án. [ADR-001](decisions/0005-docs-as-project-reference.md) quy định cách tổ chức này. Tài liệu không chứng nhận hệ thống đã hoàn thiện hoặc sẵn sàng production.
 
 **Phạm vi implementation:** các trang kỹ thuật và mục implementation main đối chiếu tĩnh `abd6183`; không sửa source nghiệp vụ để làm khớp tài liệu hoặc hạ yêu cầu để khớp code. Các bảng được ghi rõ “lịch sử Security + WIP” bảo toàn snapshot cũ, không phải contract hoặc kết quả test của main. [Trạng thái](implementation-status.md) và [testing](testing/strategy.md) phân biệt source hiện hành, kết quả lịch sử và kiểm chứng chưa chạy. Chưa có application/live E2E PASS của revision main trong đợt này.
 

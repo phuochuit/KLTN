@@ -1,9 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
-$mysqlPath = 'D:\laragon_new\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe'
+$mysqlPath = if ($c = Get-Command mysql.exe -ErrorAction SilentlyContinue) { $c.Source } else { 'mysql.exe' }
 if (-not (Test-Path $mysqlPath)) { throw 'Laragon mysql.exe not found' }
 
-$configPath = 'D:\Code\KhoaLuan\spring-web\src\main\resources\application.properties'
+$configPath = Join-Path $PSScriptRoot '..\..\spring-web\src\main\resources\application.properties'
 $settings = @{}
 foreach ($line in [System.IO.File]::ReadAllLines($configPath)) {
     if ($line -match '^\s*([^#!][^=]*)=(.*)$') {

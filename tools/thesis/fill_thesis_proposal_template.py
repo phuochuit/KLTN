@@ -1,13 +1,11 @@
 from copy import deepcopy
 from hashlib import sha256
-from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from lxml import etree
 
 
-SOURCE = Path(r"D:\Code\KLTN\Mau De cuong chi tiet KLCN_Huong ung dung_04_07_2026.docx")
-OUTPUT = Path(r"D:\Code\KhoaLuan\De_cuong_chi_tiet_KLCN_Quan_ly_bai_do_xe_chung_cu.docx")
+from tool_cli import parse_paths
 EXPECTED_SOURCE_SHA256 = "c1b157aacc738281beb45f0d7e04ef02d472c340c926933d679688b2b70ed745"
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -219,7 +217,7 @@ def rewrite_document_xml(xml_bytes):
 def clone_with_replacement(source, output):
     with ZipFile(source, "r") as zin:
         document_xml = rewrite_document_xml(zin.read("word/document.xml"))
-        with ZipFile(output, "w") as zout:
+        with ZipFile(output, "x") as zout:
             for item in zin.infolist():
                 data = document_xml if item.filename == "word/document.xml" else zin.read(item.filename)
                 copied = ZipInfo(item.filename, date_time=item.date_time)
@@ -234,11 +232,12 @@ def clone_with_replacement(source, output):
 
 
 def main():
-    actual_hash = sha256(SOURCE.read_bytes()).hexdigest()
+    args = parse_paths('De_cuong_chi_tiet_KLCN_Quan_ly_bai_do_xe_chung_cu.docx')
+    actual_hash = sha256(args.input.read_bytes()).hexdigest()
     if actual_hash != EXPECTED_SOURCE_SHA256:
         raise RuntimeError(f"Reference changed: {actual_hash}")
-    clone_with_replacement(SOURCE, OUTPUT)
-    print(OUTPUT)
+    clone_with_replacement(args.input, args.output)
+    print(args.output)
 
 
 if __name__ == "__main__":

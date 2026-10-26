@@ -7,10 +7,9 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_BREAK
-from pathlib import Path
 
 
-OUT = Path(r"D:\Code\KhoaLuan\Ke_hoach_do_an_bai_giu_xe_ANPR_Spring_Boot.docx")
+from tool_cli import parse_paths
 
 NAVY = "17365D"
 BLUE = "2E74B5"
@@ -283,7 +282,7 @@ def add_page_break(doc):
     doc.add_page_break()
 
 
-def build_document():
+def build_document(output):
     doc = setup_document()
 
     # Cover
@@ -684,10 +683,11 @@ def build_document():
     doc.core_properties.subject = "Phân tích, thiết kế, phân công và lộ trình cho nhóm 3 người"
     doc.core_properties.author = "Nhóm đồ án"
     doc.core_properties.keywords = "ANPR, Spring Boot, Thymeleaf, YOLO, OCR, WPF, bãi giữ xe"
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(OUT)
-    print(OUT)
+    with open(output, 'xb') as target:
+        doc.save(target)
+    print(output)
 
 
 if __name__ == "__main__":
-    build_document()
+    args = parse_paths('Ke_hoach_do_an_bai_giu_xe_ANPR_Spring_Boot.docx', requires_input=False)
+    build_document(args.output)
