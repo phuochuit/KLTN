@@ -176,13 +176,38 @@ if ($envMap.ContainsKey('PARKING_DB_URL') -and $envMap['PARKING_DB_URL'] -match 
     Add-Check 'Ket noi database' 'BO-QUA' 'Chua co PARKING_DB_URL hop le.'
 }
 
-# 7. Models ANPR
-$modelMissing = @()
+# 7. Model AI: 2 YOLO (.pt) + 2 ONNX khuon mat
+$yoloMissing = @()
 foreach ($model in @('anpr-service\models\license_plate_detector.pt', 'anpr-service\models\vehicle_detector.pt')) {
-    if (-not (Test-Path (Join-Path $root $model))) { $modelMissing += $model }
+    if (-not (Test-Path (Join-Path $root $model))) { $yoloMissing += (Split-Path $model -Leaf) }
 }
-if ($modelMissing.Count -eq 0) { Add-Check 'Model ANPR' 'OK' '2 file .pt da co' }
-else { Add-Check 'Model ANPR' 'THIEU' ('Thieu: ' + ($modelMissing -join ', ') + ' - copy tu may dang chay.') }
+
+$onnxNames = @('face_detection_yunet_2023mar.onnx', 'face_recognition_sface_2021dec.onnx')
+function Test-OnnxModel {
+    param([string]$Name)
+    if (Test-Path (Join-Path $root "anpr-service\models\$Name")) { return $true }
+    if (Test-Path (Join-Path $root "face-verification-demo\models\$Name")) { return $true }
+    return $false
+}
+
+$onnxMissing = @($onnxNames | Where-Object { -not (Test-OnnxModel $_) })
+if ($onnxMissing.Count -gt 0) {
+    $downloader = Join-Path $root 'face-verification-demo\download-models.ps1'
+    if (Test-Path $downloader) {
+        Write-Host 'Dang tai 2 model khuon mat ONNX...' -ForegroundColor Cyan
+        try { & $downloader | Out-Null } catch { }
+        $onnxMissing = @($onnxNames | Where-Object { -not (Test-OnnxModel $_) })
+    }
+}
+
+if ($yoloMissing.Count -eq 0 -and $onnxMissing.Count -eq 0) {
+    Add-Check 'Model AI' 'OK' '2 YOLO .pt + 2 ONNX khuon mat'
+} else {
+    $parts = @()
+    if ($yoloMissing.Count -gt 0) { $parts += ('YOLO: ' + ($yoloMissing -join ', ') + ' - copy tu may dang chay') }
+    if ($onnxMissing.Count -gt 0) { $parts += ('ONNX: ' + ($onnxMissing -join ', ') + ' - tai that bai') }
+    Add-Check 'Model AI' 'THIEU' ($parts -join ' | ')
+}
 
 # 8. Anh bang chung
 $privateData = Join-Path $root 'spring-web\private-data'
