@@ -1,6 +1,6 @@
 # Tổ chức workspace và vòng đời file
 
-[Mục lục](../README.md) · [Testing](../testing/strategy.md) · [Vận hành](../operations/setup-and-troubleshooting.md) · [ADR-002](../decisions/0002-workspace-and-test-artifacts.md)
+[Mục lục](../README.md) · [Testing](../testing/strategy.md) · [Vận hành](../operations/setup-and-troubleshooting.md) · [ADR-002](../decisions/0006-workspace-and-test-artifacts.md)
 
 ## Mục đích
 
@@ -78,4 +78,4 @@ Không tạo root `tmp/`, `.test-tmp/`, `.dotnet-cli-home/`, `.pytest_cache/`, `
 - **Lịch sử, không main inventory:** đợt chuẩn hóa trước ghi nhận `tmp/`/logs ở `.artifacts/agent-work/workspace-standardization/legacy/` và archive Spring media/temp ở `.artifacts/agent-work/workspace-review-followup/archive-*/`, kèm manifests. Không dùng các đường dẫn backup đó làm source hiện hành hoặc kết quả test mới, không tự khôi phục chúng. Nếu gặp `check_db.sql` có truy vấn PII, không dùng làm smoke test hay chạy DB tự động.
 - Workspace guard từ source phát hiện các tên cũ `test-gate-evidence`, `test-revenue-gate-evidence`, `test-uploads`, `test-revenue-uploads`, `test-tmp`, `test-tmp-*` hoặc file `.log` trực tiếp trong `spring-web/target/`. Không cấm native build directories, `surefire-reports/` hoặc `test-work/`; guard không tự di chuyển/xóa file.
 - Không khôi phục toàn bộ workspace bằng reset/clean. Khi cần rollback đường dẫn, đối chiếu manifest/hash, không ghi đè phiên bản mới; phải cập nhật caller/config cùng lúc.
-- Dùng `scripts/check-workspace.ps1` phát hiện một số vi phạm đã biết; đây không phải sandbox, secret scanner hay chứng nhận kiến trúc toàn bộ source.
+- Nhánh tài liệu `docs/workspace-architecture` có `scripts/check-workspace.ps1` để phát hiện một số vi phạm đã biết; file này **không có trong `main`**, và dù có cũng không phải sandbox, secret scanner hay chứng nhận kiến trúc toàn bộ source.

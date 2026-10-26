@@ -8,6 +8,8 @@
 
 ### Bằng chứng thực thi lịch sử — Security/feature + WIP, không phải main
 
+> **Lưu ý về runner:** `scripts/test/run-tests.ps1`, `scripts/check-workspace.ps1` và `tests/README.md` thuộc nhánh tài liệu `docs/workspace-architecture`, **không có trong `main`**. Các dòng bên dưới nhắc tới chúng là ghi chép lịch sử của nhánh đó. Trên `main`, chạy trực tiếp: `mvn test` trong `spring-web`, `dotnet test desktop-winform.Tests`, `pytest tests/` trong `anpr-service`.
+
 Các số liệu và remediation dưới đây được giữ nguyên provenance lịch sử, không gán cho `abd6183`. Revision `7b0c16f` chỉ định baseline nhánh Security; nhiều assertions/runner thay đổi còn WIP nên không có commit reference ổn định cho toàn bộ lượt. Không lấy source main có cùng tên file hoặc backup source/docs trong `.artifacts/` làm proof các lượt đó đã chạy trên main.
 
 Đợt tổng hợp docs ngày 2026-10-23 không chạy suites/apps hoặc tạo lại đề cương. Kết quả lịch sử được ghi nhận: Spring ngày 2026-10-09 có lượt102 tests rồi full suite108/108; sau remediation ngày2026-10-10 full suite108/108, gồm ParkingFlowIntegrationTest54, WebRevenueSecurityIntegrationTest3, CccdQrControllerTest1, AnprServiceClientTest8 và các unit/config/storage/migration tests. Desktop ngày2026-10-09 Release build0warnings/errors và12/12tests; ANPR10/10 là lượt trước đã được ghi nhận cùng ngày, không chạy lại trong remediation. Các con số là lịch sử, không kết quả tái chạy hôm nay hoặc coverage toàn bộ source hiện tại. H2/fake không chứng minh runtime/deployment; kiểm layout đề cương không kiểm phần mềm.
@@ -31,7 +33,7 @@ Lượt RBAC mới nhất ngày **2026-10-24**: `scripts/test/run-tests.ps1 -Sui
 
 ### Tổ chức và chạy hiện hành
 
-[Workspace policy](../architecture/workspace-layout.md) sở hữu vị trí/vòng đời file; [tests/README](../../tests/README.md) sở hữu runner. Spring tests ở `src/test`, Desktop xUnit ở `desktop-winform.Tests`, ANPR pytest trong service, `tests/tooling` kiểm runner/docs/tools. Runner boundary đã cập nhật xUnit outbox. Live API/Web/Desktop E2E chưa triển khai/chạy vì cần môi trường DB/media/credentials và harness riêng.
+[Workspace policy](../architecture/workspace-layout.md) sở hữu vị trí/vòng đời file; runner của từng module sở hữu việc chạy suite. Spring tests ở `src/test`, Desktop xUnit ở `desktop-winform.Tests`, ANPR pytest trong service, `tests/tooling` kiểm runner/docs/tools. Runner boundary đã cập nhật xUnit outbox. Live API/Web/Desktop E2E chưa triển khai/chạy vì cần môi trường DB/media/credentials và harness riêng.
 
 `scripts/test/run-tests.ps1 -Suite all` gọi ba suite, không launcher/start server riêng; Spring tests vẫn boot contexts. Reports XML/TRX/logs/version/summary có run mới, không dùng zero/all-skipped/exit lỗi làm PASS. TEMP/TMP/java.io.tmpdir riêng nhưng media paths main như `target/test-uploads`/`target/test-private` chưa tự isolate mọi lớp; không áp feature property `parking.test.work-directory` như thể main đọc nó. Native build output giữ chuẩn, pytest cache ở `.cache/pytest/`. Test manifest mới không đồng nghĩa ANPR environment đã được cài hoặc suite đã chạy.
 
