@@ -28,7 +28,7 @@ Write-Host 'Database: MySQL Aiven Cloud' -ForegroundColor Cyan
 Write-Host 'Parking Web: http://localhost:8080' -ForegroundColor Green
 Push-Location (Join-Path $workspace 'spring-web')
 try { 
-    & $maven clean spring-boot:run 
+    & $maven spring-boot:run 
 } finally {
     Pop-Location
 }

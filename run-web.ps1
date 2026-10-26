@@ -88,4 +88,4 @@ if ($occupied) {
 }
 
 Push-Location (Join-Path $workspace 'spring-web')
-try { & $maven clean spring-boot:run } finally { Pop-Location }
+try { & $maven spring-boot:run } finally { Pop-Location }
