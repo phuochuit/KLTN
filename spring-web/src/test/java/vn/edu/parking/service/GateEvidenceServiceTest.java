@@ -64,7 +64,9 @@ class GateEvidenceServiceTest {
 
         assertEquals(created.evidenceId(), response.get("evidenceId").asText());
         assertNotEquals("upstream-id", created.evidenceId());
-        verify(evidences, times(2)).save(any(GateEvidence.class));
+        var captor = ArgumentCaptor.forClass(GateEvidence.class);
+        verify(evidences).save(captor.capture());
+        assertEquals(EvidenceStatus.READY, captor.getValue().getStatus());
         verify(assets).save(any(GateEvidenceAsset.class));
     }
 
@@ -104,9 +106,10 @@ class GateEvidenceServiceTest {
             EvidenceSourceKind.IMAGE, null, requestId, upstream);
 
         var captor = ArgumentCaptor.forClass(GateEvidence.class);
-        verify(evidences, times(2)).save(captor.capture());
+        verify(evidences).save(captor.capture());
         GateEvidence saved = captor.getValue();
         assertEquals(created.evidenceId(), saved.getId());
+        assertEquals(EvidenceStatus.READY, saved.getStatus());
         assertEquals(LivenessStatus.FAIL, saved.getLivenessStatus());
         assertEquals(0.12, saved.getLivenessScore().doubleValue(), 0.0001);
         assertEquals("anpr-service", saved.getLivenessProvider());

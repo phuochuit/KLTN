@@ -413,7 +413,10 @@ public sealed class ParkingApiClient : IDisposable
     private static (byte[], string, string) PrepareImageUpload(string path)
     {
         using var source = Image.FromFile(path);
-        const int maxDimension = 2240;
+        // YOLO evaluates at 640px. Keeping a 960px source preserves enough
+        // detail for small plates while avoiding multi-megabyte image, Base64
+        // response and evidence-storage overhead on CPU-only gate machines.
+        const int maxDimension = 960;
         double scale = Math.Min(1.0, (double)maxDimension / Math.Max(source.Width, source.Height));
         int width = Math.Max(1, (int)Math.Round(source.Width * scale));
         int height = Math.Max(1, (int)Math.Round(source.Height * scale));

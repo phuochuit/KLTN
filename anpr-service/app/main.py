@@ -14,14 +14,28 @@ from threading import Lock
 
 import cv2
 import numpy as np
+import torch
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from .face_engine import FaceEngine, decode_image
 from .recognizer import AnprRecognizer
 from .schemas import RecognitionResponse
 from .internal_auth import PUBLIC_PATHS, TOKEN_HEADER, configured_tokens, token_is_valid
+
+
+CPU_COUNT = os.cpu_count() or 4
+TORCH_THREADS = max(1, int(os.getenv("ANPR_TORCH_THREADS", "4")))
+OPENCV_THREADS = max(1, int(os.getenv("ANPR_OPENCV_THREADS", "2")))
+torch.set_num_threads(TORCH_THREADS)
+try:
+    torch.set_num_interop_threads(1)
+except RuntimeError:
+    # Another imported library may already have initialized the inter-op pool.
+    pass
+cv2.setNumThreads(OPENCV_THREADS)
 
 
 SERVICE_VERSION = "4.0-robust-liveness"
@@ -66,12 +80,12 @@ camera_locks: defaultdict[str, Lock] = defaultdict(Lock)
 
 @app.on_event("startup")
 def preload_recognizer() -> None:
-    """Load model weights before accepting requests.
+    """Warm YOLO and OCR before accepting requests.
 
-    The first YOLO inference also initializes CPU execution state.  Performing
-    it here keeps an image-recognition request from paying that cold-start cost.
+    A synthetic plate forces EasyOCR through its lazy first inference as well as
+    YOLO, so the first gate operation has the same latency as later requests.
     """
-    recognizer().recognize_frame(np.zeros((640, 640, 3), dtype=np.uint8))
+    recognizer().warm_up()
 
 
 class CameraRecognitionRequest(BaseModel):
@@ -205,7 +219,11 @@ def evaluate_liveness(frames: list[np.ndarray]) -> dict:
     """
     motion = _frame_motion(frames)
     if motion is None:
-        return {"decision": "REVIEW", "confidence": 0.0,
+        # Fewer than three frames (for example a single still image) carry no
+        # motion signal at all, so liveness was never evaluated. Reporting
+        # REVIEW here would block a legitimately matched face, so keep the
+        # honest NOT_EVALUATED verdict that callers may accept.
+        return {"decision": "NOT_EVALUATED", "confidence": 0.0,
                 "model": LIVENESS_MODEL, "reason": "insufficient_frames"}
     if motion > 0.20:
         return {"decision": "REVIEW", "confidence": 0.0,
@@ -233,11 +251,13 @@ def attach_liveness(result: dict, frames: list[np.ndarray]) -> dict:
 
 @app.get("/health")
 def health() -> dict[str, str | bool]:
+    anpr = recognizer()
     return {
-        "status": "UP",
+        "status": "UP" if anpr.ready and face_engine.models_ready else "STARTING",
         "service": "parking-anpr",
         "version": SERVICE_VERSION,
-        "modelLoaded": recognizer.cache_info().currsize > 0,
+        "modelLoaded": anpr.ready,
+        "ocrReady": anpr.ready,
         "faceModelsReady": face_engine.models_ready,
     }
 
@@ -290,9 +310,11 @@ async def verify_face_camera(request: Request, registration: UploadFile = File(.
 async def verify_face_image(request: Request, registration: UploadFile = File(...),
                             realtime: UploadFile = File(...)) -> dict:
     try:
-        registered = decode_image(await registration.read())
-        frame = decode_image(await realtime.read())
-        result = face_engine.compare_best(registered, [frame])
+        registration_data = await registration.read()
+        realtime_data = await realtime.read()
+        registered = await run_in_threadpool(decode_image, registration_data)
+        frame = await run_in_threadpool(decode_image, realtime_data)
+        result = await run_in_threadpool(face_engine.compare_best, registered, [frame])
         attach_liveness(result, [frame])
         return enrich_face_result(result, [frame], request)
     except ValueError as exc:
@@ -363,7 +385,10 @@ async def recognize_image(request: Request, file: UploadFile = File(...)) -> Rec
     if len(data) > 25 * 1024 * 1024:
         raise HTTPException(413, "Ảnh vượt quá 25 MB")
     try:
-        return enrich_recognition(recognizer().recognize_image_bytes(data), request)
+        return enrich_recognition(
+            await run_in_threadpool(recognizer().recognize_image_bytes, data),
+            request,
+        )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

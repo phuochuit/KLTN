@@ -18,7 +18,7 @@ public sealed class MainForm : Form
     private GateStationSettings _stationSettings;
     private readonly TextBox _parkingUrl = new() { Text = "http://localhost:8080", Width = 190 };
     private readonly Label _connection = new() { Text = "Chưa kiểm tra dịch vụ", AutoSize = true, ForeColor = Color.DarkOrange };
-    private readonly System.Windows.Forms.Timer _sessionHeartbeat = new() { Interval = 3000 };
+    private readonly System.Windows.Forms.Timer _sessionHeartbeat = new() { Interval = 2000 };
     private readonly System.Windows.Forms.Timer _outboxTimer = new() { Interval = 15000 };
     private readonly System.Windows.Forms.Timer _clockTimer = new() { Interval = 1000 };
     private readonly Label _operatorName = new() { AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Color.FromArgb(23, 54, 93) };

@@ -110,12 +110,15 @@ public class GateEvidenceService {
             int comma = encoded.indexOf(',');
             byte[] image = Base64.getDecoder().decode(comma >= 0 ? encoded.substring(comma + 1) : encoded);
             stored = storage.storeImage(evidence.getId(), role, image);
+            // The asset is already durable at this point, so persist the
+            // evidence directly in READY state. Saving PENDING first and then
+            // marking READY generated an unnecessary UPDATE over remote MySQL
+            // for every AI request.
+            evidence.markReady();
             evidences.save(evidence);
             assets.save(new GateEvidenceAsset(UUID.randomUUID().toString(), evidence, role,
                 stored.storageKey(), stored.sha256(), stored.mediaType(), stored.sizeBytes(),
                 stored.width(), stored.height(), Instant.now()));
-            evidence.markReady();
-            evidences.save(evidence);
             result.put("evidenceId", evidence.getId());
             return new CreatedEvidence(evidence.getId(), json.writeValueAsBytes(result));
         } catch (IllegalArgumentException ex) {

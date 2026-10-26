@@ -41,10 +41,10 @@ def test_static_frames_are_reported_as_spoof():
     assert result["model"] == main.LIVENESS_MODEL
 
 
-def test_too_few_frames_require_review():
+def test_too_few_frames_are_not_evaluated():
     result = main.evaluate_liveness(_static_frames(2))
 
-    assert result["decision"] == "REVIEW"
+    assert result["decision"] == "NOT_EVALUATED"
     assert result["reason"] == "insufficient_frames"
 
 
@@ -89,7 +89,7 @@ def test_verify_camera_surfaces_liveness_fields(monkeypatch):
     assert body["decision"] == "PASS"
 
 
-def test_verify_image_reports_liveness_review_for_single_frame(monkeypatch):
+def test_verify_image_reports_liveness_not_evaluated_for_single_frame(monkeypatch):
     monkeypatch.setenv("PARKING_INTERNAL_SERVICE_TOKEN", TOKEN)
     monkeypatch.setattr(main.face_engine, "compare_best", lambda registered, frames: {
         "decision": "PASS", "similarity": 0.9, "matchThreshold": 0.363,
@@ -106,5 +106,5 @@ def test_verify_image_reports_liveness_review_for_single_frame(monkeypatch):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["livenessDecision"] == "REVIEW"
+    assert body["livenessDecision"] == "NOT_EVALUATED"
     assert body["livenessReason"] == "insufficient_frames"

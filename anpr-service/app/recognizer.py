@@ -85,6 +85,23 @@ class AnprRecognizer:
         self.plate_confidence = float(os.getenv("ANPR_PLATE_CONFIDENCE", "0.20"))
         self.vehicle_confidence = float(os.getenv("ANPR_VEHICLE_CONFIDENCE", "0.25"))
         self._lock = Lock()
+        self.ready = False
+
+    def warm_up(self) -> None:
+        """Initialize YOLO and EasyOCR execution before serving gate requests."""
+        blank = np.zeros((640, 640, 3), dtype=np.uint8)
+        self.recognize_frame(blank)
+
+        # A blank frame never reaches OCR because YOLO finds no plate. Run OCR
+        # once on a synthetic high-contrast plate so the first real vehicle does
+        # not pay PyTorch/EasyOCR's lazy CPU initialization cost.
+        synthetic_plate = np.full((140, 420, 3), 255, dtype=np.uint8)
+        cv2.putText(synthetic_plate, "59F2", (18, 58), cv2.FONT_HERSHEY_SIMPLEX,
+                    1.6, (0, 0, 0), 3, cv2.LINE_AA)
+        cv2.putText(synthetic_plate, "41578", (65, 122), cv2.FONT_HERSHEY_SIMPLEX,
+                    1.6, (0, 0, 0), 3, cv2.LINE_AA)
+        self._read_plate(synthetic_plate)
+        self.ready = True
 
     def recognize_image_bytes(self, data: bytes, frame_index: int = 0) -> RecognitionResponse:
         image = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)

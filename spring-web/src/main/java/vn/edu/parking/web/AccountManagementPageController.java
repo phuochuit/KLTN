@@ -85,7 +85,7 @@ public class AccountManagementPageController {
     private void populateLiveModel(Model model) {
         var now = Instant.now();
         model.addAttribute("activeDesktopSessions", desktopSessions.findTop100ByOrderByCreatedAtDesc().stream()
-            .filter(session -> session.isActiveAt(now))
+            .filter(session -> session.isOnlineAt(now))
             .map(session -> {
                 var currentShift = shifts
                     .findByAccount_IdAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByStartsAtDesc(

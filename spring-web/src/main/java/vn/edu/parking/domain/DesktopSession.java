@@ -14,6 +14,7 @@ import java.time.Instant;
 @Table(name = "desktop_sessions")
 public class DesktopSession {
     private static final Duration IDLE_TIMEOUT = Duration.ofHours(2);
+    private static final Duration ONLINE_TIMEOUT = Duration.ofSeconds(6);
 
     @Id
     @Column(name = "session_id", length = 36, nullable = false)
@@ -57,6 +58,16 @@ public class DesktopSession {
     public boolean isActiveAt(Instant now) {
         return revokedAt == null && now.isBefore(absoluteExpiresAt)
             && now.isBefore(lastSeenAt.plus(IDLE_TIMEOUT));
+    }
+
+    /**
+     * Presence for the live management screen. This is intentionally much
+     * shorter than the authentication idle timeout: a crashed gate client must
+     * disappear quickly without invalidating a session after a brief network
+     * interruption.
+     */
+    public boolean isOnlineAt(Instant now) {
+        return isActiveAt(now) && now.isBefore(lastSeenAt.plus(ONLINE_TIMEOUT));
     }
 
     public void touch(Instant now) {
