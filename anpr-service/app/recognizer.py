@@ -239,14 +239,14 @@ class AnprRecognizer:
         gray = cv2.cvtColor(straightened, cv2.COLOR_BGR2GRAY)
         equalized = cv2.equalizeHist(gray)
         denoised = cv2.bilateralFilter(equalized, 7, 35, 35)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
 
         # Ảnh cân bằng + khử nhiễu thường tốt nhất với biển số ngoài trời.
-        # Chạy nó trước để đa số trường hợp chỉ cần một lượt OCR.
-        variants = [denoised, equalized, enlarged]
+        # Chạy nó trước để đa số trường hợp chỉ cần một lượt OCR. Bản phóng to
+        # xếp ngay sau vì đây là biến thể duy nhất đọc đúng trên ảnh gốc lớn bị
+        # thu nhỏ, còn clahe bị loại vì luôn cho điểm cấu trúc kém trong đo đạc.
+        variants = [denoised, enlarged, equalized]
         if straightened is not enlarged:
-            variants.insert(1, straightened)
-        variants.append(clahe)
+            variants.insert(2, straightened)
 
         best_text, best_conf, best_quality = "", 0.0, -1.0
         with self._lock:
@@ -269,8 +269,10 @@ class AnprRecognizer:
                     best_text, best_conf, best_quality = text, confidence, quality
 
                 # Dừng ngay khi đã có biển đúng cấu trúc và độ tin cậy tốt.
-                # Nhờ vậy ảnh rõ chỉ chạy một biến thể OCR thay vì cả ba.
-                if confidence >= 0.82 and format_score >= 0.35:
+                # Nhờ vậy ảnh rõ chỉ chạy một biến thể OCR thay vì cả bốn.
+                # Ngưỡng 0.80 nằm giữa kết quả sai 0.7756 và kết quả đúng
+                # 0.8126 đo được trên ảnh benchmark.
+                if confidence >= 0.80 and format_score >= 0.35:
                     break
         return best_text, best_conf
 
