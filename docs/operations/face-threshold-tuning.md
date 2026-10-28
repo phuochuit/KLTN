@@ -49,7 +49,7 @@ score < FACE_REVIEW_THRESHOLD            -> REJECT (không mở barrier)
    - phân bố điểm genuine (cùng người) và impostor (khác người): min, P05, mean, P95, max;
    - ngưỡng `MATCH` cho balanced accuracy cao nhất;
    - ngưỡng `REVIEW` giữ FPR không vượt `--target-far` (mặc định 1%).
-5. **Áp dụng.** Đặt biến môi trường trước khi chạy `run-anpr.cmd` (hoặc trong `.env.local` của máy ANPR), rồi khởi động lại ANPR service vì ngưỡng được đọc lúc nạp module.
+5. **Áp dụng.** Đặt biến môi trường trước khi chạy `scripts\run-anpr.cmd` (hoặc trong `.env.local` của máy ANPR), rồi khởi động lại ANPR service vì ngưỡng được đọc lúc nạp module.
 
    ```text
    FACE_MATCH_THRESHOLD=0.380

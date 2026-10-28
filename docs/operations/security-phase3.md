@@ -86,7 +86,7 @@ Audit gắn với tài khoản Desktop đang xác thực và request ID. Không 
 
 1. Chạy test Python bằng `python -m pytest tests` và test Spring bằng `mvn.cmd clean test`.
 2. Build WinForms Release.
-3. Tắt các launcher cũ rồi chạy `run-all.cmd`.
+3. Tắt các launcher cũ rồi chạy `scripts\run-all.cmd`.
 4. `GET http://localhost:8001/health` trả `200`.
 5. Gọi endpoint AI FastAPI không có service token trả `401`.
 6. Gọi `/api/ai/health` trên Spring không có JWT trả `401`.
@@ -103,7 +103,7 @@ Kết quả chốt Giai đoạn 3 ngày 17/10/2026:
 - Video kiểm thử: nhận đúng `59F241578`, frame tốt nhất `14`, khoảng `3.625s`.
 - Nghiệm thu thực tế đạt cho hai ảnh xe/khuôn mặt, gói theo biển số, khách vãng lai và tự động cấp ô.
 
-Nếu từng chạy nhiều `run-anpr.ps1`, đóng các cửa sổ ANPR cũ trước khi nghiệm thu để tránh nhiều vòng lặp Uvicorn cạnh tranh cổng 8001.
+Nếu từng chạy nhiều `scripts\run-anpr.ps1`, đóng các cửa sổ ANPR cũ trước khi nghiệm thu để tránh nhiều vòng lặp Uvicorn cạnh tranh cổng 8001.
 
 ## 7. Rotation và rollback
 

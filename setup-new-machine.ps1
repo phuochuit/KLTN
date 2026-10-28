@@ -67,8 +67,8 @@ Write-Host '=== KIEM TRA MAY MOI CHAY DU AN PARKING ANPR ===' -ForegroundColor C
 Write-Host "Thu muc: $root"
 Write-Host ''
 
-if (-not (Test-Path (Join-Path $root 'run-all-laragon.cmd'))) {
-    Write-Host 'LOI: Khong tim thay run-all-laragon.cmd. Hay dat script nay o thu muc goc project.' -ForegroundColor Red
+if (-not (Test-Path (Join-Path $root 'scripts\run-all-laragon.cmd'))) {
+    Write-Host 'LOI: Khong tim thay scripts\run-all-laragon.cmd. Hay dat script nay o thu muc goc project.' -ForegroundColor Red
     exit 1
 }
 
@@ -131,7 +131,7 @@ foreach ($candidate in @('py', 'python')) {
     }
 }
 if ($pythonOk) { Add-Check 'Python 3.10+' 'OK' $pythonDetail }
-else { Add-Check 'Python 3.10+' 'THIEU' 'Can Python 3.10 tro len (run-anpr.ps1 se tu tao .venv).' }
+else { Add-Check 'Python 3.10+' 'THIEU' 'Can Python 3.10 tro len (scripts\run-anpr.ps1 se tu tao .venv).' }
 
 # 5. .env.local
 $envPath = Join-Path $root '.env.local'
@@ -308,5 +308,5 @@ if ($warn.Count -gt 0) {
 }
 
 Write-Host ''
-Write-Host 'Buoc tiep theo: chay run-all-laragon.cmd (hoac run-web.cmd + run-anpr.cmd + run-desktop.cmd).' -ForegroundColor Cyan
+Write-Host 'Buoc tiep theo: chay scripts\run-all-laragon.cmd (hoac scripts\run-web.cmd + scripts\run-anpr.cmd + scripts\run-desktop.cmd).' -ForegroundColor Cyan
 exit 0

@@ -5,11 +5,11 @@ Hệ thống quản lý bãi đỗ xe ANPR: Spring Web (quản trị + API), Pyt
 ## Chạy hệ thống
 
 ```cmd
-run-all.cmd              # Web + ANPR + Desktop (H2)
-run-all-laragon.cmd      # Web + ANPR + Desktop (MySQL Laragon)
+scripts\run-all.cmd              # Web + ANPR + Desktop (H2)
+scripts\run-all-laragon.cmd      # Web + ANPR + Desktop (MySQL Laragon)
 ```
 
-Chạy từng phần: `run-web.cmd`, `run-anpr.cmd`, `run-desktop.cmd` (mở 3 terminal riêng).
+Chạy từng phần: `scripts\run-web.cmd`, `scripts\run-anpr.cmd`, `scripts\run-desktop.cmd` (mở 3 terminal riêng).
 
 **Không bấm đúp file `.ps1`** — Windows có thể mở bằng Notepad. Luôn dùng file `.cmd`.
 

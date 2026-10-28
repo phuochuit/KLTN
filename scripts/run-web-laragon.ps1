@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $PSScriptRoot
 
 # Laragon la duong du phong local, tach khoi .env.local cua Aiven. Co the override
 # bang PARKING_LARAGON_* ma khong phai sua hoac commit credential vao repository.
@@ -24,5 +24,5 @@ if ($null -ne $env:PARKING_LARAGON_PASSWORD) {
     }
 }
 
-& (Join-Path $workspace 'run-web.ps1')
+& (Join-Path $PSScriptRoot 'run-web.ps1')
 exit $LASTEXITCODE

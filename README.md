@@ -13,13 +13,13 @@ Các hạng mục cần làm tiếp được ghi tại [PROJECT_GAPS.md](PROJECT
 
 ## Python chạy được khi chuyển máy hoặc đổi thư mục
 
-`run-anpr.cmd` không dùng đường dẫn Python tuyệt đối. Script tự tìm Python theo thứ tự: biến `PARKING_PYTHON`, Python Launcher `py`, rồi `python/python3` trong PATH. Môi trường `.venv` luôn được tạo trong `anpr-service` theo đường dẫn tương đối của project. Nếu `.venv` được chép từ máy khác và không còn hợp lệ, script giữ nó dưới tên `.venv.incompatible.<thời gian>` rồi tạo môi trường mới và cài `requirements.txt`.
+`scripts\run-anpr.cmd` không dùng đường dẫn Python tuyệt đối. Script tự tìm Python theo thứ tự: biến `PARKING_PYTHON`, Python Launcher `py`, rồi `python/python3` trong PATH. Môi trường `.venv` luôn được tạo trong `anpr-service` theo đường dẫn tương đối của project. Nếu `.venv` được chép từ máy khác và không còn hợp lệ, script giữ nó dưới tên `.venv.incompatible.<thời gian>` rồi tạo môi trường mới và cài `requirements.txt`.
 
 Máy mới chỉ cần cài Python 3.10 trở lên và chọn **Add python.exe to PATH**. Nếu không muốn thêm PATH, có thể cấu hình trước khi chạy:
 
 ```powershell
 $env:PARKING_PYTHON = 'E:\Python312\python.exe'
-.\run-anpr.cmd
+.\scripts\run-anpr.cmd
 ```
 
 Hệ thống gồm ba ứng dụng:
@@ -38,27 +38,27 @@ Hướng dẫn triển khai tài khoản database, bootstrap quản trị viên,
 
 ## Chạy hệ thống
 
-Cách dễ nhất trên Windows là bấm đúp `run-all.cmd`. File này mở Web, ANPR và Desktop, sử dụng database chính Aiven `parking_anpr`.
+Cách dễ nhất trên Windows là bấm đúp `scripts\run-all.cmd`. File này mở Web, ANPR và Desktop, sử dụng database chính Aiven `parking_anpr`.
 
 Muốn chạy riêng từng phần, bấm đúp lần lượt:
 
-1. `run-web.cmd`
-2. `run-anpr.cmd`
-3. `run-desktop.cmd`
+1. `scripts\run-web.cmd`
+2. `scripts\run-anpr.cmd`
+3. `scripts\run-desktop.cmd`
 
 Không bấm đúp file `.ps1`, vì Windows có thể đang liên kết loại file này với Notepad. Các launcher tự kiểm tra cổng để tránh mở trùng dịch vụ.
 
 Hoặc chạy trong ba terminal PowerShell tại `D:\Code\KhoaLuan`:
 
 ```powershell
-.\run-web.ps1
-.\run-anpr.ps1
-.\run-desktop.ps1
+.\scripts\run-web.ps1
+.\scripts\run-anpr.ps1
+.\scripts\run-desktop.ps1
 ```
 
 ### Cấu hình database
 
-Aiven `parking_anpr` là database chính cho `run-all.cmd` và `run-web.cmd`.
+Aiven `parking_anpr` là database chính cho `scripts\run-all.cmd` và `scripts\run-web.cmd`.
 
 Sao chép `.env.local.example` thành `.env.local`, sau đó điền ba giá trị:
 
@@ -70,7 +70,7 @@ PARKING_DB_PASSWORD=<password>
 
 `.env.local` bị Git ignore. Biến môi trường hệ thống cùng tên được ưu tiên hơn file local. Không lưu credential trong `application.properties`.
 
-Đường dự phòng `run-all-laragon.cmd` / `run-web-laragon.cmd` dùng MySQL local tại
+Đường dự phòng `scripts\run-all-laragon.cmd` / `scripts\run-web-laragon.cmd` dùng MySQL local tại
 `127.0.0.1:3306/parking_anpr`, mặc định user `root`. Launcher tự tạo database nếu tài
 khoản có quyền và không đọc `.env.local` của Aiven. Nếu chưa đặt
 `PARKING_LARAGON_PASSWORD`, launcher yêu cầu nhập mật khẩu ẩn; máy thật sự dùng mật
@@ -165,7 +165,7 @@ Có thể thay trọng số bằng biến môi trường:
 ```powershell
 $env:ANPR_PLATE_MODEL = 'D:\models\plate-best.pt'
 $env:ANPR_VEHICLE_MODEL = 'D:\models\vehicle-best.pt'
-.\run-anpr.ps1
+.\scripts\run-anpr.ps1
 ```
 
 Ngưỡng mặc định có thể đổi qua `ANPR_PLATE_CONFIDENCE` và `ANPR_VEHICLE_CONFIDENCE`.

@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $PSScriptRoot
 $localMaven = Join-Path $workspace 'tools\apache-maven-3.9.11\bin\mvn.cmd'
 $maven = if (Test-Path $localMaven) { $localMaven } else { 'mvn' }
 $isLaragon = $env:PARKING_DB_MODE -eq 'laragon'
@@ -82,7 +82,7 @@ try {
         exit 0
     }
     if ($health.status -eq 'UP' -and $health.service -eq 'parking-web') {
-        throw 'Parking Web cu dang chay. Hay dong cua so Parking Web cu, sau do chay lai run-all.cmd.'
+        throw 'Parking Web cu dang chay. Hay dong cua so Parking Web cu, sau do chay lai scripts\run-all.cmd.'
     }
 } catch {
     if ($_.Exception.Message -like 'Parking Web cu*') { throw }

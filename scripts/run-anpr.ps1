@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $PSScriptRoot
 $service = Join-Path $workspace 'anpr-service'
 $venv = Join-Path $service '.venv'
 $python = Join-Path $venv 'Scripts\python.exe'
@@ -39,7 +39,7 @@ Khong tim thay Python 3.10 tro len.
 Cach xu ly:
 1. Cai Python tu https://www.python.org/downloads/
 2. Khi cai, danh dau "Add python.exe to PATH".
-3. Dong terminal cu va chay lai run-anpr.cmd.
+3. Dong terminal cu va chay lai scripts\run-anpr.cmd.
 Neu Python nam o vi tri rieng, dat bien PARKING_PYTHON tro den python.exe.
 '@
 }
@@ -68,7 +68,7 @@ if ($occupied) {
         }
     }
     if ($health) {
-        Write-Host 'ANPR API dang chay san tai http://localhost:8001. Khong can mo run-anpr.cmd lan thu hai.' -ForegroundColor Green
+        Write-Host 'ANPR API dang chay san tai http://localhost:8001. Khong can mo scripts\run-anpr.cmd lan thu hai.' -ForegroundColor Green
         exit 0
     }
     $processId = $occupied[0].OwningProcess

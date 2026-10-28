@@ -145,9 +145,9 @@ Check 'Native build directories are allowed by workspace guard' {
     Assert (@(Get-ParkingWorkspaceFindings $fixture).Count -eq 0)
 }
 Check 'Laragon launcher targets local MySQL and reuses the secured Web launcher' {
-    $allLaragon = Get-Content (Join-Path $root 'run-all-laragon.ps1') -Raw
-    $webLaragon = Get-Content (Join-Path $root 'run-web-laragon.ps1') -Raw
-    $web = Get-Content (Join-Path $root 'run-web.ps1') -Raw
+    $allLaragon = Get-Content (Join-Path $root 'scripts\run-all-laragon.ps1') -Raw
+    $webLaragon = Get-Content (Join-Path $root 'scripts\run-web-laragon.ps1') -Raw
+    $web = Get-Content (Join-Path $root 'scripts\run-web.ps1') -Raw
     Assert ($allLaragon -match "run-web-laragon\.ps1")
     Assert ($webLaragon -match "PARKING_DB_MODE\s*=\s*'laragon'")
     Assert ($webLaragon -match '127\.0\.0\.1:3306/parking_anpr')

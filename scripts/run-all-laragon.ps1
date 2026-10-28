@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $PSScriptRoot
 Write-Host 'Che do du phong: MySQL Laragon local 127.0.0.1:3306/parking_anpr.' -ForegroundColor Yellow
 
 $web = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -12,7 +12,7 @@ if ($web) {
 
 Start-Process -FilePath 'powershell.exe' -ArgumentList @(
     '-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-    '-File', (Join-Path $workspace 'run-web-laragon.ps1')
+    '-File', (Join-Path $PSScriptRoot 'run-web-laragon.ps1')
 ) -WorkingDirectory $workspace
 
 $ready = $false
@@ -27,7 +27,7 @@ if (-not $ready) { throw 'Spring Web khong ket noi duoc MySQL. Xem loi trong cua
 
 Start-Process -FilePath 'powershell.exe' -ArgumentList @(
     '-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-    '-File', (Join-Path $workspace 'run-anpr.ps1')
+    '-File', (Join-Path $PSScriptRoot 'run-anpr.ps1')
 ) -WorkingDirectory $workspace
 Start-Sleep -Seconds 5
-& (Join-Path $workspace 'run-desktop.ps1')
+& (Join-Path $PSScriptRoot 'run-desktop.ps1')

@@ -23,12 +23,12 @@ Desktop **không** gọi thẳng FastAPI: mọi xử lý ảnh/video/khuôn mặ
 ## Lệnh
 
 ```cmd
-run-all.cmd              :: Web + ANPR + Desktop (Aiven)
-run-all-laragon.cmd      :: đường dự phòng MySQL local
+scripts\run-all.cmd              :: Web + ANPR + Desktop (Aiven)
+scripts\run-all-laragon.cmd      :: đường dự phòng MySQL local
 setup-new-machine.cmd    :: kiểm tra 13 mục trên máy mới
 ```
 
-Chạy lẻ: `run-web.cmd`, `run-anpr.cmd`, `run-desktop.cmd`. Launcher nằm ở **thư mục gốc repo**, không phải `scripts/`.
+Chạy lẻ: `scripts\run-web.cmd`, `scripts\run-anpr.cmd`, `scripts\run-desktop.cmd`. Launcher nằm ở **thư mục gốc repo**, không phải `scripts/`.
 
 Test:
 
@@ -74,8 +74,8 @@ Trỏ tới `docs/` thay vì đọc lại code:
 
 ## Cạm bẫy đã gặp
 
-- **`.env.local` bị gitignore** — chỉ có `.env.local.example`. `run-web.ps1` chốt cứng URL phải chứa `/parking_anpr`, nếu không thì từ chối chạy.
-- **`application.properties` không có giá trị mặc định** cho `${PARKING_DB_URL/USERNAME/PASSWORD}` → `run-web-laragon.ps1` không nạp `.env.local` nên không khởi động được.
+- **`.env.local` bị gitignore** — chỉ có `.env.local.example`. `scripts\run-web.ps1` chốt cứng URL phải chứa `/parking_anpr`, nếu không thì từ chối chạy.
+- **`application.properties` không có giá trị mặc định** cho `${PARKING_DB_URL/USERNAME/PASSWORD}` → `scripts\run-web-laragon.ps1` không nạp `.env.local` nên không khởi động được.
 - **Không có Flyway.** Schema do `ddl-auto=update` + 11 script tay trong `scripts/database/`.
 - **Không có H2 runtime.** H2 chỉ ở scope `test`.
 - **`private-data/` bị gitignore** (138 ảnh) — máy mới sẽ trống ảnh bằng chứng.

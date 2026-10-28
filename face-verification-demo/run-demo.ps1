@@ -4,7 +4,7 @@ $workspace = Split-Path -Parent $demoDir
 $python = Join-Path (Split-Path -Parent $workspace) 'anpr-service\.venv\Scripts\python.exe'
 
 if (-not (Test-Path $python)) {
-    throw 'Chua co moi truong Python. Hay chay run-anpr.cmd o thu muc goc project truoc.'
+    throw 'Chua co moi truong Python. Hay chay scripts\run-anpr.cmd o thu muc goc project truoc.'
 }
 
 $yunet = Join-Path $demoDir 'models\face_detection_yunet_2023mar.onnx'

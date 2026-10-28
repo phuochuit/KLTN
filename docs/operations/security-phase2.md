@@ -85,14 +85,14 @@ Lưu ý:
 
 Sao chép `.env.local.example` thành `.env.local` và điền `PARKING_DB_URL`, `PARKING_DB_USERNAME`, `PARKING_DB_PASSWORD`. File `.env.local` bị Git ignore; không đưa credential vào `application.properties`, log hoặc tài liệu.
 
-`run-all.cmd` và `run-web.cmd` dùng Aiven `parking_anpr`; biến môi trường hệ thống được ưu tiên hơn `.env.local`. `run-all-laragon.cmd` là đường dự phòng riêng cho MySQL local `127.0.0.1:3306/parking_anpr`, không đọc `.env.local` Aiven và nhận override qua `PARKING_LARAGON_URL`, `PARKING_LARAGON_USERNAME`, `PARKING_LARAGON_PASSWORD`. Khi thiếu password, launcher yêu cầu nhập kín thay vì đọc credential cloud.
+`scripts\run-all.cmd` và `scripts\run-web.cmd` dùng Aiven `parking_anpr`; biến môi trường hệ thống được ưu tiên hơn `.env.local`. `scripts\run-all-laragon.cmd` là đường dự phòng riêng cho MySQL local `127.0.0.1:3306/parking_anpr`, không đọc `.env.local` Aiven và nhận override qua `PARKING_LARAGON_URL`, `PARKING_LARAGON_USERNAME`, `PARKING_LARAGON_PASSWORD`. Khi thiếu password, launcher yêu cầu nhập kín thay vì đọc credential cloud.
 
 ## 5. Chạy lại
 
 Trong cùng terminal đã đặt biến JWT:
 
 ```cmd
-run-all.cmd
+scripts\run-all.cmd
 ```
 
 Launcher nạp credential Aiven từ biến môi trường hoặc `.env.local`. `application.properties` chỉ chứa placeholder, không chứa secret.
@@ -221,7 +221,7 @@ Các thao tác có ảnh hưởng như thu hồi phiên, đặt lại mật kh�
 
 1. Chạy `mvn.cmd clean test` và xác nhận toàn bộ test dùng H2 memory.
 2. Build WinForms Release, không có lỗi biên dịch.
-3. Tắt toàn bộ hệ thống rồi chạy `run-all.cmd`; xác nhận Web, ANPR và Desktop cùng khởi động.
+3. Tắt toàn bộ hệ thống rồi chạy `scripts\run-all.cmd`; xác nhận Web, ANPR và Desktop cùng khởi động.
 4. Đăng nhập Desktop, quan sát phiên xuất hiện trên Web mà không F5.
 5. Thu hồi phiên từ Web; Desktop phải tự quay về đăng nhập trong vài giây.
 6. Thử login, refresh, logout và reuse detection theo mục 6.
