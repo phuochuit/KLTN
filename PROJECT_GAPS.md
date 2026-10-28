@@ -21,7 +21,7 @@ Cập nhật 28/10/2026, sau khi hoàn tất hardening trên nhánh `feat/final-
 ## Còn thiếu
 
 1. Driver thiết bị thật: relay/PLC barrier, cảm biến vòng từ, đầu đọc thẻ, máy in vé, máy POS. Cần hãng/model/protocol cụ thể để viết adapter.
-2. Hiệu chỉnh ngưỡng bằng dữ liệu camera thật: `FACE_MATCH_THRESHOLD=0.363`, `FACE_REVIEW_THRESHOLD=0.300` và ngưỡng liveness motion-blink (`0.55`/`0.25`) mới là giá trị mặc định, chưa đo trên camera của bãi xe. Chống phát lại video/ảnh in/deepfake vẫn chưa có.
+2. Hiệu chỉnh ngưỡng bằng dữ liệu camera thật: `FACE_MATCH_THRESHOLD=0.363`, `FACE_REVIEW_THRESHOLD=0.300` và ngưỡng liveness motion-blink (`0.55`/`0.25`) mới là giá trị mặc định, chưa đo trên camera của bãi xe. Chống phát lại video/ảnh in/deepfake vẫn chưa có. Quy trình và công cụ đo: [face-threshold-tuning.md](docs/operations/face-threshold-tuning.md).
 3. Cần nhập sơ đồ tầng/khu, mã ô và kích thước thực tế thay cho dữ liệu khởi tạo; ràng buộc nhóm xe đã được triển khai.
 4. TLS/mTLS cho triển khai thật và chữ ký kết quả AI để tránh giả mạo `faceVerified`.
 5. Mã hóa dữ liệu sinh trắc học khi lưu trữ bằng KMS/ổ đĩa mã hóa của môi trường triển khai; script backup, checksum và vùng private đã có.
