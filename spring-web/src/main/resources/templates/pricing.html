@@ -6,6 +6,7 @@
 <label th:text="${p.vehicleType.car ? 'Giá 4 giờ đầu' : 'Giá lượt ban ngày'}"></label><input name="basePrice" type="number" min="0" required th:value="${p.basePrice}">
 <label>Giá lượt ban đêm</label><input name="nightPrice" type="number" min="0" required th:value="${p.nightPrice}" th:readonly="${p.vehicleType.car}">
 <label th:text="${p.vehicleType.car ? 'Tối thiểu mỗi đêm' : 'Giá mỗi chu kỳ qua đêm'}"></label><input name="overnightFee" type="number" min="0" required th:value="${p.overnightFee}">
+<label>Giá gói 1 ngày</label><input name="dailyPassPrice" type="number" min="0" required th:value="${p.dailyPassPrice}">
 <label>Giá gói 30 ngày</label><input name="monthlyPrice" type="number" min="0" required th:value="${p.monthlyPrice}">
 <div class="car-fields" th:if="${p.vehicleType.car}"><label>Số giờ đầu<input name="baseHours" type="number" min="1" th:value="${p.baseHours}"></label><label>Số giờ mỗi block thêm<input name="extraBlockHours" type="number" min="1" th:value="${p.extraBlockHours}"></label><label>Giá mỗi block thêm<input name="extraBlockPrice" type="number" min="0" th:value="${p.extraBlockPrice}"></label></div>
 <input th:unless="${p.vehicleType.car}" type="hidden" name="baseHours" value="0"><input th:unless="${p.vehicleType.car}" type="hidden" name="extraBlockHours" value="0"><input th:unless="${p.vehicleType.car}" type="hidden" name="extraBlockPrice" value="0">

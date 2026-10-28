@@ -74,7 +74,8 @@ class ParkingFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.plateNumber", is("59A112345")))
             .andExpect(jsonPath("$.status", is("OPEN")))
-            .andExpect(jsonPath("$.warning", is(false)));
+            .andExpect(jsonPath("$.warning", is(true)))
+            .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("chưa mua gói")));
 
         mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
             .andExpect(status().isOk())
@@ -135,7 +136,7 @@ class ParkingFlowIntegrationTest {
             .andExpect(jsonPath("$.status", is("COMPLETED")))
             .andExpect(jsonPath("$.fee", is(0)))
             .andExpect(jsonPath("$.message",
-                org.hamcrest.Matchers.containsString("gói tháng còn hiệu lực")))
+                org.hamcrest.Matchers.containsString("gói trả trước còn hiệu lực")))
             .andExpect(jsonPath("$.receiptNumber").doesNotExist())
             .andExpect(jsonPath("$.paymentMethod").doesNotExist());
         assertThat(paymentTransactions.count()).isEqualTo(paymentCountBefore);
@@ -197,6 +198,8 @@ class ParkingFlowIntegrationTest {
     @Test
     @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void combinedRegistrationCreatesHouseholdMemberVehicleThenOpensPackageStep() throws Exception {
+        seedCollectorAccount();
+        long paymentCountBefore = paymentTransactions.count();
         byte[] image = java.util.Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
         MockMultipartFile face = new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image);
@@ -209,7 +212,9 @@ class ParkingFlowIntegrationTest {
                 .param("plateNumber", "61A1-234.56").param("vehicleType", "MOTORBIKE")
                 .param("fuelType", "GASOLINE").param("registrationNumber", "DKX-COMBINED")
                 .param("brand", "Honda").param("modelName", "Vision").param("color", "Đen")
-                .param("chassisNumber", "FRAME-COMBINED").param("engineNumber", "ENGINE-COMBINED"))
+                .param("chassisNumber", "FRAME-COMBINED").param("engineNumber", "ENGINE-COMBINED")
+                .param("passType", "DAILY").param("packageStartDate", LocalDate.now().toString())
+                .param("packageDurationDays", "10").param("paymentMethod", "CASH"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrlPattern("/cards?vehicleId=*"));
 
@@ -217,6 +222,11 @@ class ParkingFlowIntegrationTest {
         assertEquals("HH-COMBINED-01", vehicle.getHousehold().getHouseholdCode());
         assertEquals("Cư dân đăng ký tổng hợp", vehicle.getRegisteredOwner().getFullName());
         assertTrue(vehicle.getRegisteredOwner().getRegistrationFaceImagePath().startsWith("resident:"));
+        ParkingCard packageCard = cards.findByVehicleId(vehicle.getId()).orElseThrow();
+        assertEquals(PassType.DAILY, packageCard.getPassType());
+        assertEquals(LocalDate.now().plusDays(9), packageCard.getValidUntil());
+        assertThat(packageCard.getSubscriptionFee()).isEqualByComparingTo("100000");
+        assertThat(paymentTransactions.count()).isEqualTo(paymentCountBefore + 1);
     }
 
     @Test

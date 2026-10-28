@@ -45,8 +45,8 @@ public class ParkingCard {
             && (validFrom == null || !date.isBefore(validFrom))
             && (validUntil == null || !date.isAfter(validUntil));
     }
-    public boolean isMonthlyValid(LocalDate date) {
-        return getPassType() == PassType.MONTHLY
+    public boolean isPrepaidPackageValid(LocalDate date) {
+        return (getPassType() == PassType.DAILY || getPassType() == PassType.MONTHLY)
             && validFrom != null && validUntil != null
             && isValidOn(date);
     }

@@ -85,7 +85,7 @@ public record ResidentLookupResponse(
     [property: JsonPropertyName("cardCode")] string CardCode,
     [property: JsonPropertyName("passType")] string PassType,
     [property: JsonPropertyName("validUntil")] DateTime? ValidUntil,
-    [property: JsonPropertyName("monthlyValid")] bool MonthlyValid,
+    [property: JsonPropertyName("packageValid")] bool PackageValid,
     [property: JsonPropertyName("message")] string Message,
     [property: JsonPropertyName("authorizedMembers")] List<AuthorizedMemberResponse> AuthorizedMembers,
     [property: JsonPropertyName("guestEntryFaceAvailable")] bool GuestEntryFaceAvailable);

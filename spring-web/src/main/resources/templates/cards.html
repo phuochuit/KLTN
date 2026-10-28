@@ -6,19 +6,23 @@
 <p class="notice" th:if="${message}" th:text="${message}"></p>
 <form class="card toolbar" method="post" th:action="@{/cards}">
     <label>Xe đã đăng ký<select name="vehicleId" required><option th:each="v:${vehicles}" th:value="${v.id}" th:selected="${selectedVehicleId != null && selectedVehicleId == v.id}" th:text="${v.plateNumber + ' - ' + v.effectiveOwnerName + ' - ' + v.vehicleType.displayName}"></option></select></label>
-    <label>Hình thức<select name="passType"><option th:each="p:${passTypes}" th:value="${p}" th:text="${p.displayName}"></option></select></label>
+    <label>Gói gửi xe<select id="cardPassType" name="passType"><option th:each="p:${passTypes}" th:value="${p}" th:text="${p.displayName}"></option></select></label>
     <label>Ngày bắt đầu<input name="startDate" type="date" th:value="${today}"></label>
-    <label>Số ngày<input name="durationDays" type="number" value="30" min="1" max="366"></label>
-    <label>Trạng thái<select name="status"><option th:each="s:${statuses}" th:value="${s}" th:text="${s.displayName}"></option></select></label>
+    <label>Số ngày<input id="cardDurationDays" name="durationDays" type="number" value="1" min="1" max="366"></label>
+    <input type="hidden" name="status" value="ACTIVE">
     <label>Hình thức thu<select name="paymentMethod"><option th:each="m:${paymentMethods}" th:value="${m}" th:text="${m.displayName}"></option></select></label>
     <label>Mã giao dịch ngoài<input name="paymentReference" maxlength="120" placeholder="Bắt buộc khi chuyển khoản/POS"></label>
-    <button>Tạo / gia hạn gói theo biển số</button>
+    <button>Tạo / gia hạn và thu tiền</button>
 </form>
-<div class="card help">Biển số xe được dùng làm mã nhận diện tự động, không cần nhập hoặc quẹt thẻ. Chọn <strong>Vé lượt</strong> để thu phí mỗi lần ra. Chọn <strong>Gói 30 ngày</strong> để thu phí một lần khi tạo/gia hạn; các lượt ra trong thời hạn có phí 0 đ.</div>
+<div class="card help">Biển số xe được dùng làm mã nhận diện tự động, không cần nhập hoặc quẹt thẻ. <strong>Gói theo ngày</strong> thu giá một ngày × số ngày; <strong>Gói 30 ngày</strong> thu giá tháng. Các lượt ra trong thời hạn gói hợp lệ có phí 0 đ. Xe cư dân không mua gói được tính như khách vãng lai.</div>
 <h2>Danh sách thẻ</h2>
 <table><thead><tr><th>Mã nhận diện biển số</th><th>Biển số</th><th>Chủ xe</th><th>Hình thức</th><th>Hiệu lực</th><th>Giá gói</th><th>Trạng thái</th></tr></thead>
 <tbody><tr th:each="c:${cards}"><td><strong th:text="${c.cardCode}"></strong></td><td th:text="${c.vehicle?.plateNumber}"></td><td th:text="${c.vehicle?.effectiveOwnerName}"></td><td th:text="${c.passType.displayName}"></td><td th:text="${c.validFrom != null && c.validUntil != null ? (#temporals.format(c.validFrom,'dd/MM/yyyy') + ' - ' + #temporals.format(c.validUntil,'dd/MM/yyyy')) : 'Không giới hạn'}"></td><td th:text="${#numbers.formatDecimal(c.subscriptionFee,0,'COMMA',0,'POINT') + ' đ'}"></td><td th:text="${c.status.displayName}" th:class="${c.status.name() == 'ACTIVE' ? 'status-active' : 'status-blocked'}"></td></tr></tbody></table>
 <h2>Lịch sử thu tiền gói</h2>
 <table><thead><tr><th>Thời gian thu</th><th>Thẻ</th><th>Biển số</th><th>Kỳ hạn</th><th>Số tiền</th></tr></thead>
-<tbody><tr th:each="p:${payments}"><td th:text="${#temporals.format(p.paidAt,'dd/MM/yyyy HH:mm')}"></td><td th:text="${p.parkingCard.cardCode}"></td><td th:text="${p.parkingCard.vehicle.plateNumber}"></td><td th:text="${#temporals.format(p.periodStart,'dd/MM/yyyy') + ' - ' + #temporals.format(p.periodEnd,'dd/MM/yyyy')}"></td><td th:text="${#numbers.formatDecimal(p.amount,0,'COMMA',0,'POINT') + ' đ'}"></td></tr><tr th:if="${#lists.isEmpty(payments)}"><td colspan="5" class="muted">Chưa có giao dịch gói tháng.</td></tr></tbody></table>
-</main></body></html>
+<tbody><tr th:each="p:${payments}"><td th:text="${#temporals.format(p.paidAt,'dd/MM/yyyy HH:mm')}"></td><td th:text="${p.parkingCard.cardCode}"></td><td th:text="${p.parkingCard.vehicle.plateNumber}"></td><td th:text="${#temporals.format(p.periodStart,'dd/MM/yyyy') + ' - ' + #temporals.format(p.periodEnd,'dd/MM/yyyy')}"></td><td th:text="${#numbers.formatDecimal(p.amount,0,'COMMA',0,'POINT') + ' đ'}"></td></tr><tr th:if="${#lists.isEmpty(payments)}"><td colspan="5" class="muted">Chưa có giao dịch gói gửi xe.</td></tr></tbody></table>
+</main><script>
+const cardType=document.getElementById('cardPassType'),cardDays=document.getElementById('cardDurationDays');
+function syncCardPackage(){const monthly=cardType.value==='MONTHLY';cardDays.value=monthly?'30':(cardDays.value==='30'?'1':cardDays.value);cardDays.readOnly=monthly;}
+cardType.addEventListener('change',syncCardPackage);syncCardPackage();
+</script></body></html>

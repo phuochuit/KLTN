@@ -27,6 +27,16 @@
  <label>Số khung<input name="chassisNumber" required></label><label>Số máy<input name="engineNumber" required></label><label>Số chỗ ngồi<input name="seatCount" type="number" min="1"></label><label>Dung tích xi-lanh (cc)<input name="cylinderCapacityCc" type="number" min="0"></label>
  <label class="span-all">Ảnh giấy đăng ký xe<input id="registrationImage" type="file" name="registrationImage" accept="image/*" required><small>Mỗi ảnh tối đa 10 MB.</small></label>
 </div></section>
+<section class="card registration-section"><h2><span class="step-number">4</span> Gói gửi xe và thanh toán</h2><div class="form-grid">
+ <label>Gói đăng ký<select id="packageType" name="passType"><option value="">Không mua gói — tính giá khách vãng lai</option><option th:each="p:${packageTypes}" th:value="${p}" th:text="${p.displayName}"></option></select></label>
+ <div id="packageFields" class="span-all form-grid" hidden>
+  <label>Ngày bắt đầu<input name="packageStartDate" type="date" th:value="${today}"></label>
+  <label>Số ngày<input id="packageDurationDays" name="packageDurationDays" type="number" value="1" min="1" max="366"></label>
+  <label>Hình thức thu<select id="packagePaymentMethod" name="paymentMethod"><option value="">-- Chọn --</option><option th:each="m:${paymentMethods}" th:value="${m}" th:text="${m.displayName}"></option></select></label>
+  <label>Mã giao dịch ngoài<input name="paymentReference" maxlength="120" placeholder="Bắt buộc khi chuyển khoản/POS"></label>
+  <small class="span-all">Gói ngày thu giá một ngày × số ngày. Gói tháng cố định 30 ngày. Tiền được thu và lập biên nhận ngay khi lưu hồ sơ.</small>
+ </div>
+</div></section>
 <div class="registration-submit"><button type="submit">LƯU HỒ SƠ VÀ CHUYỂN SANG ĐĂNG KÝ GÓI</button></div>
 </form>
 </main><script>
@@ -38,6 +48,8 @@ q('openCamera').onclick=async()=>{try{stream=await navigator.mediaDevices.getUse
 q('captureFace').onclick=()=>{const v=q('faceVideo'),data=captureCompressed(v,q('faceCanvas'));q('registrationFaceCapture').value=data;q('facePreview').src=data;q('facePreview').hidden=false;v.hidden=true;if(stream)stream.getTracks().forEach(t=>t.stop());};
 q('faceUpload').onchange=e=>{if(!validateImage(e.target,'Ảnh khuôn mặt'))return;if(e.target.files[0]){q('registrationFaceCapture').value='';q('facePreview').src=URL.createObjectURL(e.target.files[0]);q('facePreview').hidden=false;}};
 q('registrationImage').onchange=e=>validateImage(e.target,'Ảnh giấy đăng ký xe');
+function syncPackageFields(){const type=q('packageType').value,enabled=!!type,days=q('packageDurationDays');q('packageFields').hidden=!enabled;q('packagePaymentMethod').required=enabled;days.value=type==='MONTHLY'?'30':(days.value==='30'?'1':days.value);days.readOnly=type==='MONTHLY';}
+q('packageType').addEventListener('change',syncPackageFields);syncPackageFields();
 q('registrationForm').addEventListener('submit',e=>{if(!validateImage(q('faceUpload'),'Ảnh khuôn mặt')||!validateImage(q('registrationImage'),'Ảnh giấy đăng ký xe'))e.preventDefault();});
 const parseDate=s=>s&&s.length===8?s.slice(4)+'-'+s.slice(2,4)+'-'+s.slice(0,2):'';
 async function scanQrBlob(blob){q('qrStatus').textContent='Đang đọc QR...';try{const form=new FormData();form.append('file',blob,'cccd-qr.jpg');const response=await fetch('/api/cccd/scan-qr',{method:'POST',body:form});const data=await response.json();if(!response.ok)throw new Error(data.message||'Không đọc được QR');q('cccdQrRaw').value=data.raw||'';q('citizenId').value=data.citizenId||'';q('oldCitizenId').value=data.oldCitizenId||'';document.querySelector('[name=fullName]').value=data.fullName||'';document.querySelector('[name=dateOfBirth]').value=data.dateOfBirth||'';document.querySelector('[name=gender]').value=data.gender||'';document.querySelector('[name=permanentAddress]').value=data.permanentAddress||'';document.querySelector('[name=cccdIssueDate]').value=data.cccdIssueDate||'';q('qrStatus').textContent=data.message;}catch(e){q('qrStatus').textContent='Không đọc được QR: '+e.message;}}

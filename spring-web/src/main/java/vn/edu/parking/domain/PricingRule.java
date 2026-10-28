@@ -19,6 +19,8 @@ public class PricingRule {
     private BigDecimal overnightFee;
     @Column(precision = 12, scale = 0)
     private BigDecimal monthlyPrice;
+    @Column(name = "daily_pass_price", precision = 12, scale = 0)
+    private BigDecimal dailyPassPrice;
     private Integer baseHours;
     private Integer extraBlockHours;
     @Column(precision = 12, scale = 0)
@@ -36,6 +38,8 @@ public class PricingRule {
     public void setOvernightFee(BigDecimal overnightFee) { this.overnightFee = overnightFee; }
     public BigDecimal getMonthlyPrice() { return monthlyPrice == null ? BigDecimal.ZERO : monthlyPrice; }
     public void setMonthlyPrice(BigDecimal monthlyPrice) { this.monthlyPrice = monthlyPrice; }
+    public BigDecimal getDailyPassPrice() { return dailyPassPrice == null ? BigDecimal.ZERO : dailyPassPrice; }
+    public void setDailyPassPrice(BigDecimal dailyPassPrice) { this.dailyPassPrice = dailyPassPrice; }
     public int getBaseHours() { return baseHours == null ? 0 : baseHours; }
     public void setBaseHours(Integer baseHours) { this.baseHours = baseHours; }
     public int getExtraBlockHours() { return extraBlockHours == null ? 0 : extraBlockHours; }

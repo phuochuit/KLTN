@@ -14,7 +14,7 @@ public record ResidentLookupResponse(
     String cardCode,
     String passType,
     LocalDate validUntil,
-    boolean monthlyValid,
+    boolean packageValid,
     String message,
     List<AuthorizedMemberResponse> authorizedMembers,
     boolean guestEntryFaceAvailable

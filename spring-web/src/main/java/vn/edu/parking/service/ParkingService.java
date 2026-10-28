@@ -75,10 +75,6 @@ public class ParkingService {
         boolean warning = false;
         String message;
 
-        if (card != null && card.getStatus() != CardStatus.ACTIVE) {
-            throw new IllegalStateException("Thẻ không hoạt động");
-        }
-
         boolean cardMatches = card != null && card.getVehicle() != null
             && card.getVehicle().getPlateNumber().equalsIgnoreCase(plate);
 
@@ -87,19 +83,14 @@ public class ParkingService {
         } else if (!cardMatches) {
             warning = true;
             message = "Xe cư dân nhưng thẻ không trùng khớp hoặc chưa quẹt thẻ; sẽ tính theo giá lượt";
-        } else if (card != null && card.getPassType() == PassType.MONTHLY) {
-            LocalDate today = LocalDate.now();
-            if (card.isMonthlyValid(today)) {
-                message = "Xe cư dân có gói tháng hợp lệ";
-            } else {
-                warning = true;
-                message = "Gói tháng đã hết hạn; chuyển sang tính giá lượt";
-            }
-        } else if (card != null && !card.isValidOn(LocalDate.now())) {
+        } else if (card.isPrepaidPackageValid(LocalDate.now())) {
+            message = "Xe cư dân có " + card.getPassType().getDisplayName() + " hợp lệ";
+        } else if (card.getPassType() == PassType.DAILY || card.getPassType() == PassType.MONTHLY) {
             warning = true;
-            message = "Vé lượt đã hết hạn hoặc chưa đến ngày hiệu lực; chuyển sang tính giá lượt";
+            message = "Gói gửi xe đã hết hạn hoặc chưa đến ngày hiệu lực; tính giá khách vãng lai";
         } else {
-            message = "Xe cư dân dùng vé lượt";
+            warning = true;
+            message = "Xe cư dân chưa mua gói; tính giá khách vãng lai";
         }
 
         ParkingSession session = new ParkingSession();
@@ -178,8 +169,8 @@ public class ParkingService {
             slot.setCurrentSession(null);
             slots.save(slot);
         });
-        String message = session.getFee().signum() == 0 && hasValidMonthlyPass(session)
-            ? "Đã xác nhận xe ra; gói tháng còn hiệu lực nên không thu thêm"
+        String message = session.getFee().signum() == 0 && hasValidPrepaidPackage(session)
+            ? "Đã xác nhận xe ra; gói trả trước còn hiệu lực nên không thu thêm"
             : "Đã xác nhận xe ra; tổng thu: " + String.format("%,d", session.getFee().longValue())
                 + " đ; biên nhận " + payment.getReceiptNumber();
         return toResponse(session, message, false,
@@ -498,7 +489,7 @@ public class ParkingService {
     }
 
     BigDecimal calculateFee(ParkingSession session, LocalDateTime exitTime) {
-        if (hasValidMonthlyPass(session)) return BigDecimal.ZERO;
+        if (hasValidPrepaidPackage(session)) return BigDecimal.ZERO;
         VehicleType type = session.getDetectedVehicleType();
         PricingRule rule = pricingRules.findByVehicleType(type)
             .orElseThrow(() -> new IllegalStateException("Chưa cấu hình bảng giá cho " + type));
@@ -534,11 +525,11 @@ public class ParkingService {
         return (x + y - 1) / y;
     }
 
-    private boolean hasValidMonthlyPass(ParkingSession session) {
+    private boolean hasValidPrepaidPackage(ParkingSession session) {
         ParkingCard card = session.getParkingCard();
         if (card == null || session.getVehicle() == null || card.getVehicle() == null) return false;
         boolean sameVehicle = card.getVehicle().getId().equals(session.getVehicle().getId());
-        return sameVehicle && card.isMonthlyValid(session.getEntryTime().toLocalDate());
+        return sameVehicle && card.isPrepaidPackageValid(session.getEntryTime().toLocalDate());
     }
 
     private ParkingCard resolveCard(String cardCode) {

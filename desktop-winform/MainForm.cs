@@ -423,10 +423,13 @@ public sealed class MainForm : Form
                 ? Color.FromArgb(234, 245, 239) : Color.FromArgb(255, 247, 230);
             string pass = resident.PassType switch
             {
-                "MONTHLY" => resident.MonthlyValid
+                "MONTHLY" => resident.PackageValid
                     ? $"Gói 30 ngày - hạn {resident.ValidUntil:dd/MM/yyyy}"
                     : "Gói 30 ngày không còn hiệu lực",
-                "PER_VISIT" => "Vé lượt",
+                "DAILY" => resident.PackageValid
+                    ? $"Gói ngày - hạn {resident.ValidUntil:dd/MM/yyyy}"
+                    : "Gói ngày không còn hiệu lực",
+                "PER_VISIT" => "Chưa mua gói (dữ liệu cũ)",
                 _ => "Chưa gán thẻ / gói"
             };
             _residentInfo.Text = resident.Registered

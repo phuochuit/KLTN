@@ -51,11 +51,11 @@ Các references dưới đây thuộc `spring-web/src/main/java/vn/edu/parking/`
 
 | Symbol / lines | Quan sát tĩnh |
 | --- | --- |
-| `domain/ParkingCard.java:7–25` | `parking_cards`, unique `card_code`, length 30/not-null; vehicle ManyToOne; default ACTIVE, PER_VISIT; validFrom/validUntil/subscriptionFee. Không chứng minh global registration dedup/concurrent replacement policy |
-| `ParkingCard.java:35,43–46` | Null passType đọc thành PER_VISIT. MONTHLY valid khi card ACTIVE, cả hai date có giá trị và ngày kiểm tra nằm **inclusive** giữa validFrom/validUntil |
+| `domain/ParkingCard.java` | `parking_cards`, unique `card_code`; DAILY/MONTHLY là hai gói tạo mới, PER_VISIT chỉ đọc dữ liệu cũ; validFrom/validUntil/subscriptionFee |
+| `ParkingCard.isPrepaidPackageValid` | DAILY hoặc MONTHLY hợp lệ khi card ACTIVE, cả hai date có giá trị và ngày kiểm tra nằm **inclusive** giữa validFrom/validUntil |
 | `service/ParkingService.java` `enter`; `AdminController.saveCard` | Card được sinh/tra bằng plate chuẩn hóa; entry bỏ qua `cardCode` request. Không dùng helper `resolveCard` chưa được gọi ở đây để khẳng định supplied unknown card bị từ chối |
 | Cùng service `enter` | Card tìm theo plate mà inactive → từ chối; thiếu/mismatched card với resident → warning/per-visit; matching MONTHLY expired cũng warning/per-visit nhưng tạo OPEN. Không đồng nhất fallback với nguồn “không tự mở” |
-| Cùng service `hasValidMonthlyPass` | Miễn phí cần session.vehicle/card.vehicle IDs trùng và `isMonthlyValid` tại **ngày entry**; status ACTIVE vẫn được helper kiểm tra qua entity |
+| Cùng service `hasValidPrepaidPackage` | Miễn phí cần session.vehicle/card.vehicle IDs trùng và gói DAILY/MONTHLY hợp lệ tại **ngày entry** |
 | Cùng service `confirmExit`; `PaymentTransactionService` | Fee>0 bắt buộc method CASH/BANK_TRANSFER/POS, hai loại sau cần reference; ghi PaymentTransaction/receipt/collector và ca nếu có trong transaction nghiệp vụ. Fee0 không tạo exit payment. Operator input/PAID không chứng minh provider settlement hoặc reasoned waiver |
 | `AdminController.saveCard` | MONTHLY lưu kỳ SubscriptionPayment pending rồi ghi PaymentTransaction, clear pending và link receipt; method/reference có kiểm tra. Handler không transaction bao toàn luồng: card/kỳ lưu trước lỗi payment vẫn là partial-failure gap. Renewal continuity/overlap/debt/refund chưa chứng minh |
 
@@ -63,9 +63,9 @@ Không suy luận “card còn hiệu lực lúc vào thì luôn miễn phí”:
 
 ## Actual code: công thức phí theo lượt
 
-Reference: [ParkingService](../../spring-web/src/main/java/vn/edu/parking/service/ParkingService.java) `calculateFee`/`hasValidMonthlyPass`; đây là mô tả implementation, **không phải giá/chính sách được phê duyệt**.
+Reference: [ParkingService](../../spring-web/src/main/java/vn/edu/parking/service/ParkingService.java) `calculateFee`/`hasValidPrepaidPackage`.
 
-1. `hasValidMonthlyPass` true → fee zero. Nếu không, tìm `PricingRule` theo session detected type; thiếu rule → lỗi.
+1. `hasValidPrepaidPackage` true → fee zero. Nếu không, tìm `PricingRule` theo session detected type và tính như khách vãng lai.
 2. Duration tính phút, tối thiểu 1. `midnightCount` là số chênh lệch ngày không âm, không phải duration 24h.
 3. Xe `type.isCar()`: basePrice cho `max(1,baseHours)` giờ; vượt thì cộng extraBlockPrice theo `ceil(extraMinutes / (max(1,extraBlockHours)*60))`. Fee cuối là max(timeFee, overnightFee × midnightCount).
 4. Loại không-car: nếu qua ngày hoặc duration ≥24h, overnightFee × ceil(minutes/1440).

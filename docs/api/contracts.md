@@ -100,7 +100,7 @@ JSON dùng camelCase; Long là number, BigDecimal là JSON number/VND theo mappi
 | Response | Fields được khai báo |
 | --- | --- |
 | ParkingResponse | `sessionId` Long; `plateNumber`, `ownerName`, `vehicleType`, `cardCode`, `status`, `message` strings; `entryTime`, `exitTime` LocalDateTime; `fee` BigDecimal; `warning` boolean; nullable `receiptNumber`, `paymentMethod`, `paymentReference`. Không generic success flag |
-| ResidentLookupResponse | `registered`, `cardMatched`, `monthlyValid`, `guestEntryFaceAvailable` booleans; `plateNumber`, `ownerName`, `ownerPhone`, `apartmentNumber`, `vehicleType`, `cardCode`, `passType`, `message` strings; `validUntil` LocalDate; `authorizedMembers` array |
+| ResidentLookupResponse | `registered`, `cardMatched`, `packageValid`, `guestEntryFaceAvailable` booleans; `plateNumber`, `ownerName`, `ownerPhone`, `apartmentNumber`, `vehicleType`, `cardCode`, `passType`, `message` strings; `validUntil` LocalDate; `authorizedMembers` array |
 | AuthorizedMemberResponse | `id` Long, `fullName`, `relationship` strings, `faceImageAvailable` boolean; không image path |
 | Open sessions | Controller trả `ParkingSession` entities, không `OpenParkingSessionResponse` allowlist; quan hệ/lazy serialization thực tế chưa kiểm runtime |
 | ParkingSlotResponse | `id` Long; strings `slotCode`, `zoneName`, `floor`, `slotType`, `allowedVehicleType`, `statusOverride`, `assignedPlate`, **assignedOwnerName/assignedOwnerPhone/assignedApartment**, `occupiedPlate`, `borrowedPlate`, `borrowNotes`, `status`, `statusDescription`; `occupiedEntryTime`, `borrowedUntil` LocalDateTime; `overdue` boolean. Owner fields được trả từ ParkingService.toSlotResponse |

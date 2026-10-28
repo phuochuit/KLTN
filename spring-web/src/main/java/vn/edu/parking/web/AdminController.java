@@ -111,6 +111,9 @@ public class AdminController {
     String registrations(Model model) {
         model.addAttribute("types", VehicleType.values());
         model.addAttribute("fuelTypes", FuelType.values());
+        model.addAttribute("packageTypes", List.of(PassType.DAILY, PassType.MONTHLY));
+        model.addAttribute("paymentMethods", PaymentMethod.values());
+        model.addAttribute("today", LocalDate.now());
         model.addAttribute("policy", getPolicy());
         return "registrations";
     }
@@ -141,7 +144,13 @@ public class AdminController {
             @RequestParam String chassisNumber, @RequestParam String engineNumber,
             @RequestParam(required = false) Integer seatCount,
             @RequestParam(required = false) Integer cylinderCapacityCc,
-            @RequestParam(required = false) MultipartFile registrationImage, RedirectAttributes redirect) {
+            @RequestParam(required = false) MultipartFile registrationImage,
+            @RequestParam(required = false) PassType passType,
+            @RequestParam(required = false) LocalDate packageStartDate,
+            @RequestParam(defaultValue = "1") int packageDurationDays,
+            @RequestParam(required = false) PaymentMethod paymentMethod,
+            @RequestParam(required = false) String paymentReference,
+            RedirectAttributes redirect) {
         String normalizedCitizenId = citizenId.replaceAll("\\D", "");
         if (normalizedCitizenId.length() != 12)
             throw new IllegalArgumentException("Số CCCD phải gồm đúng 12 chữ số");
@@ -209,8 +218,17 @@ public class AdminController {
         vehicle.setActive(true);
         vehicle = vehicles.save(vehicle);
 
-        redirect.addFlashAttribute("message",
-                "Đã tạo hồ sơ hộ, cư dân và xe " + plate + ". Có thể đăng ký gói ngay bên dưới.");
+        if (passType == null) {
+            redirect.addFlashAttribute("message", "Đã tạo hồ sơ hộ, cư dân và xe " + plate
+                + ". Chưa mua gói nên các lượt gửi xe sẽ tính theo giá khách vãng lai.");
+            return "redirect:/cards?vehicleId=" + vehicle.getId();
+        }
+        PackageActivation activation = activatePackage(vehicle, passType, packageStartDate,
+            packageDurationDays, paymentMethod, paymentReference);
+        redirect.addFlashAttribute("message", "Đã tạo hồ sơ và kích hoạt "
+            + passType.getDisplayName() + " đến " + activation.until()
+            + ". Đã thu " + activation.amount() + " đ. Biên nhận: "
+            + activation.transaction().getReceiptNumber());
         return "redirect:/cards?vehicleId=" + vehicle.getId();
     }
 
@@ -662,10 +680,11 @@ public class AdminController {
 
     @GetMapping("/cards")
     String cards(@RequestParam(required = false) Long vehicleId, Model model) {
-        model.addAttribute("cards", cards.findAll());
+        model.addAttribute("cards", cards.findAll().stream()
+            .filter(card -> card.getPassType() != PassType.PER_VISIT).toList());
         model.addAttribute("vehicles", vehicles.findAll());
         model.addAttribute("statuses", CardStatus.values());
-        model.addAttribute("passTypes", PassType.values());
+        model.addAttribute("passTypes", List.of(PassType.DAILY, PassType.MONTHLY));
         model.addAttribute("paymentMethods", PaymentMethod.values());
         model.addAttribute("today", LocalDate.now());
         model.addAttribute("payments", payments.findAllByOrderByPaidAtDesc().stream().limit(20).toList());
@@ -674,6 +693,7 @@ public class AdminController {
     }
 
     @PostMapping("/cards")
+    @Transactional
     String saveCard(@RequestParam Long vehicleId,
             @RequestParam CardStatus status,
             @RequestParam PassType passType,
@@ -682,58 +702,66 @@ public class AdminController {
             @RequestParam(required = false) PaymentMethod paymentMethod,
             @RequestParam(required = false) String paymentReference,
             RedirectAttributes redirect) {
-        if (durationDays < 1 || durationDays > 366) {
-            throw new IllegalArgumentException("Số ngày của gói phải từ 1 đến 366");
-        }
         Vehicle vehicle = vehicles.findById(vehicleId).orElseThrow();
-        String plateIdentifier = PlateNormalizer.normalize(vehicle.getPlateNumber());
-        ParkingCard card = cards.findByVehicleId(vehicleId).orElseGet(ParkingCard::new);
-        card.setCardCode(plateIdentifier);
-        card.setVehicle(vehicle);
-        card.setStatus(status);
-        card.setPassType(passType);
-        LocalDate from = startDate == null ? LocalDate.now() : startDate;
-        LocalDate until = from.plusDays(durationDays - 1L);
-
-        if (passType == PassType.MONTHLY) {
-            BigDecimal amount = prices.findByVehicleType(vehicle.getVehicleType())
-                    .orElseThrow(
-                            () -> new IllegalStateException("Chưa cấu hình bảng giá cho " + vehicle.getVehicleType()))
-                    .getMonthlyPrice();
-            if (amount.signum() <= 0) {
-                throw new IllegalStateException(
-                        "Chưa cấu hình giá gói tháng cho " + vehicle.getVehicleType().getDisplayName());
-            }
-            card.setValidFrom(from);
-            card.setValidUntil(until);
-            card.setSubscriptionFee(amount);
-            card = cards.save(card);
-
-            SubscriptionPayment payment = new SubscriptionPayment();
-            payment.setParkingCard(card);
-            payment.setPeriodStart(from);
-            payment.setPeriodEnd(until);
-            payment.setAmount(amount);
-            payment.setPaidAt(LocalDateTime.now());
-            payment.setPendingPayment(true);
-            payment = payments.save(payment);
-            PaymentTransaction transaction = paymentTransactions.recordSubscription(
-                payment, paymentMethod, paymentReference);
-            payment.setPendingPayment(false);
-            payment.setPaymentTransaction(transaction);
-            payments.save(payment);
-            redirect.addFlashAttribute("message", "Đã kích hoạt gói " + durationDays
-                + " ngày đến " + until + ". Biên nhận: " + transaction.getReceiptNumber());
-        } else {
-            card.setValidFrom(from);
-            card.setValidUntil(until);
-            card.setSubscriptionFee(BigDecimal.ZERO);
-            cards.save(card);
-            redirect.addFlashAttribute("message", "Đã kích hoạt vé lượt " + durationDays
-                + " ngày đến " + until);
-        }
+        if (status != CardStatus.ACTIVE)
+            throw new IllegalArgumentException("Gói mới hoặc gia hạn phải ở trạng thái hoạt động");
+        PackageActivation activation = activatePackage(vehicle, passType, startDate, durationDays,
+            paymentMethod, paymentReference);
+        redirect.addFlashAttribute("message", "Đã kích hoạt " + passType.getDisplayName()
+            + " đến " + activation.until() + ". Đã thu " + activation.amount()
+            + " đ. Biên nhận: " + activation.transaction().getReceiptNumber());
         return "redirect:/cards";
     }
+
+    private PackageActivation activatePackage(Vehicle vehicle, PassType passType,
+            LocalDate requestedStart, int requestedDays, PaymentMethod paymentMethod,
+            String paymentReference) {
+        if (passType == null || passType == PassType.PER_VISIT)
+            throw new IllegalArgumentException("Chỉ hỗ trợ gói theo ngày hoặc gói 30 ngày");
+        int days = passType == PassType.MONTHLY ? 30 : requestedDays;
+        if (days < 1 || days > 366)
+            throw new IllegalArgumentException("Số ngày của gói phải từ 1 đến 366");
+
+        LocalDate from = requestedStart == null ? LocalDate.now() : requestedStart;
+        LocalDate until = from.plusDays(days - 1L);
+        PricingRule price = prices.findByVehicleType(vehicle.getVehicleType())
+            .orElseThrow(() -> new IllegalStateException(
+                "Chưa cấu hình bảng giá cho " + vehicle.getVehicleType().getDisplayName()));
+        BigDecimal amount = passType == PassType.MONTHLY
+            ? price.getMonthlyPrice()
+            : price.getDailyPassPrice().multiply(BigDecimal.valueOf(days));
+        if (amount.signum() <= 0)
+            throw new IllegalStateException("Chưa cấu hình giá cho " + passType.getDisplayName()
+                + " của " + vehicle.getVehicleType().getDisplayName());
+
+        ParkingCard card = cards.findByVehicleId(vehicle.getId()).orElseGet(ParkingCard::new);
+        card.setCardCode(PlateNormalizer.normalize(vehicle.getPlateNumber()));
+        card.setVehicle(vehicle);
+        card.setStatus(CardStatus.ACTIVE);
+        card.setPassType(passType);
+        card.setValidFrom(from);
+        card.setValidUntil(until);
+        card.setSubscriptionFee(amount);
+        card = cards.save(card);
+
+        SubscriptionPayment payment = new SubscriptionPayment();
+        payment.setParkingCard(card);
+        payment.setPeriodStart(from);
+        payment.setPeriodEnd(until);
+        payment.setAmount(amount);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setPendingPayment(true);
+        payment = payments.save(payment);
+        PaymentTransaction transaction = paymentTransactions.recordSubscription(
+            payment, paymentMethod, paymentReference);
+        payment.setPendingPayment(false);
+        payment.setPaymentTransaction(transaction);
+        payments.save(payment);
+        return new PackageActivation(transaction, until, amount);
+    }
+
+    private record PackageActivation(PaymentTransaction transaction, LocalDate until,
+            BigDecimal amount) { }
 
     @GetMapping("/pricing")
     String pricing(Model model) {
@@ -747,12 +775,13 @@ public class AdminController {
             @RequestParam BigDecimal basePrice,
             @RequestParam BigDecimal nightPrice,
             @RequestParam BigDecimal overnightFee,
+            @RequestParam BigDecimal dailyPassPrice,
             @RequestParam BigDecimal monthlyPrice,
             @RequestParam(defaultValue = "0") int baseHours,
             @RequestParam(defaultValue = "0") int extraBlockHours,
             @RequestParam(defaultValue = "0") BigDecimal extraBlockPrice,
             RedirectAttributes redirect) {
-        if (List.of(basePrice, nightPrice, overnightFee, monthlyPrice, extraBlockPrice)
+        if (List.of(basePrice, nightPrice, overnightFee, dailyPassPrice, monthlyPrice, extraBlockPrice)
                 .stream().anyMatch(value -> value.signum() < 0)) {
             throw new IllegalArgumentException("Giá không được âm");
         }
@@ -764,6 +793,7 @@ public class AdminController {
         rule.setBasePrice(basePrice);
         rule.setNightPrice(nightPrice);
         rule.setOvernightFee(overnightFee);
+        rule.setDailyPassPrice(dailyPassPrice);
         rule.setMonthlyPrice(monthlyPrice);
         rule.setBaseHours(vehicleType.isCar() ? baseHours : 0);
         rule.setExtraBlockHours(vehicleType.isCar() ? extraBlockHours : 0);
