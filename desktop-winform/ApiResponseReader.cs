@@ -10,7 +10,12 @@ public static class ApiResponseReader
     {
         string body = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(BuildHttpError(response.StatusCode, body, serviceName, action));
+        {
+            string message = BuildHttpError(response.StatusCode, body, serviceName, action);
+            if (TransientServerException.IsTransient(response.StatusCode))
+                throw new TransientServerException(response.StatusCode, message);
+            throw new InvalidOperationException(message);
+        }
 
         if (string.IsNullOrWhiteSpace(body))
             throw new InvalidOperationException($"{serviceName} không trả về dữ liệu khi {action}.\n\nCách xử lý: đóng và chạy lại dịch vụ, sau đó bấm Kiểm tra.");

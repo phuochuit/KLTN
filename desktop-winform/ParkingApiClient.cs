@@ -322,8 +322,10 @@ public sealed class ParkingApiClient : IDisposable
         }
     }
 
+    // Lỗi 5xx từ Spring (mất database, AI chưa sẵn sàng) cũng phải vào outbox: request có
+    // operationId nên Spring chống trùng bằng UUID + SHA-256 khi gửi lại.
     private static bool IsConnectivityFailure(Exception ex) =>
-        ex is HttpRequestException or IOException or OperationCanceledException;
+        ex is HttpRequestException or IOException or OperationCanceledException or TransientServerException;
 
     private async Task<AnprResponse> UploadAiAsync(string endpoint, string path, string operation)
     {
