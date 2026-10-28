@@ -21,6 +21,7 @@ Thư mục này lưu các quyết định kiến trúc quan trọng của hệ t
 | [ADR-0004](0004-tich-hop-bao-mat-tung-giai-doan.md) | Accepted | Port bảo mật theo giai đoạn thay vì merge nguyên branch |
 | [ADR-0005](0005-docs-as-project-reference.md) | Accepted | Docs là tài liệu tham khảo chính của dự án |
 | [ADR-0006](0006-workspace-and-test-artifacts.md) | Accepted | Tách `.cache/`, `.artifacts/` và chuẩn hóa tools/test runner |
+| [ADR-0007](0007-schema-migration-khong-dung-flyway.md) | Accepted | Không dùng Flyway; schema do `ddl-auto=update` và script SQL thủ công |
 
 ## Ràng buộc kỹ thuật đang áp dụng
 
