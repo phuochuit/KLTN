@@ -95,6 +95,9 @@ public class ParkingService {
                 warning = true;
                 message = "Gói tháng đã hết hạn; chuyển sang tính giá lượt";
             }
+        } else if (card != null && !card.isValidOn(LocalDate.now())) {
+            warning = true;
+            message = "Vé lượt đã hết hạn hoặc chưa đến ngày hiệu lực; chuyển sang tính giá lượt";
         } else {
             message = "Xe cư dân dùng vé lượt";
         }

@@ -98,7 +98,9 @@ public class ParkingApiController {
             message = "Gói tháng còn hiệu lực đến " + card.getValidUntil();
         else if (card.getPassType() == PassType.MONTHLY)
             message = "Gói tháng đã hết hạn hoặc chưa đến ngày hiệu lực";
-        else message = "Thẻ vé lượt đang hoạt động";
+        else if (card.isValidOn(LocalDate.now()))
+            message = "Vé lượt còn hiệu lực đến " + card.getValidUntil();
+        else message = "Vé lượt đã hết hạn hoặc chưa đến ngày hiệu lực; sẽ tính giá lượt";
         if (!vehicle.getAuthorizedMemberNames().isBlank()) {
             message += "; người được phép sử dụng: " + vehicle.getAuthorizedMemberNames();
         }

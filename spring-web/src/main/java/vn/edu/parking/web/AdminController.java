@@ -692,10 +692,10 @@ public class AdminController {
         card.setVehicle(vehicle);
         card.setStatus(status);
         card.setPassType(passType);
+        LocalDate from = startDate == null ? LocalDate.now() : startDate;
+        LocalDate until = from.plusDays(durationDays - 1L);
 
         if (passType == PassType.MONTHLY) {
-            LocalDate from = startDate == null ? LocalDate.now() : startDate;
-            LocalDate until = from.plusDays(durationDays - 1L);
             BigDecimal amount = prices.findByVehicleType(vehicle.getVehicleType())
                     .orElseThrow(
                             () -> new IllegalStateException("Chưa cấu hình bảng giá cho " + vehicle.getVehicleType()))
@@ -725,11 +725,12 @@ public class AdminController {
             redirect.addFlashAttribute("message", "Đã kích hoạt gói " + durationDays
                 + " ngày đến " + until + ". Biên nhận: " + transaction.getReceiptNumber());
         } else {
-            card.setValidFrom(null);
-            card.setValidUntil(null);
+            card.setValidFrom(from);
+            card.setValidUntil(until);
             card.setSubscriptionFee(BigDecimal.ZERO);
             cards.save(card);
-            redirect.addFlashAttribute("message", "Đã lưu thẻ vé lượt");
+            redirect.addFlashAttribute("message", "Đã kích hoạt vé lượt " + durationDays
+                + " ngày đến " + until);
         }
         return "redirect:/cards";
     }

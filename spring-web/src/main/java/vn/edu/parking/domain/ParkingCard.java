@@ -40,9 +40,14 @@ public class ParkingCard {
     public void setValidUntil(LocalDate validUntil) { this.validUntil = validUntil; }
     public BigDecimal getSubscriptionFee() { return subscriptionFee == null ? BigDecimal.ZERO : subscriptionFee; }
     public void setSubscriptionFee(BigDecimal subscriptionFee) { this.subscriptionFee = subscriptionFee; }
+    public boolean isValidOn(LocalDate date) {
+        return status == CardStatus.ACTIVE
+            && (validFrom == null || !date.isBefore(validFrom))
+            && (validUntil == null || !date.isAfter(validUntil));
+    }
     public boolean isMonthlyValid(LocalDate date) {
-        return getPassType() == PassType.MONTHLY && status == CardStatus.ACTIVE
+        return getPassType() == PassType.MONTHLY
             && validFrom != null && validUntil != null
-            && !date.isBefore(validFrom) && !date.isAfter(validUntil);
+            && isValidOn(date);
     }
 }
