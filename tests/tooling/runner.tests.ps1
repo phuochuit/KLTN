@@ -144,6 +144,20 @@ Check 'Native build directories are allowed by workspace guard' {
     }
     Assert (@(Get-ParkingWorkspaceFindings $fixture).Count -eq 0)
 }
+Check 'Laragon launcher targets local MySQL and reuses the secured Web launcher' {
+    $allLaragon = Get-Content (Join-Path $root 'run-all-laragon.ps1') -Raw
+    $webLaragon = Get-Content (Join-Path $root 'run-web-laragon.ps1') -Raw
+    $web = Get-Content (Join-Path $root 'run-web.ps1') -Raw
+    Assert ($allLaragon -match "run-web-laragon\.ps1")
+    Assert ($webLaragon -match "PARKING_DB_MODE\s*=\s*'laragon'")
+    Assert ($webLaragon -match '127\.0\.0\.1:3306/parking_anpr')
+    Assert ($webLaragon -match 'PARKING_LARAGON_PASSWORD')
+    Assert ($webLaragon -match 'Read-Host.*-AsSecureString')
+    Assert ($webLaragon -match 'PARKING_LARAGON_ALLOW_EMPTY_PASSWORD')
+    Assert ($webLaragon -match "run-web\.ps1")
+    Assert ($web.Contains('if (-not $isLaragon -and (Test-Path $localEnvironment))'))
+    Assert ($web -match 'Laragon mode only accepts MySQL')
+}
 if ($ReportPath) {
     $items = ($cases | ForEach-Object { '<testcase name="' + [System.Security.SecurityElement]::Escape($_) + '" />' }) -join ''
     "<testsuite tests=`"$($cases.Count)`" failures=`"0`" errors=`"0`" skipped=`"0`">$items</testsuite>" | Set-Content -LiteralPath $ReportPath -Encoding UTF8

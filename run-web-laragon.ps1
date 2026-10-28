@@ -1,34 +1,28 @@
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
-$localMaven = Join-Path $workspace 'tools\apache-maven-3.9.11\bin\mvn.cmd'
-$maven = if (Test-Path $localMaven) { $localMaven } else { 'mvn' }
 
-if (Test-Path 'C:\Program Files\Java\jdk-21.0.12') {
-    $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21.0.12'
-    $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
-}
-
-# Kiem tra va giai phong port 8080
-try {
-    $health = Invoke-RestMethod -Uri 'http://localhost:8080/api/parking/health' -TimeoutSec 2
-    if ($health.status -eq 'UP') {
-        if ($health.service -ne 'parking-web') { throw 'Cong 8080 dang do ung dung khac su dung.' }
-        $connection = Get-NetTCPConnection -LocalPort 8080 -State Listen | Select-Object -First 1
-        Stop-Process -Id $connection.OwningProcess -Force
-        Start-Sleep -Seconds 2
+# Laragon la duong du phong local, tach khoi .env.local cua Aiven. Co the override
+# bang PARKING_LARAGON_* ma khong phai sua hoac commit credential vao repository.
+$env:PARKING_DB_MODE = 'laragon'
+$env:PARKING_DB_URL = if ([string]::IsNullOrWhiteSpace($env:PARKING_LARAGON_URL)) {
+    'jdbc:mysql://127.0.0.1:3306/parking_anpr?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Ho_Chi_Minh&useSSL=false&allowPublicKeyRetrieval=true'
+} else { $env:PARKING_LARAGON_URL }
+$env:PARKING_DB_USERNAME = if ([string]::IsNullOrWhiteSpace($env:PARKING_LARAGON_USERNAME)) {
+    'root'
+} else { $env:PARKING_LARAGON_USERNAME }
+if ($null -ne $env:PARKING_LARAGON_PASSWORD) {
+    $env:PARKING_DB_PASSWORD = $env:PARKING_LARAGON_PASSWORD
+} elseif ($env:PARKING_LARAGON_ALLOW_EMPTY_PASSWORD -eq 'true') {
+    $env:PARKING_DB_PASSWORD = ''
+} else {
+    $securePassword = Read-Host "Nhap mat khau MySQL Laragon cho user $env:PARKING_DB_USERNAME" -AsSecureString
+    $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+    try {
+        $env:PARKING_DB_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
     }
-} catch {
-    if ($_.Exception.Message -like 'Cong 8080*') { throw }
 }
 
-$occupied = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
-if ($occupied) { throw 'Cong 8080 dang duoc ung dung khac su dung.' }
-
-Write-Host 'Database: MySQL Aiven Cloud' -ForegroundColor Cyan
-Write-Host 'Parking Web: http://localhost:8080' -ForegroundColor Green
-Push-Location (Join-Path $workspace 'spring-web')
-try { 
-    & $maven spring-boot:run 
-} finally {
-    Pop-Location
-}
+& (Join-Path $workspace 'run-web.ps1')
+exit $LASTEXITCODE

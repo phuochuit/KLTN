@@ -56,9 +56,9 @@ Hoặc chạy trong ba terminal PowerShell tại `D:\Code\KhoaLuan`:
 .\run-desktop.ps1
 ```
 
-### Cấu hình Aiven
+### Cấu hình database
 
-Aiven `parking_anpr` là database chính cho cả `run-all.cmd`, `run-web.cmd` và launcher tương thích tên cũ `run-all-laragon.cmd`. Launcher tên cũ không kết nối MySQL local.
+Aiven `parking_anpr` là database chính cho `run-all.cmd` và `run-web.cmd`.
 
 Sao chép `.env.local.example` thành `.env.local`, sau đó điền ba giá trị:
 
@@ -69,6 +69,13 @@ PARKING_DB_PASSWORD=<password>
 ```
 
 `.env.local` bị Git ignore. Biến môi trường hệ thống cùng tên được ưu tiên hơn file local. Không lưu credential trong `application.properties`.
+
+Đường dự phòng `run-all-laragon.cmd` / `run-web-laragon.cmd` dùng MySQL local tại
+`127.0.0.1:3306/parking_anpr`, mặc định user `root`. Launcher tự tạo database nếu tài
+khoản có quyền và không đọc `.env.local` của Aiven. Nếu chưa đặt
+`PARKING_LARAGON_PASSWORD`, launcher yêu cầu nhập mật khẩu ẩn; máy thật sự dùng mật
+khẩu rỗng phải đặt `PARKING_LARAGON_ALLOW_EMPTY_PASSWORD=true`. Có thể đổi URL/user
+bằng `PARKING_LARAGON_URL`, `PARKING_LARAGON_USERNAME`; không ghi mật khẩu vào repo.
 
 Launcher tự tạo service token nội bộ 256-bit bị Git ignore để Spring gọi FastAPI. Có thể ghi đè bằng `PARKING_INTERNAL_SERVICE_TOKEN` trong môi trường triển khai. Chi tiết tại [Vận hành bảo mật Giai đoạn 3](docs/operations/security-phase3.md).
 

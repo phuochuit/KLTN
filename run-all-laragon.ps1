@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
-Write-Host 'Luu y: launcher ten Laragon duoc giu de tuong thich, nhung database chinh van la Aiven parking_anpr.' -ForegroundColor Yellow
+Write-Host 'Che do du phong: MySQL Laragon local 127.0.0.1:3306/parking_anpr.' -ForegroundColor Yellow
 
 $web = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($web) {
@@ -12,7 +12,7 @@ if ($web) {
 
 Start-Process -FilePath 'powershell.exe' -ArgumentList @(
     '-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-    '-File', (Join-Path $workspace 'run-web.ps1')
+    '-File', (Join-Path $workspace 'run-web-laragon.ps1')
 ) -WorkingDirectory $workspace
 
 $ready = $false

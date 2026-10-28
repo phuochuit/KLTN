@@ -85,7 +85,7 @@ Lưu ý:
 
 Sao chép `.env.local.example` thành `.env.local` và điền `PARKING_DB_URL`, `PARKING_DB_USERNAME`, `PARKING_DB_PASSWORD`. File `.env.local` bị Git ignore; không đưa credential vào `application.properties`, log hoặc tài liệu.
 
-`run-all.cmd`, `run-web.cmd` và launcher tương thích `run-all-laragon.cmd` đều dùng Aiven `parking_anpr`. Biến môi trường hệ thống được ưu tiên hơn `.env.local`.
+`run-all.cmd` và `run-web.cmd` dùng Aiven `parking_anpr`; biến môi trường hệ thống được ưu tiên hơn `.env.local`. `run-all-laragon.cmd` là đường dự phòng riêng cho MySQL local `127.0.0.1:3306/parking_anpr`, không đọc `.env.local` Aiven và nhận override qua `PARKING_LARAGON_URL`, `PARKING_LARAGON_USERNAME`, `PARKING_LARAGON_PASSWORD`. Khi thiếu password, launcher yêu cầu nhập kín thay vì đọc credential cloud.
 
 ## 5. Chạy lại
 

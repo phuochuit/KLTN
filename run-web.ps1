@@ -2,11 +2,12 @@ $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
 $localMaven = Join-Path $workspace 'tools\apache-maven-3.9.11\bin\mvn.cmd'
 $maven = if (Test-Path $localMaven) { $localMaven } else { 'mvn' }
+$isLaragon = $env:PARKING_DB_MODE -eq 'laragon'
 
 # Aiven is the primary database. Existing process environment takes precedence;
 # .env.local is only a developer-machine fallback and is excluded from Git.
 $localEnvironment = Join-Path $workspace '.env.local'
-if (Test-Path $localEnvironment) {
+if (-not $isLaragon -and (Test-Path $localEnvironment)) {
     foreach ($line in Get-Content $localEnvironment) {
         $trimmed = $line.Trim()
         if (-not $trimmed -or $trimmed.StartsWith('#')) { continue }
@@ -19,13 +20,19 @@ if (Test-Path $localEnvironment) {
         }
     }
 }
-foreach ($required in @('PARKING_DB_URL', 'PARKING_DB_USERNAME', 'PARKING_DB_PASSWORD')) {
+foreach ($required in @('PARKING_DB_URL', 'PARKING_DB_USERNAME')) {
     if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($required, 'Process'))) {
-        throw "Missing Aiven setting $required. Configure it in the environment or .env.local."
+        throw "Missing database setting $required. Configure it in the environment or .env.local."
     }
 }
+if (-not $isLaragon -and [string]::IsNullOrWhiteSpace($env:PARKING_DB_PASSWORD)) {
+    throw 'Missing Aiven setting PARKING_DB_PASSWORD. Configure it in the environment or .env.local.'
+}
 if ($env:PARKING_DB_URL -notmatch '/parking_anpr(?:\?|$)') {
-    throw 'PARKING_DB_URL must target the primary Aiven database parking_anpr.'
+    throw 'PARKING_DB_URL must target the parking_anpr database.'
+}
+if ($isLaragon -and $env:PARKING_DB_URL -notmatch '^jdbc:mysql://(?:127\.0\.0\.1|localhost):3306/') {
+    throw 'Laragon mode only accepts MySQL on 127.0.0.1:3306 or localhost:3306.'
 }
 
 . (Join-Path $workspace 'scripts\security\ensure-internal-service-token.ps1')
@@ -88,4 +95,9 @@ if ($occupied) {
 }
 
 Push-Location (Join-Path $workspace 'spring-web')
-try { & $maven spring-boot:run } finally { Pop-Location }
+try {
+    $databaseLabel = if ($isLaragon) { 'MySQL Laragon local' } else { 'MySQL Aiven Cloud' }
+    Write-Host "Database: $databaseLabel" -ForegroundColor Cyan
+    Write-Host 'Parking Web: http://localhost:8080' -ForegroundColor Green
+    & $maven spring-boot:run
+} finally { Pop-Location }
