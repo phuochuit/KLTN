@@ -68,6 +68,14 @@ public class ParkingService {
         }
 
         Vehicle vehicle = vehicles.findByPlateNumberIgnoreCase(plate).orElse(null);
+        boolean guestEntryFaceAvailable = request.realtimeFaceImageBase64() != null
+            && !request.realtimeFaceImageBase64().isBlank();
+        guestEntryFaceAvailable = guestEntryFaceAvailable
+            || (!trusted.legacy() && trusted.faceEvidence() != null);
+        if (vehicle == null && !guestEntryFaceAvailable && !override.requested()) {
+            throw new IllegalStateException(
+                "Khách vãng lai phải chụp ảnh khuôn mặt khi xe vào");
+        }
         FamilyMember driver = verifyDriver(vehicle, familyMemberId, faceVerified,
             faceSimilarity, override.requested());
         ParkingCard card = cards.findByCardCodeIgnoreCase(plate).orElse(null);
@@ -492,8 +500,11 @@ public class ParkingService {
     private FamilyMember verifyExitPerson(ParkingSession session, Long memberId,
             boolean faceVerified, Double faceSimilarity, boolean manualOverride) {
         if (session.getVehicle() == null) {
-            if (session.getEntryFaceImagePath() != null && !session.getEntryFaceImagePath().isBlank()
-                    && !faceVerified && !manualOverride)
+            if ((session.getEntryFaceImagePath() == null || session.getEntryFaceImagePath().isBlank())
+                    && !manualOverride)
+                throw new IllegalStateException(
+                    "Lượt khách vãng lai thiếu ảnh khuôn mặt lúc vào; cần xử lý thủ công");
+            if (!faceVerified && !manualOverride)
                 throw new IllegalStateException(
                     "Khách vãng lai phải xác thực khuôn mặt ra với ảnh đã chụp lúc vào");
             return null;

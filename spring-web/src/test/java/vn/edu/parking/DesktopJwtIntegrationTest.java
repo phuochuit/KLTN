@@ -211,9 +211,19 @@ class DesktopJwtIntegrationTest {
                 .header("X-Request-ID", requestId))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         String evidenceId = objectMapper.readTree(recognition).get("evidenceId").asText();
+        var account = accounts.findByUsername("gate-01").orElseThrow();
+        var desktopSession = sessions.findAll().stream().findFirst().orElseThrow();
+        Instant now = Instant.now();
+        var face = new GateEvidence(UUID.randomUUID().toString(), EvidenceType.FACE,
+            EvidenceOperation.ENTRY, EvidenceSourceKind.IMAGE, account, desktopSession,
+            "face-guest-entry-test", "integration-face", "b".repeat(64), now,
+            now.plusSeconds(600));
+        face.setFaceResult("upstream-face", null, "CAPTURED", null, 0.36, 0.30);
+        face.markReady();
+        face = evidences.save(face);
         String body = objectMapper.writeValueAsString(java.util.Map.of(
             "plateNumber", "CLIENT-CANNOT-OVERRIDE", "vehicleType", "CAR",
-            "vehicleEvidenceId", evidenceId));
+            "vehicleEvidenceId", evidenceId, "faceEvidenceId", face.getId()));
 
         mvc.perform(post("/api/parking/entry")
                 .header("Authorization", "Bearer " + tokens.accessToken())
@@ -227,6 +237,8 @@ class DesktopJwtIntegrationTest {
                 .contentType("application/json").content(body))
             .andExpect(status().isBadRequest());
         assert evidences.findById(evidenceId).orElseThrow().getStatus()
+            == vn.edu.parking.domain.EvidenceStatus.CONSUMED;
+        assert evidences.findById(face.getId()).orElseThrow().getStatus()
             == vn.edu.parking.domain.EvidenceStatus.CONSUMED;
     }
 

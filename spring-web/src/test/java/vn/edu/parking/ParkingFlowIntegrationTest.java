@@ -216,9 +216,10 @@ class ParkingFlowIntegrationTest {
 
     @Test
     void entryPersistsPriceSnapshotAndIgnoresLaterPriceChanges() throws Exception {
-        String body = """
-            {"plateNumber":"88A765432","cardCode":"88A765432","vehicleType":"CAR","manualOverride":false}
-            """;
+        String onePixelPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+        String body = "{\"plateNumber\":\"88A765432\",\"cardCode\":\"88A765432\","
+            + "\"vehicleType\":\"CAR\",\"manualOverride\":false,\"faceVerified\":true,"
+            + "\"realtimeFaceImageBase64\":\"" + onePixelPng + "\"}";
         PricingRule carPrice = prices.findByVehicleType(VehicleType.CAR).orElseThrow();
         BigDecimal originalBase = carPrice.getBasePrice();
 
@@ -260,9 +261,10 @@ class ParkingFlowIntegrationTest {
         monthly.setValidUntil(LocalDate.now().plusDays(30));
         cards.save(monthly);
 
-        String body = """
-            {"plateNumber":"77A888888","cardCode":"30A999999","vehicleType":"MOTORBIKE","manualOverride":false}
-            """;
+        String onePixelPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+        String body = "{\"plateNumber\":\"77A888888\",\"cardCode\":\"30A999999\","
+            + "\"vehicleType\":\"MOTORBIKE\",\"manualOverride\":false,"
+            + "\"realtimeFaceImageBase64\":\"" + onePixelPng + "\"}";
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.plateNumber", is("77A888888")))
@@ -292,6 +294,19 @@ class ParkingFlowIntegrationTest {
             .andExpect(status().isBadRequest());
         mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(exitWithFace))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status", is("COMPLETED")));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
+    void rejectsGuestEntryWithoutFaceCapture() throws Exception {
+        String entry = """
+            {"plateNumber":"77A654321","vehicleType":"MOTORBIKE","manualOverride":false}
+            """;
+
+        mvc.perform(post("/api/parking/entry").contentType("application/json").content(entry))
+            .andExpect(status().isBadRequest());
+        assertThat(parkingSessions.existsByEntryPlateIgnoreCaseAndStatus(
+            "77A654321", SessionStatus.OPEN)).isFalse();
     }
 
     @Test
