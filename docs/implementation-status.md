@@ -14,7 +14,32 @@
 | **Not verified** | Chưa đủ assertions/runtime/source authority; không tự kết luận không có implementation |
 | **Known discrepancy** | Nguồn/claim khác actual observation hoặc variants xung đột; cần quyết định/kiểm chứng |
 
-## Cập nhật 2026-10-26 — main `eb471d7`
+## Cập nhật 2026-10-28 — `feat/pre-report-completion` tại `689901e`
+
+Đây là trạng thái mới nhất sau khi chạy lại toàn bộ bốn suite. Kết quả ngày 28/10/2026:
+Spring **163/163** (`20261028T082253Z-spring-eac9218b`), Desktop **12/12**
+(`20261028T082356Z-desktop-6e88ec5c`), ANPR **38/38**
+(`20261028T082405Z-anpr-d78ec8ad`) và tooling **31/31**
+(`20261028T083101Z-tooling-24206ab6`). Tất cả đều pass. Kết quả H2/fake này không thay
+thế kiểm thử MySQL thật, camera/phần cứng hoặc nghiệm thu production. Runner `-Suite all`
+đã được sửa để bao gồm cả tooling thay vì chỉ ba application suite.
+
+| Phạm vi | Trạng thái đã xác minh bằng code/test | Giới hạn còn lại |
+| --- | --- | --- |
+| NV02 gói/giá | Chỉ DAILY/MONTHLY cho đăng ký mới; giá, block giờ và quyền gói được snapshot lúc entry; thay giá hoặc khóa/hết hạn card sau entry không đổi lượt OPEN | Refund/debt/payment provider thật chưa có |
+| NV03 xe vào | `open_plate` unique bảo đảm một lượt OPEN/biển số; idempotency reserve có test hai thread; migration phase 9 đã có | Chưa chạy concurrency trên MySQL test riêng; barrier/camera thật chưa nghiệm thu |
+| NV04 xe ra | Cư dân bắt buộc chọn thành viên active được quyền sử dụng xe và face match; confirm lưu `exitMember`; thiếu người, sai quyền hoặc face mismatch đều fail-closed | Manual override vẫn phụ thuộc JWT Desktop, ca trực, evidence và audit; chưa nghiệm thu camera thật |
+| NV05 khách | Bắt buộc ảnh realtime/face evidence lúc vào và đối chiếu lúc ra; phiên legacy thiếu ảnh phải manual override; replay evidence bị từ chối | Liveness/deepfake và lost-card quy trình hiện trường chưa nghiệm thu |
+| NV07 phục hồi | UUID + payload hash + response cache; retry action lỗi; concurrent reservation chỉ một processor; unique payment/session làm lớp bảo vệ DB | Restart/process-kill và MySQL live chưa được diễn tập tự động |
+| NV08 doanh thu | Known-total test xác minh CASH 100.000 + BANK 250.000 + POS 75.000 = 425.000; reconciled vẫn thuộc doanh thu và pending còn 2 | Cutoff/refund/settlement provider và đối soát tài chính thực tế chưa có |
+
+Các commit chức năng của đợt này: `662960a` (snapshot giá/gói), `dfa707c` (người lấy xe),
+`c49b7f9` (guest face evidence), `2b93285` (concurrency) và `689901e` (known-total).
+MySQL local có service nhưng không có tài khoản/database test riêng; lần thử tạo
+`parking_anpr_test` bằng `root` không mật khẩu bị từ chối trước khi tạo DB. Không chạy test ghi
+dữ liệu lên `parking_anpr` hoặc Aiven chính.
+
+## Cập nhật lịch sử 2026-10-26 — main `eb471d7`
 
 Mục này bổ sung cho bảng `abd6183` bên dưới, không thay thế bản ghi lịch sử. Đo lại trên `main` ngày 2026-10-26:
 

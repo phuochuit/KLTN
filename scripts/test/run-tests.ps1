@@ -107,7 +107,7 @@ function Invoke-Suite([string]$Name) {
 }
 
 $exitCode = 0
-$suites = if ($Suite -eq 'all') { @('spring','desktop','anpr') } else { @($Suite) }
+$suites = if ($Suite -eq 'all') { @('spring','desktop','anpr','tooling') } else { @($Suite) }
 foreach ($name in $suites) {
     $result = Invoke-Suite $name
     if ($result -ne 0) { $exitCode = [Math]::Max($exitCode, $result) }
