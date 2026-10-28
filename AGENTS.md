@@ -103,7 +103,7 @@ cd anpr-service
 
 ## Tài khoản
 
-- **Web**: `admin` / `admin123`
+- **Web**: `admin` / `Admin@123456` (bắt buộc đổi ở lần đăng nhập đầu)
 
 ## Dữ liệu mẫu
 

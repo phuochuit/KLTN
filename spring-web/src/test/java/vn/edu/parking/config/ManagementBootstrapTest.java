@@ -20,6 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ManagementBootstrapTest {
+    private static final String DEMO_SECRET = "synthetic demo secret";
     private final SystemAccountRepository accounts = mock(SystemAccountRepository.class);
     private final SecurityRoleRepository roles = mock(SecurityRoleRepository.class);
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
@@ -30,7 +31,7 @@ class ManagementBootstrapTest {
         when(roles.findByCode("MANAGEMENT")).thenReturn(Optional.of(
             new SecurityRole("MANAGEMENT", "Quản trị viên", "QT", null, true, java.util.Set.of())));
         var bootstrap = new ManagementBootstrap(accounts, encoder, roles, " Manager ",
-            "synthetic bootstrap secret");
+            "synthetic bootstrap secret", "");
         bootstrap.run(new DefaultApplicationArguments(new String[0]));
         var saved = org.mockito.ArgumentCaptor.forClass(SystemAccount.class);
         verify(accounts).save(saved.capture());
@@ -43,26 +44,49 @@ class ManagementBootstrapTest {
     void leavesExistingManagementAccountUntouched() {
         when(accounts.findByUsername("manager")).thenReturn(Optional.of(
             new SystemAccount("manager", "existing hash", AccountRole.MANAGEMENT, false)));
-        new ManagementBootstrap(accounts, encoder, roles, "manager", "synthetic bootstrap secret")
+        new ManagementBootstrap(accounts, encoder, roles, "manager", "synthetic bootstrap secret", "")
             .run(new DefaultApplicationArguments(new String[0]));
         verify(accounts, never()).save(any());
     }
 
     @Test
     void doesNothingWhenBootstrapCredentialsAreNotConfigured() {
-        new ManagementBootstrap(accounts, encoder, roles, "", "")
+        new ManagementBootstrap(accounts, encoder, roles, "", "", "")
             .run(new DefaultApplicationArguments(new String[0]));
         verify(accounts, never()).findByUsername(any());
         verify(accounts, never()).save(any());
     }
 
     @Test
+    void seedsDemoAccountWhenDatabaseHasNoAccount() {
+        when(accounts.count()).thenReturn(0L);
+        when(roles.findByCode("MANAGEMENT")).thenReturn(Optional.of(
+            new SecurityRole("MANAGEMENT", "Quản trị viên", "QT", null, true, java.util.Set.of())));
+        new ManagementBootstrap(accounts, encoder, roles, "", "", DEMO_SECRET)
+            .run(new DefaultApplicationArguments(new String[0]));
+        var saved = org.mockito.ArgumentCaptor.forClass(SystemAccount.class);
+        verify(accounts).save(saved.capture());
+        assertEquals("admin", saved.getValue().getUsername());
+        assertEquals(AccountRole.MANAGEMENT, saved.getValue().getRole());
+        assertTrue(saved.getValue().isMustChangePassword());
+        assertTrue(encoder.matches(DEMO_SECRET, saved.getValue().getPasswordHash()));
+    }
+
+    @Test
+    void doesNotSeedDemoAccountWhenDatabaseAlreadyHasAccounts() {
+        when(accounts.count()).thenReturn(2L);
+        new ManagementBootstrap(accounts, encoder, roles, "", "", DEMO_SECRET)
+            .run(new DefaultApplicationArguments(new String[0]));
+        verify(accounts, never()).save(any());
+    }
+
+    @Test
     void rejectsIncompleteOrWeakBootstrapCredentials() {
         assertThrows(IllegalStateException.class, () ->
-            new ManagementBootstrap(accounts, encoder, roles, "manager", "")
+            new ManagementBootstrap(accounts, encoder, roles, "manager", "", "")
                 .run(new DefaultApplicationArguments(new String[0])));
         assertThrows(IllegalStateException.class, () ->
-            new ManagementBootstrap(accounts, encoder, roles, "manager", "too-short")
+            new ManagementBootstrap(accounts, encoder, roles, "manager", "too-short", "")
                 .run(new DefaultApplicationArguments(new String[0])));
     }
 }
