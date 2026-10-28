@@ -5,7 +5,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "parking_sessions")
+@Table(name = "parking_sessions", uniqueConstraints = @UniqueConstraint(
+    name = "uk_parking_sessions_open_plate", columnNames = "open_plate"))
 public class ParkingSession {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -15,6 +16,8 @@ public class ParkingSession {
     private ParkingCard parkingCard;
     @Column(nullable = false)
     private String entryPlate;
+    @Column(name = "open_plate", length = 20)
+    private String openPlate;
     private String exitPlate;
     @Column(nullable = false)
     private LocalDateTime entryTime;
@@ -64,6 +67,8 @@ public class ParkingSession {
     public void setParkingCard(ParkingCard parkingCard) { this.parkingCard = parkingCard; }
     public String getEntryPlate() { return entryPlate; }
     public void setEntryPlate(String entryPlate) { this.entryPlate = entryPlate; }
+    public String getOpenPlate() { return openPlate; }
+    public void setOpenPlate(String openPlate) { this.openPlate = openPlate; }
     public String getExitPlate() { return exitPlate; }
     public void setExitPlate(String exitPlate) { this.exitPlate = exitPlate; }
     public LocalDateTime getEntryTime() { return entryTime; }

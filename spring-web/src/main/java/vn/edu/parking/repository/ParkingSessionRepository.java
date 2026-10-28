@@ -2,7 +2,9 @@ package vn.edu.parking.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 import vn.edu.parking.domain.ParkingSession;
 import vn.edu.parking.domain.SessionStatus;
 import java.time.LocalDateTime;
@@ -11,6 +13,10 @@ import java.util.Optional;
 
 public interface ParkingSessionRepository extends JpaRepository<ParkingSession, Long> {
     Optional<ParkingSession> findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(String plate, SessionStatus status);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from ParkingSession s where upper(s.entryPlate) = upper(:plate) and s.status = :status order by s.entryTime desc")
+    List<ParkingSession> findByPlateAndStatusForUpdate(@Param("plate") String plate,
+        @Param("status") SessionStatus status);
     Optional<ParkingSession> findFirstByParkingCard_CardCodeIgnoreCaseAndStatusOrderByEntryTimeDesc(String cardCode, SessionStatus status);
     boolean existsByEntryPlateIgnoreCaseAndStatus(String plate, SessionStatus status);
     List<ParkingSession> findAllByOrderByEntryTimeDesc();

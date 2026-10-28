@@ -103,6 +103,7 @@ public class ParkingService {
 
         ParkingSession session = new ParkingSession();
         session.setEntryPlate(plate);
+        session.setOpenPlate(plate);
         session.setVehicle(vehicle);
         session.setParkingCard(card);
         session.setDetectedVehicleType(resolveVehicleType(detectedType, vehicle));
@@ -135,7 +136,7 @@ public class ParkingService {
         boolean faceVerified = trusted.legacy() ? request.faceVerified() : trusted.faceVerified();
         Double faceSimilarity = trusted.legacy() ? request.faceSimilarity() : trusted.faceSimilarity();
         Long familyMemberId = trusted.legacy() ? request.familyMemberId() : trusted.familyMemberId();
-        ParkingSession session = findOpenSession(plate, request.cardCode());
+        ParkingSession session = findOpenSession(plate, request.cardCode(), false);
         var override = manualOverrides.authorize(request.manualOverride(), EvidenceOperation.EXIT,
             request.manualOverrideReasonCode(), request.manualOverrideReasonText(), trusted);
         verifyExitPerson(session, familyMemberId, faceVerified, faceSimilarity, override.requested());
@@ -163,13 +164,14 @@ public class ParkingService {
         boolean faceVerified = trusted.legacy() ? request.faceVerified() : trusted.faceVerified();
         Double faceSimilarity = trusted.legacy() ? request.faceSimilarity() : trusted.faceSimilarity();
         Long familyMemberId = trusted.legacy() ? request.familyMemberId() : trusted.familyMemberId();
-        ParkingSession session = findOpenSession(plate, request.cardCode());
+        ParkingSession session = findOpenSession(plate, request.cardCode(), true);
         FamilyMember exitMember = verifyExitPerson(session, familyMemberId, faceVerified,
             faceSimilarity, override.requested());
         session.setExitPlate(PlateNormalizer.normalize(plate));
         session.setExitTime(LocalDateTime.now());
         session.setFee(calculateFee(session, session.getExitTime()));
         session.setStatus(SessionStatus.COMPLETED);
+        session.setOpenPlate(null);
         session.setExitFaceVerified(faceVerified);
         session.setExitFaceSimilarity(faceSimilarity);
         session.setExitMember(exitMember);
@@ -458,20 +460,26 @@ public class ParkingService {
         });
     }
 
-    private ParkingSession findOpenSession(String plate, String cardCode) {
+    private ParkingSession findOpenSession(String plate, String cardCode, boolean forUpdate) {
         String normalizedPlate = PlateNormalizer.normalize(plate);
         var byPlate = normalizedPlate.isBlank() ? java.util.Optional.<ParkingSession>empty()
-            : sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(normalizedPlate, SessionStatus.OPEN);
+            : findOpenByPlate(normalizedPlate, forUpdate);
         if (byPlate.isPresent()) return byPlate.get();
         String normalizedIdentifier = PlateNormalizer.normalize(cardCode);
         ParkingCard card = normalizedIdentifier.isBlank() ? null
             : cards.findByCardCodeIgnoreCase(normalizedIdentifier).orElse(null);
         if (card != null && card.getVehicle() != null) {
-            return sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
-                card.getVehicle().getPlateNumber(), SessionStatus.OPEN)
+            return findOpenByPlate(card.getVehicle().getPlateNumber(), forUpdate)
                 .orElseThrow(() -> new IllegalStateException("Không tìm thấy lượt xe vào đang mở"));
         }
         throw new IllegalStateException("Không tìm thấy lượt xe vào đang mở");
+    }
+
+    private java.util.Optional<ParkingSession> findOpenByPlate(String plate, boolean forUpdate) {
+        if (!forUpdate)
+            return sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+                plate, SessionStatus.OPEN);
+        return sessions.findByPlateAndStatusForUpdate(plate, SessionStatus.OPEN).stream().findFirst();
     }
 
     private FamilyMember verifyDriver(Vehicle vehicle, Long memberId, boolean faceVerified,

@@ -5,6 +5,9 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +16,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import vn.edu.parking.repository.ParkingOperationRepository;
 import vn.edu.parking.service.ParkingIdempotencyService;
+import vn.edu.parking.service.ParkingOperationReservationService;
 import vn.edu.parking.web.dto.ParkingResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @WithMockUser(username = "gate-idempotency", roles = "MANAGEMENT")
 class ParkingIdempotencyIntegrationTest {
     @Autowired ParkingIdempotencyService idempotency;
+    @Autowired ParkingOperationReservationService reservations;
     @Autowired ParkingOperationRepository operations;
 
     @BeforeEach
@@ -86,6 +91,39 @@ class ParkingIdempotencyIntegrationTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Mã thao tác không hợp lệ.");
         assertThat(actionCalls).hasValue(0);
+    }
+
+    @Test
+    void concurrentReservationAllowsOnlyOneProcessor() throws Exception {
+        String operationId = UUID.randomUUID().toString();
+        String payloadHash = "a".repeat(64);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var task = (java.util.concurrent.Callable<String>) () -> {
+                ready.countDown();
+                start.await(5, TimeUnit.SECONDS);
+                try {
+                    reservations.reserve("gate-concurrent", "EXIT_CONFIRM", operationId, payloadHash);
+                    return "RESERVED";
+                } catch (IllegalStateException ex) {
+                    return "REJECTED:" + ex.getMessage();
+                }
+            };
+            var first = executor.submit(task);
+            var second = executor.submit(task);
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            assertThat(java.util.List.of(first.get(10, TimeUnit.SECONDS),
+                    second.get(10, TimeUnit.SECONDS)))
+                .anyMatch(result -> result.equals("RESERVED"))
+                .anyMatch(result -> result.startsWith("REJECTED:"));
+            assertThat(operations.count()).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private static ParkingResponse response(long sessionId) {

@@ -23,6 +23,7 @@ import vn.edu.parking.service.ResidentImageStorage;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.io.ByteArrayOutputStream;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -33,6 +34,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.anyOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -86,7 +88,8 @@ class ParkingFlowIntegrationTest {
 
         mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(body))
             .andExpect(status().isBadRequest());
-        assertThat(parkingSessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN)).hasSize(1);
+        assertThat(parkingSessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+            "59A112345", SessionStatus.OPEN)).isPresent();
         assertThat(paymentTransactions.count()).isZero();
 
         String paidBody = "{\"plateNumber\":\"59A1-123.45\",\"cardCode\":\"59A112345\","
@@ -310,6 +313,18 @@ class ParkingFlowIntegrationTest {
     }
 
     @Test
+    void databaseRejectsTwoOpenSessionsForSamePlate() {
+        ParkingSession first = openSession("92A123456");
+        parkingSessions.saveAndFlush(first);
+
+        ParkingSession duplicate = openSession("92A123456");
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+            () -> parkingSessions.saveAndFlush(duplicate));
+        assertThat(parkingSessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+            "92A123456", SessionStatus.OPEN)).isPresent();
+    }
+
+    @Test
     @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void combinedRegistrationCreatesHouseholdMemberVehicleThenOpensPackageStep() throws Exception {
         seedCollectorAccount();
@@ -486,5 +501,15 @@ class ParkingFlowIntegrationTest {
         vehicle.setAuthorizedMembers(authorized);
         vehicles.save(vehicle);
         return member;
+    }
+
+    private ParkingSession openSession(String plate) {
+        ParkingSession session = new ParkingSession();
+        session.setEntryPlate(plate);
+        session.setOpenPlate(plate);
+        session.setEntryTime(LocalDateTime.now());
+        session.setStatus(SessionStatus.OPEN);
+        session.setDetectedVehicleType(VehicleType.CAR);
+        return session;
     }
 }
