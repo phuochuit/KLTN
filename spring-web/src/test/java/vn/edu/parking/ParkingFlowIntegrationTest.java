@@ -145,6 +145,35 @@ class ParkingFlowIntegrationTest {
     }
 
     @Test
+    void entryPersistsPriceSnapshotAndIgnoresLaterPriceChanges() throws Exception {
+        String body = """
+            {"plateNumber":"88A765432","cardCode":"88A765432","vehicleType":"CAR","manualOverride":false}
+            """;
+        PricingRule carPrice = prices.findByVehicleType(VehicleType.CAR).orElseThrow();
+        BigDecimal originalBase = carPrice.getBasePrice();
+
+        mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
+            .andExpect(status().isOk());
+        ParkingSession persisted = parkingSessions
+            .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc("88A765432", SessionStatus.OPEN)
+            .orElseThrow();
+        assertThat(persisted.getPriceBaseSnapshot()).isEqualByComparingTo(originalBase);
+        assertThat(persisted.getBaseHoursSnapshot()).isEqualTo(carPrice.getBaseHours());
+        assertThat(persisted.getPrepaidPackageApplied()).isFalse();
+
+        try {
+            carPrice.setBasePrice(BigDecimal.valueOf(999_000));
+            prices.saveAndFlush(carPrice);
+            mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fee").value(originalBase.intValue()));
+        } finally {
+            carPrice.setBasePrice(originalBase);
+            prices.saveAndFlush(carPrice);
+        }
+    }
+
+    @Test
     void ignoresForeignCardCodeAndUsesRecognizedPlateAsIdentifier() throws Exception {
         Vehicle subscribedVehicle = new Vehicle();
         subscribedVehicle.setPlateNumber("30A999999");

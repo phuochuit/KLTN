@@ -100,6 +100,8 @@ public class ParkingService {
         session.setDetectedVehicleType(resolveVehicleType(detectedType, vehicle));
         session.setEntryMember(driver);
         session.setEntryTime(LocalDateTime.now());
+        capturePricingSnapshot(session, cardMatches && card.isPrepaidPackageValid(
+            session.getEntryTime().toLocalDate()));
         session.setStatus(SessionStatus.OPEN);
         session.setEntryFaceVerified(faceVerified);
         session.setEntryFaceSimilarity(faceSimilarity);
@@ -169,7 +171,7 @@ public class ParkingService {
             slot.setCurrentSession(null);
             slots.save(slot);
         });
-        String message = session.getFee().signum() == 0 && hasValidPrepaidPackage(session)
+        String message = session.getFee().signum() == 0 && packageAppliedAtEntry(session)
             ? "Đã xác nhận xe ra; gói trả trước còn hiệu lực nên không thu thêm"
             : "Đã xác nhận xe ra; tổng thu: " + String.format("%,d", session.getFee().longValue())
                 + " đ; biên nhận " + payment.getReceiptNumber();
@@ -489,48 +491,83 @@ public class ParkingService {
     }
 
     BigDecimal calculateFee(ParkingSession session, LocalDateTime exitTime) {
-        if (hasValidPrepaidPackage(session)) return BigDecimal.ZERO;
+        if (packageAppliedAtEntry(session)) return BigDecimal.ZERO;
         VehicleType type = session.getDetectedVehicleType();
-        PricingRule rule = pricingRules.findByVehicleType(type)
-            .orElseThrow(() -> new IllegalStateException("Chưa cấu hình bảng giá cho " + type));
+        PricingTerms price = pricingTerms(session, type);
         long minutes = Math.max(1, Duration.between(session.getEntryTime(), exitTime).toMinutes());
         long midnightCount = Math.max(0,
             ChronoUnit.DAYS.between(session.getEntryTime().toLocalDate(), exitTime.toLocalDate()));
 
         if (type.isCar()) {
-            long baseMinutes = Math.max(1, rule.getBaseHours()) * 60L;
-            BigDecimal timeFee = rule.getBasePrice();
+            long baseMinutes = Math.max(1, price.baseHours()) * 60L;
+            BigDecimal timeFee = price.basePrice();
             if (minutes > baseMinutes) {
-                long blockMinutes = Math.max(1, rule.getExtraBlockHours()) * 60L;
+                long blockMinutes = Math.max(1, price.extraBlockHours()) * 60L;
                 long extraBlocks = ceilDiv(minutes - baseMinutes, blockMinutes);
-                timeFee = timeFee.add(rule.getExtraBlockPrice().multiply(BigDecimal.valueOf(extraBlocks)));
+                timeFee = timeFee.add(price.extraBlockPrice().multiply(BigDecimal.valueOf(extraBlocks)));
             }
-            BigDecimal overnightMinimum = rule.getOvernightFee().multiply(BigDecimal.valueOf(midnightCount));
+            BigDecimal overnightMinimum = price.overnightPrice().multiply(BigDecimal.valueOf(midnightCount));
             return timeFee.max(overnightMinimum);
         }
 
         if (midnightCount > 0 || minutes >= 24L * 60L) {
             long cycles = ceilDiv(minutes, 24L * 60L);
-            return rule.getOvernightFee().multiply(BigDecimal.valueOf(cycles));
+            return price.overnightPrice().multiply(BigDecimal.valueOf(cycles));
         }
         LocalTime dayStart = LocalTime.of(6, 0);
         LocalTime nightStart = LocalTime.of(18, 0);
         boolean entirelyDaytime = !session.getEntryTime().toLocalTime().isBefore(dayStart)
             && exitTime.toLocalTime().isBefore(nightStart)
             && session.getEntryTime().toLocalDate().isEqual(exitTime.toLocalDate());
-        return entirelyDaytime ? rule.getBasePrice() : rule.getNightPrice();
+        return entirelyDaytime ? price.basePrice() : price.nightPrice();
     }
 
     private static long ceilDiv(long x, long y) {
         return (x + y - 1) / y;
     }
 
-    private boolean hasValidPrepaidPackage(ParkingSession session) {
+    private boolean packageAppliedAtEntry(ParkingSession session) {
+        if (session.getPrepaidPackageApplied() != null)
+            return session.getPrepaidPackageApplied();
+        // Tương thích các lượt OPEN tạo trước khi có snapshot.
         ParkingCard card = session.getParkingCard();
         if (card == null || session.getVehicle() == null || card.getVehicle() == null) return false;
         boolean sameVehicle = card.getVehicle().getId().equals(session.getVehicle().getId());
         return sameVehicle && card.isPrepaidPackageValid(session.getEntryTime().toLocalDate());
     }
+
+    private void capturePricingSnapshot(ParkingSession session, boolean prepaidPackageApplied) {
+        PricingRule rule = pricingRules.findByVehicleType(session.getDetectedVehicleType())
+            .orElseThrow(() -> new IllegalStateException(
+                "Chưa cấu hình bảng giá cho " + session.getDetectedVehicleType()));
+        session.setPrepaidPackageApplied(prepaidPackageApplied);
+        session.setPriceBaseSnapshot(rule.getBasePrice());
+        session.setPriceNightSnapshot(rule.getNightPrice());
+        session.setPriceOvernightSnapshot(rule.getOvernightFee());
+        session.setPriceExtraBlockSnapshot(rule.getExtraBlockPrice());
+        session.setBaseHoursSnapshot(rule.getBaseHours());
+        session.setExtraBlockHoursSnapshot(rule.getExtraBlockHours());
+    }
+
+    private PricingTerms pricingTerms(ParkingSession session, VehicleType type) {
+        if (session.getPriceBaseSnapshot() != null && session.getPriceNightSnapshot() != null
+                && session.getPriceOvernightSnapshot() != null
+                && session.getPriceExtraBlockSnapshot() != null
+                && session.getBaseHoursSnapshot() != null
+                && session.getExtraBlockHoursSnapshot() != null) {
+            return new PricingTerms(session.getPriceBaseSnapshot(), session.getPriceNightSnapshot(),
+                session.getPriceOvernightSnapshot(), session.getPriceExtraBlockSnapshot(),
+                session.getBaseHoursSnapshot(), session.getExtraBlockHoursSnapshot());
+        }
+        PricingRule rule = pricingRules.findByVehicleType(type)
+            .orElseThrow(() -> new IllegalStateException("Chưa cấu hình bảng giá cho " + type));
+        return new PricingTerms(rule.getBasePrice(), rule.getNightPrice(), rule.getOvernightFee(),
+            rule.getExtraBlockPrice(), rule.getBaseHours(), rule.getExtraBlockHours());
+    }
+
+    private record PricingTerms(BigDecimal basePrice, BigDecimal nightPrice,
+            BigDecimal overnightPrice, BigDecimal extraBlockPrice,
+            int baseHours, int extraBlockHours) { }
 
     private ParkingCard resolveCard(String cardCode) {
         if (cardCode == null || cardCode.isBlank()) return null;

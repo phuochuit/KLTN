@@ -41,6 +41,20 @@ public class ParkingSession {
     private Double exitFaceSimilarity;
     @Column(length = 500)
     private String entryFaceImagePath;
+    @Column(name = "prepaid_package_applied")
+    private Boolean prepaidPackageApplied;
+    @Column(name = "price_base_snapshot", precision = 12, scale = 0)
+    private BigDecimal priceBaseSnapshot;
+    @Column(name = "price_night_snapshot", precision = 12, scale = 0)
+    private BigDecimal priceNightSnapshot;
+    @Column(name = "price_overnight_snapshot", precision = 12, scale = 0)
+    private BigDecimal priceOvernightSnapshot;
+    @Column(name = "price_extra_block_snapshot", precision = 12, scale = 0)
+    private BigDecimal priceExtraBlockSnapshot;
+    @Column(name = "base_hours_snapshot")
+    private Integer baseHoursSnapshot;
+    @Column(name = "extra_block_hours_snapshot")
+    private Integer extraBlockHoursSnapshot;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -78,4 +92,18 @@ public class ParkingSession {
     public void setExitFaceSimilarity(Double value) { this.exitFaceSimilarity = value; }
     public String getEntryFaceImagePath() { return entryFaceImagePath; }
     public void setEntryFaceImagePath(String value) { this.entryFaceImagePath = value; }
+    public Boolean getPrepaidPackageApplied() { return prepaidPackageApplied; }
+    public void setPrepaidPackageApplied(Boolean value) { this.prepaidPackageApplied = value; }
+    public BigDecimal getPriceBaseSnapshot() { return priceBaseSnapshot; }
+    public void setPriceBaseSnapshot(BigDecimal value) { this.priceBaseSnapshot = value; }
+    public BigDecimal getPriceNightSnapshot() { return priceNightSnapshot; }
+    public void setPriceNightSnapshot(BigDecimal value) { this.priceNightSnapshot = value; }
+    public BigDecimal getPriceOvernightSnapshot() { return priceOvernightSnapshot; }
+    public void setPriceOvernightSnapshot(BigDecimal value) { this.priceOvernightSnapshot = value; }
+    public BigDecimal getPriceExtraBlockSnapshot() { return priceExtraBlockSnapshot; }
+    public void setPriceExtraBlockSnapshot(BigDecimal value) { this.priceExtraBlockSnapshot = value; }
+    public Integer getBaseHoursSnapshot() { return baseHoursSnapshot; }
+    public void setBaseHoursSnapshot(Integer value) { this.baseHoursSnapshot = value; }
+    public Integer getExtraBlockHoursSnapshot() { return extraBlockHoursSnapshot; }
+    public void setExtraBlockHoursSnapshot(Integer value) { this.extraBlockHoursSnapshot = value; }
 }

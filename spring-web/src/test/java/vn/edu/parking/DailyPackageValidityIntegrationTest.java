@@ -82,6 +82,10 @@ class DailyPackageValidityIntegrationTest {
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.warning").value(false));
+        // Quyền lợi được chốt lúc vào: gia hạn/hết hạn hoặc khóa card sau đó không đổi lượt đang mở.
+        card.setValidUntil(start.minusDays(1));
+        card.setStatus(CardStatus.BLOCKED);
+        cards.saveAndFlush(card);
         mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.fee").value(0));
