@@ -3,6 +3,11 @@
 # Script chi tu sua cac viec an toan: tao .env.local tu file mau, sinh token noi bo,
 # sinh cap khoa JWT Desktop neu may co openssl. Con lai chi bao thieu, khong tu tai.
 
+param(
+    # Tuy chon: file .zip chua thu muc private-data (anh cu dan + bang chung) de giai nen san.
+    [string]$PrivateDataZip = ''
+)
+
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
@@ -211,11 +216,25 @@ if ($yoloMissing.Count -eq 0 -and $onnxMissing.Count -eq 0) {
 
 # 8. Anh bang chung
 $privateData = Join-Path $root 'spring-web\private-data'
+$privateDataOrigin = ''
+if ($PrivateDataZip -and -not (Test-Path $privateData)) {
+    $staging = Join-Path $env:TEMP ("private-data-" + [guid]::NewGuid().ToString('N'))
+    try {
+        Expand-Archive -Path $PrivateDataZip -DestinationPath $staging -Force
+        $source = if (Test-Path (Join-Path $staging 'private-data')) { Join-Path $staging 'private-data' } else { $staging }
+        Copy-Item (Join-Path $source '*') $privateData -Recurse -Force
+        $privateDataOrigin = " (giai nen tu $PrivateDataZip)"
+    } catch {
+        Add-Check 'private-data' 'LOI' "Khong giai nen duoc $PrivateDataZip : $($_.Exception.Message)"
+    } finally {
+        Remove-Item $staging -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 if (Test-Path $privateData) {
     $count = (Get-ChildItem $privateData -Recurse -File -ErrorAction SilentlyContinue).Count
-    Add-Check 'private-data' 'OK' "$count file (anh cu dan + bang chung)"
+    Add-Check 'private-data' 'OK' "$count file (anh cu dan + bang chung)$privateDataOrigin"
 } else {
-    Add-Check 'private-data' 'THIEU' 'Copy thu muc spring-web\private-data tu may dang chay (thieu thi man hinh doi chieu trong).'
+    Add-Check 'private-data' 'THIEU' 'Copy thu muc spring-web\private-data tu may dang chay, hoac chay lai voi -PrivateDataZip <file.zip>.'
 }
 
 # 9. Token noi bo (tu sinh duoc)
