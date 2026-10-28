@@ -125,10 +125,12 @@ public class ParkingService {
         String plate = requirePlate(request.manualOverride() ? request.plateNumber()
             : trusted.legacy() ? request.plateNumber() : trusted.plateNumber());
         boolean faceVerified = trusted.legacy() ? request.faceVerified() : trusted.faceVerified();
+        Double faceSimilarity = trusted.legacy() ? request.faceSimilarity() : trusted.faceSimilarity();
+        Long familyMemberId = trusted.legacy() ? request.familyMemberId() : trusted.familyMemberId();
         ParkingSession session = findOpenSession(plate, request.cardCode());
         var override = manualOverrides.authorize(request.manualOverride(), EvidenceOperation.EXIT,
             request.manualOverrideReasonCode(), request.manualOverrideReasonText(), trusted);
-        verifyGuestExit(session, faceVerified, override.requested());
+        verifyExitPerson(session, familyMemberId, faceVerified, faceSimilarity, override.requested());
         LocalDateTime exitTime = LocalDateTime.now();
         BigDecimal fee = calculateFee(session, exitTime);
         ParkingResponse r = toResponse(session, "Xem trước phí gửi xe", false);
@@ -152,14 +154,17 @@ public class ParkingService {
         String correctedType = override.requested() ? request.vehicleType() : originalType;
         boolean faceVerified = trusted.legacy() ? request.faceVerified() : trusted.faceVerified();
         Double faceSimilarity = trusted.legacy() ? request.faceSimilarity() : trusted.faceSimilarity();
+        Long familyMemberId = trusted.legacy() ? request.familyMemberId() : trusted.familyMemberId();
         ParkingSession session = findOpenSession(plate, request.cardCode());
-        verifyGuestExit(session, faceVerified, override.requested());
+        FamilyMember exitMember = verifyExitPerson(session, familyMemberId, faceVerified,
+            faceSimilarity, override.requested());
         session.setExitPlate(PlateNormalizer.normalize(plate));
         session.setExitTime(LocalDateTime.now());
         session.setFee(calculateFee(session, session.getExitTime()));
         session.setStatus(SessionStatus.COMPLETED);
         session.setExitFaceVerified(faceVerified);
         session.setExitFaceSimilarity(faceSimilarity);
+        session.setExitMember(exitMember);
         if (override.requested()) session.setManualOverride(true);
         session = sessions.save(session);
         PaymentTransaction payment = session.getFee().signum() > 0
@@ -484,10 +489,34 @@ public class ParkingService {
         return member;
     }
 
-    private void verifyGuestExit(ParkingSession session, boolean faceVerified, boolean manualOverride) {
-        if (session.getVehicle() == null && session.getEntryFaceImagePath() != null
-            && !session.getEntryFaceImagePath().isBlank() && !faceVerified && !manualOverride)
-            throw new IllegalStateException("Khách vãng lai phải xác thực khuôn mặt ra với ảnh đã chụp lúc vào");
+    private FamilyMember verifyExitPerson(ParkingSession session, Long memberId,
+            boolean faceVerified, Double faceSimilarity, boolean manualOverride) {
+        if (session.getVehicle() == null) {
+            if (session.getEntryFaceImagePath() != null && !session.getEntryFaceImagePath().isBlank()
+                    && !faceVerified && !manualOverride)
+                throw new IllegalStateException(
+                    "Khách vãng lai phải xác thực khuôn mặt ra với ảnh đã chụp lúc vào");
+            return null;
+        }
+        Vehicle vehicle = session.getVehicle();
+        if (memberId == null) {
+            if (manualOverride) return null;
+            throw new IllegalStateException("Hãy chọn người đang lấy xe");
+        }
+        FamilyMember member = members.findById(memberId)
+            .orElseThrow(() -> new IllegalStateException("Không tìm thấy người đang lấy xe"));
+        boolean authorized = member.isActive() && vehicle.getAuthorizedMembers().stream()
+            .anyMatch(item -> item.getId().equals(member.getId()));
+        if (!authorized)
+            throw new IllegalStateException("Người này không được đăng ký sử dụng xe");
+        if (member.getRegistrationFaceImagePath() == null
+                || member.getRegistrationFaceImagePath().isBlank()) {
+            if (!manualOverride)
+                throw new IllegalStateException("Người lấy xe chưa có ảnh khuôn mặt đăng ký");
+        } else if (!faceVerified && !manualOverride) {
+            throw new IllegalStateException("Khuôn mặt người lấy xe chưa khớp ảnh đăng ký");
+        }
+        return member;
     }
 
     BigDecimal calculateFee(ParkingSession session, LocalDateTime exitTime) {

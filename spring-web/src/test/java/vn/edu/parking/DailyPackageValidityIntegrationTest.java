@@ -13,11 +13,16 @@ import vn.edu.parking.domain.ParkingCard;
 import vn.edu.parking.domain.PassType;
 import vn.edu.parking.domain.AccountRole;
 import vn.edu.parking.domain.SystemAccount;
+import vn.edu.parking.domain.FamilyMember;
+import vn.edu.parking.domain.Household;
 import vn.edu.parking.domain.Vehicle;
 import vn.edu.parking.domain.VehicleType;
 import vn.edu.parking.repository.ParkingCardRepository;
 import vn.edu.parking.repository.PaymentTransactionRepository;
 import vn.edu.parking.repository.SystemAccountRepository;
+import vn.edu.parking.repository.FamilyMemberRepository;
+import vn.edu.parking.repository.HouseholdRepository;
+import java.util.Set;
 import vn.edu.parking.repository.VehicleRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +43,8 @@ class DailyPackageValidityIntegrationTest {
     @Autowired ParkingCardRepository cards;
     @Autowired PaymentTransactionRepository paymentTransactions;
     @Autowired SystemAccountRepository systemAccounts;
+    @Autowired FamilyMemberRepository members;
+    @Autowired HouseholdRepository households;
 
     @Test
     @WithMockUser(username = "admin", roles = "MANAGEMENT")
@@ -76,9 +83,10 @@ class DailyPackageValidityIntegrationTest {
             .andExpect(jsonPath("$.passType").value("DAILY"))
             .andExpect(jsonPath("$.packageValid").value(true));
 
-        String body = """
-            {"plateNumber":"60A123450","cardCode":"60A123450","vehicleType":"CAR","manualOverride":false}
-            """;
+        long memberId = vehicle.getRegisteredOwner().getId();
+        String body = "{\"plateNumber\":\"60A123450\",\"cardCode\":\"60A123450\","
+            + "\"vehicleType\":\"CAR\",\"manualOverride\":false,\"familyMemberId\":"
+            + memberId + ",\"faceVerified\":true}";
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.warning").value(false));
@@ -103,9 +111,9 @@ class DailyPackageValidityIntegrationTest {
         card.setValidUntil(LocalDate.now().minusDays(1));
         cards.save(card);
 
-        String body = """
-            {"plateNumber":"60A123451","cardCode":"60A123451","vehicleType":"CAR","manualOverride":false}
-            """;
+        String body = "{\"plateNumber\":\"60A123451\",\"cardCode\":\"60A123451\","
+            + "\"vehicleType\":\"CAR\",\"manualOverride\":false,\"familyMemberId\":"
+            + vehicle.getRegisteredOwner().getId() + ",\"faceVerified\":true}";
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.warning").value(true))
@@ -113,10 +121,24 @@ class DailyPackageValidityIntegrationTest {
     }
 
     private Vehicle vehicle(String plate, String owner) {
+        Household household = new Household();
+        household.setHouseholdCode("HH-" + plate);
+        household.setApartmentNumber("TEST-" + plate);
+        household = households.save(household);
+        FamilyMember member = new FamilyMember();
+        member.setHousehold(household);
+        member.setFullName(owner);
+        member.setCitizenId("CID-" + plate);
+        member.setRegistrationFaceImagePath("resident:test-" + plate + ".jpg");
+        member.setActive(true);
+        member = members.save(member);
         Vehicle vehicle = new Vehicle();
         vehicle.setPlateNumber(plate);
         vehicle.setOwnerName(owner);
         vehicle.setVehicleType(VehicleType.CAR);
+        vehicle.setHousehold(household);
+        vehicle.setRegisteredOwner(member);
+        vehicle.setAuthorizedMembers(Set.of(member));
         return vehicles.save(vehicle);
     }
 
