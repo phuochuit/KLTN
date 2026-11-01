@@ -12,6 +12,10 @@ public static class ApiResponseReader
         if (!response.IsSuccessStatusCode)
         {
             string message = BuildHttpError(response.StatusCode, body, serviceName, action);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+                throw new DesktopAuthenticationException(message);
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+                throw new DesktopAuthorizationException(message);
             if (TransientServerException.IsTransient(response.StatusCode))
                 throw new TransientServerException(response.StatusCode, message);
             throw new InvalidOperationException(message);
@@ -62,7 +66,8 @@ public static class ApiResponseReader
         string reason = status switch
         {
             HttpStatusCode.BadRequest => detail.Length > 0 ? detail : "Thông tin gửi lên chưa hợp lệ.",
-            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "Không có quyền truy cập API hoặc phiên đăng nhập đã hết hạn.",
+            HttpStatusCode.Unauthorized => detail.Length > 0 ? detail : "Phiên làm việc đã hết hạn hoặc chưa đăng nhập.",
+            HttpStatusCode.Forbidden => detail.Length > 0 ? detail : "Tài khoản không có quyền thực hiện thao tác này.",
             HttpStatusCode.NotFound => "Không tìm thấy chức năng API. Có thể đang chạy phiên bản chương trình cũ.",
             HttpStatusCode.UnprocessableEntity => detail.Length > 0 ? detail : "Ảnh hoặc dữ liệu không đạt yêu cầu xử lý.",
             HttpStatusCode.InternalServerError => "Máy chủ gặp lỗi khi xử lý dữ liệu.",

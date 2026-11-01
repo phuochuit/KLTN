@@ -25,6 +25,9 @@ public class ParkingSession {
     @Enumerated(EnumType.STRING)
     @Column(length = 50, columnDefinition = "varchar(50)")
     private VehicleType detectedVehicleType = VehicleType.MOTORBIKE;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "detected_vehicle_type_id")
+    private VehicleTypeEntity detectedVehicleTypeRef;
     @Column(nullable = false, precision = 12, scale = 0)
     private BigDecimal fee = BigDecimal.ZERO;
     @Column(nullable = false, columnDefinition = "boolean default false")
@@ -60,6 +63,8 @@ public class ParkingSession {
     public void setStatus(SessionStatus status) { this.status = status; }
     public VehicleType getDetectedVehicleType() { return detectedVehicleType == null ? VehicleType.MOTORBIKE : detectedVehicleType; }
     public void setDetectedVehicleType(VehicleType detectedVehicleType) { this.detectedVehicleType = detectedVehicleType; }
+    public VehicleTypeEntity getDetectedVehicleTypeRef() { return detectedVehicleTypeRef; }
+    public void setDetectedVehicleTypeRef(VehicleTypeEntity detectedVehicleTypeRef) { this.detectedVehicleTypeRef = detectedVehicleTypeRef; }
     public BigDecimal getFee() { return fee; }
     public void setFee(BigDecimal fee) { this.fee = fee; }
     public boolean isManualOverride() { return manualOverride; }

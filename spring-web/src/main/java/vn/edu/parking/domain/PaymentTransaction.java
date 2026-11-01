@@ -64,7 +64,7 @@ public class PaymentTransaction {
     @Column(name = "reconciliation_note", length = 500)
     private String reconciliationNote;
 
-    protected PaymentTransaction() { }
+    public PaymentTransaction() { }
 
     public PaymentTransaction(String receiptNumber, PaymentType paymentType, PaymentMethod paymentMethod,
             BigDecimal amount, String externalReference, ParkingSession parkingSession,
@@ -83,6 +83,37 @@ public class PaymentTransaction {
         this.paidAt = paidAt;
     }
 
+    public static PaymentTransaction createPending(String receiptNumber, PaymentType paymentType,
+            PaymentMethod paymentMethod, BigDecimal amount, ParkingSession parkingSession,
+            SystemAccount collectedBy, GateShiftAssignment gateShiftAssignment, Instant createdAt) {
+        PaymentTransaction pt = new PaymentTransaction();
+        pt.receiptNumber = receiptNumber;
+        pt.paymentType = paymentType;
+        pt.paymentMethod = paymentMethod != null ? paymentMethod : PaymentMethod.CASH;
+        pt.status = PaymentStatus.PENDING;
+        pt.amount = amount;
+        pt.parkingSession = parkingSession;
+        pt.collectedBy = collectedBy;
+        pt.gateShiftAssignment = gateShiftAssignment;
+        pt.paidAt = createdAt;
+        return pt;
+    }
+
+    public void confirmPayment(PaymentMethod method, BigDecimal finalAmount, String reference,
+                               SystemAccount collector, GateShiftAssignment shift, Instant paidAt) {
+        this.status = PaymentStatus.PAID;
+        this.paymentMethod = method;
+        this.amount = finalAmount;
+        this.externalReference = reference;
+        if (collector != null) this.collectedBy = collector;
+        if (shift != null) this.gateShiftAssignment = shift;
+        if (paidAt != null) this.paidAt = paidAt;
+    }
+
+    public void updateAmount(BigDecimal newAmount) {
+        this.amount = newAmount;
+    }
+
     public void reconcile(SystemAccount account, Instant at, String note) {
         status = PaymentStatus.RECONCILED;
         reconciledBy = account;
@@ -95,6 +126,7 @@ public class PaymentTransaction {
     public PaymentType getPaymentType() { return paymentType; }
     public PaymentMethod getPaymentMethod() { return paymentMethod; }
     public PaymentStatus getStatus() { return status; }
+    public void setStatus(PaymentStatus status) { this.status = status; }
     public BigDecimal getAmount() { return amount; }
     public String getExternalReference() { return externalReference; }
     public ParkingSession getParkingSession() { return parkingSession; }

@@ -1,5 +1,6 @@
 package vn.edu.parking.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.parking.domain.*;
@@ -26,14 +27,32 @@ public class ParkingService {
     private final GateEvidenceConsumptionService evidenceConsumption;
     private final ManualOverrideService manualOverrides;
     private final PaymentTransactionService paymentTransactions;
+    private final ParkingFloorRepository parkingFloors;
+    private final ParkingZoneRepository parkingZones;
+    private final VehicleTypeRepository vehicleTypes;
 
     public ParkingService(VehicleRepository vehicles, ParkingCardRepository cards,
                           ParkingSessionRepository sessions, PricingRuleRepository pricingRules,
-                           FamilyMemberRepository members, ParkingSlotRepository slots,
-                             ResidentImageStorage imageStorage,
-                             GateEvidenceConsumptionService evidenceConsumption,
-                             ManualOverrideService manualOverrides,
-                             PaymentTransactionService paymentTransactions) {
+                          FamilyMemberRepository members, ParkingSlotRepository slots,
+                          ResidentImageStorage imageStorage,
+                          GateEvidenceConsumptionService evidenceConsumption,
+                          ManualOverrideService manualOverrides,
+                          PaymentTransactionService paymentTransactions) {
+        this(vehicles, cards, sessions, pricingRules, members, slots, imageStorage,
+             evidenceConsumption, manualOverrides, paymentTransactions, null, null, null);
+    }
+
+    @Autowired
+    public ParkingService(VehicleRepository vehicles, ParkingCardRepository cards,
+                          ParkingSessionRepository sessions, PricingRuleRepository pricingRules,
+                          FamilyMemberRepository members, ParkingSlotRepository slots,
+                          ResidentImageStorage imageStorage,
+                          GateEvidenceConsumptionService evidenceConsumption,
+                          ManualOverrideService manualOverrides,
+                          PaymentTransactionService paymentTransactions,
+                          ParkingFloorRepository parkingFloors,
+                          ParkingZoneRepository parkingZones,
+                          VehicleTypeRepository vehicleTypes) {
         this.vehicles = vehicles;
         this.cards = cards;
         this.sessions = sessions;
@@ -44,6 +63,9 @@ public class ParkingService {
         this.evidenceConsumption = evidenceConsumption;
         this.manualOverrides = manualOverrides;
         this.paymentTransactions = paymentTransactions;
+        this.parkingFloors = parkingFloors;
+        this.parkingZones = parkingZones;
+        this.vehicleTypes = vehicleTypes;
     }
 
     @Transactional
@@ -71,7 +93,6 @@ public class ParkingService {
         FamilyMember driver = verifyDriver(vehicle, familyMemberId, faceVerified,
             faceSimilarity, override.requested());
         ParkingCard card = cards.findByCardCodeIgnoreCase(plate).orElse(null);
-        VehicleType cameraType = parseDetectedType(detectedType);
         boolean warning = false;
         String message;
 
@@ -98,6 +119,7 @@ public class ParkingService {
         session.setVehicle(vehicle);
         session.setParkingCard(card);
         session.setDetectedVehicleType(resolveVehicleType(detectedType, vehicle));
+        session.setDetectedVehicleTypeRef(resolveVehicleTypeRef(detectedType, vehicle));
         session.setEntryMember(driver);
         session.setEntryTime(LocalDateTime.now());
         session.setStatus(SessionStatus.OPEN);
@@ -131,7 +153,8 @@ public class ParkingService {
         BigDecimal fee = calculateFee(session, exitTime);
         ParkingResponse r = toResponse(session, "Xem trước phí gửi xe", false);
         return new ParkingResponse(r.sessionId(), r.plateNumber(), r.ownerName(), r.vehicleType(),
-            r.cardCode(), "PREVIEW", r.entryTime(), exitTime, fee, "Xem trước phí gửi xe", false);
+            r.cardCode(), "PREVIEW", r.entryTime(), exitTime, fee, "Xem trước phí gửi xe", false,
+            null, null, null);
     }
 
     @Transactional
@@ -160,22 +183,28 @@ public class ParkingService {
         session.setExitFaceSimilarity(faceSimilarity);
         if (override.requested()) session.setManualOverride(true);
         session = sessions.save(session);
+
         PaymentTransaction payment = session.getFee().signum() > 0
             ? paymentTransactions.recordParkingExit(session, request.paymentMethod(), request.paymentReference())
             : null;
+
         evidenceConsumption.consume(trusted, session);
         manualOverrides.recordApproved(override, session, originalPlate, plate, originalType, correctedType);
         slots.findFirstByCurrentSessionId(session.getId()).ifPresent(slot -> {
             slot.setCurrentSession(null);
             slots.save(slot);
         });
-        String message = session.getFee().signum() == 0 && hasValidPrepaidPackage(session)
-            ? "Đã xác nhận xe ra; gói trả trước còn hiệu lực nên không thu thêm"
+
+        String message = (payment == null)
+            ? (hasValidPrepaidPackage(session)
+                ? "Đã xác nhận xe ra; gói trả trước còn hiệu lực nên không thu thêm"
+                : "Đã xác nhận xe ra; không thu phí.")
             : "Đã xác nhận xe ra; tổng thu: " + String.format("%,d", session.getFee().longValue())
                 + " đ; biên nhận " + payment.getReceiptNumber();
+
         return toResponse(session, message, false,
             payment == null ? null : payment.getReceiptNumber(),
-            payment == null ? null : request.paymentMethod().name(),
+            payment == null ? null : (request.paymentMethod() != null ? request.paymentMethod().name() : PaymentMethod.CASH.name()),
             payment == null ? null : request.paymentReference());
     }
 
@@ -190,13 +219,14 @@ public class ParkingService {
         }
         Vehicle vehicle = vehicles.findById(vehicleId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phương tiện ID " + vehicleId));
-        ensureSlotCompatible(slot, vehicle.getVehicleType());
+
+        ensureSlotVehicleCompatible(slot, vehicle.getVehicleTypeRef(), vehicle.getVehicleType());
 
         // Ràng buộc 1 xe chỉ được gán 1 ô
         slots.findFirstByAssignedVehicleIdAndActiveTrue(vehicleId).ifPresent(existingSlot -> {
             if (!existingSlot.getId().equals(slotId)) {
                 throw new IllegalArgumentException("Xe biển số " + vehicle.getPlateNumber()
-                        + " đã được gán tại ô " + existingSlot.getSlotCode() + ". Không thể gán thêm ô khác!");
+                        + " đã được gán cố định tại ô " + existingSlot.getSlotCode() + ". Quy tắc 1 xe - 1 ô không cho phép gán thêm ô khác!");
             }
         });
 
@@ -213,16 +243,25 @@ public class ParkingService {
         if (normalized.length() < 5) {
             throw new IllegalArgumentException("Biển số xe đỗ nhờ không hợp lệ");
         }
+
+        // Ràng buộc 1 xe chỉ đỗ nhờ 1 ô
+        slots.findFirstByBorrowedPlateIgnoreCaseAndActiveTrue(normalized).ifPresent(otherSlot -> {
+            if (!otherSlot.getId().equals(slotId)) {
+                throw new IllegalArgumentException("Xe biển số " + normalized + " đang có lịch đỗ nhờ tại ô "
+                        + otherSlot.getSlotCode() + ". Mỗi xe chỉ được giữ tối đa 1 ô!");
+            }
+        });
+
         int hours = Math.max(1, durationHours);
         vehicles.findByPlateNumberIgnoreCase(normalized)
-            .ifPresent(vehicle -> ensureSlotCompatible(slot, vehicle.getVehicleType()));
+            .ifPresent(vehicle -> ensureSlotVehicleCompatible(slot, vehicle.getVehicleTypeRef(), vehicle.getVehicleType()));
         slot.setBorrowedPlate(normalized);
         slot.setBorrowedUntil(LocalDateTime.now().plusHours(hours));
         slot.setBorrowNotes(notes != null ? notes.trim() : "");
 
         sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(normalized, SessionStatus.OPEN)
                 .ifPresent(session -> {
-                    ensureSlotCompatible(slot, session.getDetectedVehicleType());
+                    ensureSlotVehicleCompatible(slot, session.getDetectedVehicleTypeRef(), session.getDetectedVehicleType());
                     slots.findFirstByCurrentSessionId(session.getId()).ifPresent(oldSlot -> {
                         if (!oldSlot.getId().equals(slotId)) {
                             oldSlot.setCurrentSession(null);
@@ -275,15 +314,29 @@ public class ParkingService {
         ParkingSession session = sessions.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lượt gửi ID " + sessionId));
 
+        if (session.getStatus() != SessionStatus.OPEN) {
+            throw new IllegalStateException("Lượt xe không ở trạng thái mở.");
+        }
         if (slot.getStatusOverride() == SlotStatusOverride.BLOCKED) {
             throw new IllegalStateException("Không thể điều phối xe vào ô đang cấm đỗ / bảo trì.");
         }
         if (!slot.isActive()) {
             throw new IllegalStateException("Không thể điều phối xe vào ô đã ngừng sử dụng.");
         }
-        ensureSlotCompatible(slot, session.getDetectedVehicleType());
+        ensureSlotVehicleCompatible(slot, session.getDetectedVehicleTypeRef(), session.getDetectedVehicleType());
+
         if (slot.getCurrentSession() != null && !slot.getCurrentSession().getId().equals(sessionId)) {
             throw new IllegalStateException("Ô này đang có xe đỗ, không thể điều phối xe khác vào.");
+        }
+
+        if (slot.getAssignedVehicle() != null) {
+            String assignedPlate = slot.getAssignedVehicle().getPlateNumber();
+            String sessionPlate = session.getEntryPlate();
+            boolean isAssignedCar = assignedPlate != null && assignedPlate.equalsIgnoreCase(sessionPlate);
+            boolean isBorrowedCar = slot.getBorrowedPlate() != null && slot.getBorrowedPlate().equalsIgnoreCase(sessionPlate);
+            if (!isAssignedCar && !isBorrowedCar) {
+                throw new IllegalStateException("Ô " + slot.getSlotCode() + " đã cấp riêng cho xe cư dân " + assignedPlate + ".");
+            }
         }
 
         slots.findFirstByCurrentSessionId(sessionId).ifPresent(oldSlot -> {
@@ -299,24 +352,58 @@ public class ParkingService {
 
     @Transactional
     public int batchGenerateSlots(BatchSlotGenerateRequest req) {
-        String floor = (req.floor() == null || req.floor().isBlank()) ? "Tầng hầm B1" : req.floor().trim();
-        String zone = (req.zoneName() == null || req.zoneName().isBlank()) ? "Khu A" : req.zoneName().trim();
+        String floorName = (req.floor() == null || req.floor().isBlank()) ? "Tầng 1" : req.floor().trim();
+        String zoneName = (req.zoneName() == null || req.zoneName().isBlank()) ? "Khu A" : req.zoneName().trim();
         String prefix = (req.prefix() == null || req.prefix().isBlank()) ? "A" : req.prefix().trim().toUpperCase();
         int start = Math.max(1, req.startNumber());
         int count = Math.min(100, Math.max(1, req.count()));
-        SlotType slotType = "VISITOR".equalsIgnoreCase(req.slotType()) ? SlotType.VISITOR_FLEXIBLE : SlotType.RESIDENT_RESERVED;
-        VehicleType vType = "MOTORBIKE".equalsIgnoreCase(req.vehicleType()) ? VehicleType.MOTORBIKE : VehicleType.CAR;
+
+        ParkingFloor floor = parkingFloors.findByNameIgnoreCase(floorName).orElseGet(() -> {
+            boolean isBasement = floorName.toLowerCase().contains("hầm") || floorName.toUpperCase().startsWith("B");
+            ParkingFloor f = new ParkingFloor(floorName, isBasement, 0, 500);
+            return parkingFloors.save(f);
+        });
+
+        VehicleTypeEntity vTypeEntity = null;
+        if (req.vehicleType() != null && !req.vehicleType().isBlank()) {
+            vTypeEntity = vehicleTypes.findByCodeIgnoreCase(req.vehicleType().trim())
+                    .or(() -> vehicleTypes.findByDisplayNameIgnoreCase(req.vehicleType().trim()))
+                    .orElse(null);
+        }
+        if (vTypeEntity == null) {
+            VehicleType vtEnum = "MOTORBIKE".equalsIgnoreCase(req.vehicleType()) ? VehicleType.MOTORBIKE : VehicleType.CAR;
+            vTypeEntity = vehicleTypes.findFirstByCategoryAndActiveTrueOrderByIdAsc(vtEnum).orElse(null);
+        }
+
+        if (vTypeEntity != null && !pricingRules.existsByVehicleTypeRef_Id(vTypeEntity.getId())) {
+            throw new IllegalStateException("Loại phương tiện '" + vTypeEntity.getDisplayName()
+                    + "' chưa được thiết lập bảng giá. Vui lòng tạo bảng giá trước khi tạo ô đỗ.");
+        }
+
+        VehicleTypeEntity finalVType = vTypeEntity;
+        ParkingZone zone = parkingZones.findByFloor_IdAndNameIgnoreCase(floor.getId(), zoneName).orElseGet(() -> {
+            int unit = finalVType != null ? finalVType.getCapacityUnits() : 5;
+            ParkingZone z = new ParkingZone(floor, zoneName, prefix, finalVType, count * unit, null);
+            return parkingZones.save(z);
+        });
+
+        SlotType slotType = ("VISITOR".equalsIgnoreCase(req.slotType()) || "VISITOR_FLEXIBLE".equalsIgnoreCase(req.slotType()))
+                ? SlotType.VISITOR_FLEXIBLE : SlotType.RESIDENT_RESERVED;
+        VehicleType vTypeEnum = finalVType != null ? finalVType.getCategory() : VehicleType.CAR;
 
         int created = 0;
         for (int i = 0; i < count; i++) {
-            String code = prefix + (start + i);
+            int num = start + i;
+            String code = prefix + (num < 10 ? ("0" + num) : String.valueOf(num));
             if (!slots.existsBySlotCodeIgnoreCase(code)) {
                 ParkingSlot slot = new ParkingSlot();
                 slot.setSlotCode(code);
-                slot.setFloor(floor);
-                slot.setZoneName(zone);
+                slot.setFloor(floor.getName());
+                slot.setZoneName(zone.getName());
+                slot.setZone(zone);
+                slot.setVehicleTypeRef(finalVType);
                 slot.setSlotType(slotType);
-                slot.setAllowedVehicleType(vType);
+                slot.setAllowedVehicleType(vTypeEnum);
                 slot.setActive(true);
                 slots.save(slot);
                 created++;
@@ -372,11 +459,43 @@ public class ParkingService {
             }
         }
 
+        String floorName = (slot.getZone() != null && slot.getZone().getFloor() != null)
+                ? slot.getZone().getFloor().getName() : slot.getFloor();
+        Boolean isBasement = (slot.getZone() != null && slot.getZone().getFloor() != null)
+                ? slot.getZone().getFloor().isBasement()
+                : (floorName != null && (floorName.toLowerCase().contains("hầm") || floorName.toUpperCase().startsWith("B")));
+        Long floorId = (slot.getZone() != null && slot.getZone().getFloor() != null)
+                ? slot.getZone().getFloor().getId() : null;
+
+        String zoneName = (slot.getZone() != null) ? slot.getZone().getName() : slot.getZoneName();
+        Long zoneId = (slot.getZone() != null) ? slot.getZone().getId() : null;
+        String zonePrefix = (slot.getZone() != null && slot.getZone().getCodePrefix() != null)
+                ? slot.getZone().getCodePrefix()
+                : (slot.getSlotCode() != null && !slot.getSlotCode().isEmpty() ? slot.getSlotCode().substring(0, 1) : "A");
+
+        Long vehicleTypeId = (slot.getVehicleTypeRef() != null)
+                ? slot.getVehicleTypeRef().getId()
+                : (slot.getZone() != null && slot.getZone().getVehicleType() != null ? slot.getZone().getVehicleType().getId() : null);
+
+        String vehicleTypeCode = (slot.getVehicleTypeRef() != null)
+                ? slot.getVehicleTypeRef().getCode()
+                : (slot.getAllowedVehicleType() != null ? slot.getAllowedVehicleType().name() : "CAR");
+
+        String vehicleTypeName = (slot.getVehicleTypeRef() != null)
+                ? slot.getVehicleTypeRef().getDisplayName()
+                : (slot.getAllowedVehicleType() != null ? slot.getAllowedVehicleType().getDisplayName() : "Chưa xác định");
+
+        Integer capacityUnits = (slot.getVehicleTypeRef() != null)
+                ? slot.getVehicleTypeRef().getCapacityUnits()
+                : (slot.getAllowedVehicleType() != null && slot.getAllowedVehicleType().isCar() ? 5 : 1);
+
+        String locationLabel = LocationLabelFormatter.format(floorName, zoneName, vehicleTypeName);
+
         return new ParkingSlotResponse(
             slot.getId(),
             slot.getSlotCode(),
-            slot.getZoneName(),
-            slot.getFloor(),
+            zoneName,
+            floorName,
             slot.getSlotType() == null ? "RESIDENT_RESERVED" : slot.getSlotType().name(),
             slot.getAllowedVehicleType() == null ? "CAR" : slot.getAllowedVehicleType().name(),
             slot.getStatusOverride() == null ? "NORMAL" : slot.getStatusOverride().name(),
@@ -391,7 +510,16 @@ public class ParkingService {
             slot.getBorrowNotes() == null ? "" : slot.getBorrowNotes(),
             overdue,
             status,
-            desc
+            desc,
+            floorId,
+            isBasement,
+            zoneId,
+            zonePrefix,
+            vehicleTypeId,
+            vehicleTypeCode,
+            vehicleTypeName,
+            capacityUnits,
+            locationLabel
         );
     }
 
@@ -402,7 +530,7 @@ public class ParkingService {
         if (plate != null && !plate.isBlank()) {
             var borrowedSlot = slots.findFirstByBorrowedPlateIgnoreCaseAndCurrentSessionIsNullAndActiveTrue(plate);
             if (borrowedSlot.isPresent() && borrowedSlot.get().getStatusOverride() != SlotStatusOverride.BLOCKED
-                    && isSlotCompatible(borrowedSlot.get(), session.getDetectedVehicleType())) {
+                    && isSlotVehicleCompatible(borrowedSlot.get(), session.getDetectedVehicleTypeRef(), session.getDetectedVehicleType())) {
                 var bSlot = borrowedSlot.get();
                 bSlot.setCurrentSession(session);
                 slots.save(bSlot);
@@ -410,11 +538,11 @@ public class ParkingService {
             }
         }
 
-        // 2. Kiểm tra ô cấp cố định cho xe cư dân
+        // 2. Kiểm tra ô đã gán xe cư dân
         if (session.getVehicle() != null) {
             var assignedSlot = slots.findFirstByAssignedVehicleIdAndCurrentSessionIsNullAndActiveTrue(session.getVehicle().getId());
             if (assignedSlot.isPresent() && assignedSlot.get().getStatusOverride() != SlotStatusOverride.BLOCKED
-                    && isSlotCompatible(assignedSlot.get(), session.getDetectedVehicleType())) {
+                    && isSlotVehicleCompatible(assignedSlot.get(), session.getDetectedVehicleTypeRef(), session.getDetectedVehicleType())) {
                 var s = assignedSlot.get();
                 s.setCurrentSession(session);
                 slots.save(s);
@@ -423,18 +551,17 @@ public class ParkingService {
         }
 
         // 3. Tự động tìm ô trống phù hợp loại xe và đối tượng
-        boolean isCar = session.getDetectedVehicleType() != null && session.getDetectedVehicleType().isCar();
         var candidate = slots.findByActiveTrueOrderBySlotCodeAsc().stream()
             .filter(s -> s.getCurrentSession() == null)
             .filter(s -> s.getStatusOverride() != SlotStatusOverride.BLOCKED)
-            .filter(s -> s.getAssignedVehicle() == null) // Đảm bảo ô chưa gán cho cư dân
+            .filter(s -> s.getAssignedVehicle() == null)
             .filter(s -> {
                 if (session.getVehicle() == null) {
                     return s.getSlotType() == null || s.getSlotType() == SlotType.VISITOR_FLEXIBLE;
                 }
                 return true;
             })
-            .filter(s -> s.getAllowedVehicleType() == null || s.getAllowedVehicleType().isCar() == isCar)
+            .filter(s -> isSlotVehicleCompatible(s, session.getDetectedVehicleTypeRef(), session.getDetectedVehicleType()))
             .findFirst();
 
         candidate.ifPresent(item -> {
@@ -461,11 +588,11 @@ public class ParkingService {
 
     private FamilyMember verifyDriver(Vehicle vehicle, Long memberId, boolean faceVerified,
                                       Double faceSimilarity, boolean manualOverride) {
-        if (vehicle == null) return null; // Khách vãng lai chỉ đối chiếu ảnh vào/ra ở nghiệp vụ riêng.
+        if (vehicle == null) return null;
         if (memberId == null) {
             boolean hasFaceProfile = vehicle.getAuthorizedMembers().stream().anyMatch(m ->
                 m.getRegistrationFaceImagePath() != null && !m.getRegistrationFaceImagePath().isBlank());
-            if (!hasFaceProfile) return null; // dữ liệu cũ được phép đi qua để quản trị viên bổ sung ảnh sau
+            if (!hasFaceProfile) return null;
             if (manualOverride) return null;
             throw new IllegalStateException("Hãy chọn thành viên gia đình đang điều khiển xe");
         }
@@ -490,14 +617,25 @@ public class ParkingService {
 
     BigDecimal calculateFee(ParkingSession session, LocalDateTime exitTime) {
         if (hasValidPrepaidPackage(session)) return BigDecimal.ZERO;
-        VehicleType type = session.getDetectedVehicleType();
-        PricingRule rule = pricingRules.findByVehicleType(type)
-            .orElseThrow(() -> new IllegalStateException("Chưa cấu hình bảng giá cho " + type));
+
+        PricingRule rule = null;
+        if (session.getDetectedVehicleTypeRef() != null) {
+            rule = pricingRules.findByVehicleTypeRef_Id(session.getDetectedVehicleTypeRef().getId()).orElse(null);
+        }
+        if (rule == null && session.getVehicle() != null && session.getVehicle().getVehicleTypeRef() != null) {
+            rule = pricingRules.findByVehicleTypeRef_Id(session.getVehicle().getVehicleTypeRef().getId()).orElse(null);
+        }
+        if (rule == null) {
+            rule = pricingRules.findFirstByVehicleTypeOrderByIdAsc(session.getDetectedVehicleType())
+                .or(() -> pricingRules.findByVehicleType(session.getDetectedVehicleType()))
+                .orElseThrow(() -> new IllegalStateException("Chưa cấu hình bảng giá cho loại phương tiện."));
+        }
+
         long minutes = Math.max(1, Duration.between(session.getEntryTime(), exitTime).toMinutes());
         long midnightCount = Math.max(0,
             ChronoUnit.DAYS.between(session.getEntryTime().toLocalDate(), exitTime.toLocalDate()));
 
-        if (type.isCar()) {
+        if (rule.isCarCategory()) {
             long baseMinutes = Math.max(1, rule.getBaseHours()) * 60L;
             BigDecimal timeFee = rule.getBasePrice();
             if (minutes > baseMinutes) {
@@ -532,12 +670,6 @@ public class ParkingService {
         return sameVehicle && card.isPrepaidPackageValid(session.getEntryTime().toLocalDate());
     }
 
-    private ParkingCard resolveCard(String cardCode) {
-        if (cardCode == null || cardCode.isBlank()) return null;
-        return cards.findByCardCodeIgnoreCase(cardCode.trim())
-            .orElseThrow(() -> new IllegalStateException("Không tìm thấy thẻ " + cardCode));
-    }
-
     private String requirePlate(String value) {
         String plate = PlateNormalizer.normalize(value);
         if (plate.length() < 5) throw new IllegalArgumentException("Biển số không hợp lệ");
@@ -548,6 +680,20 @@ public class ParkingService {
         if (vehicle != null) return vehicle.getVehicleType();
         VehicleType detected = parseDetectedType(detectedType);
         return detected == null ? VehicleType.MOTORBIKE : detected;
+    }
+
+    private VehicleTypeEntity resolveVehicleTypeRef(String detectedType, Vehicle vehicle) {
+        if (vehicle != null && vehicle.getVehicleTypeRef() != null) {
+            return vehicle.getVehicleTypeRef();
+        }
+        if (detectedType != null && !detectedType.isBlank()) {
+            var byCode = vehicleTypes.findByCodeIgnoreCase(detectedType.trim());
+            if (byCode.isPresent()) return byCode.get();
+            var byName = vehicleTypes.findByDisplayNameIgnoreCase(detectedType.trim());
+            if (byName.isPresent()) return byName.get();
+        }
+        VehicleType vt = resolveVehicleType(detectedType, vehicle);
+        return vehicleTypes.findFirstByCategoryAndActiveTrueOrderByIdAsc(vt).orElse(null);
     }
 
     private VehicleType parseDetectedType(String detectedType) {
@@ -575,17 +721,33 @@ public class ParkingService {
         return s.getEntryPlate();
     }
 
-    private static boolean isSlotCompatible(ParkingSlot slot, VehicleType vehicleType) {
-        return slot.getAllowedVehicleType() == null || vehicleType == null
-            || slot.getAllowedVehicleType().isCar() == vehicleType.isCar();
+    public boolean isSlotVehicleCompatible(ParkingSlot slot, VehicleTypeEntity vehicleTypeRef, VehicleType fallbackCategory) {
+        if (slot == null || !slot.isActive()) return false;
+        if (slot.getVehicleTypeRef() != null && vehicleTypeRef != null) {
+            return slot.getVehicleTypeRef().getId().equals(vehicleTypeRef.getId());
+        }
+        VehicleType slotCat = slot.getVehicleTypeRef() != null ? slot.getVehicleTypeRef().getCategory() : slot.getAllowedVehicleType();
+        VehicleType targetCat = vehicleTypeRef != null ? vehicleTypeRef.getCategory() : fallbackCategory;
+        if (slotCat == null || targetCat == null) return true;
+        return slotCat.isCar() == targetCat.isCar();
     }
 
-    private static void ensureSlotCompatible(ParkingSlot slot, VehicleType vehicleType) {
-        if (!isSlotCompatible(slot, vehicleType)) {
-            String expected = slot.getAllowedVehicleType() != null
-                && slot.getAllowedVehicleType().isCar() ? "ô tô" : "xe hai bánh";
-            throw new IllegalArgumentException("Ô " + slot.getSlotCode()
-                + " chỉ dành cho " + expected + ".");
+    public void ensureSlotVehicleCompatible(ParkingSlot slot, VehicleTypeEntity vehicleTypeRef, VehicleType fallbackCategory) {
+        if (!slot.isActive()) {
+            throw new IllegalStateException("Ô " + slot.getSlotCode() + " đã ngừng sử dụng.");
+        }
+        VehicleType slotCat = slot.getVehicleTypeRef() != null ? slot.getVehicleTypeRef().getCategory() : slot.getAllowedVehicleType();
+        VehicleType targetCat = vehicleTypeRef != null ? vehicleTypeRef.getCategory() : fallbackCategory;
+        if (slotCat != null && targetCat != null && slotCat.isCar() != targetCat.isCar()) {
+            String expected = slotCat.isCar() ? "ô tô" : "xe hai bánh";
+            throw new IllegalArgumentException("Ô " + slot.getSlotCode() + " chỉ dành cho " + expected + ".");
+        }
+        if (slot.getVehicleTypeRef() != null && vehicleTypeRef != null) {
+            if (!slot.getVehicleTypeRef().getId().equals(vehicleTypeRef.getId())) {
+                throw new IllegalArgumentException("Ô " + slot.getSlotCode() + " chỉ dành cho loại phương tiện '"
+                        + slot.getVehicleTypeRef().getDisplayName() + "', không thể xếp xe loại '"
+                        + vehicleTypeRef.getDisplayName() + "'.");
+            }
         }
     }
 }

@@ -3,7 +3,6 @@ package vn.edu.parking.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import vn.edu.parking.domain.ParkingSlot;
-import vn.edu.parking.domain.VehicleType;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,11 +18,19 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, Long> 
     Optional<ParkingSlot> findFirstByCurrentSessionId(Long sessionId);
     Optional<ParkingSlot> findFirstByCurrentSessionIsNullAndActiveTrueOrderBySlotCodeAsc();
 
+    Optional<ParkingSlot> findFirstByBorrowedPlateIgnoreCaseAndActiveTrue(String borrowedPlate);
     Optional<ParkingSlot> findFirstByBorrowedPlateIgnoreCaseAndCurrentSessionIsNullAndActiveTrue(String borrowedPlate);
 
     List<ParkingSlot> findByFloorOrderBySlotCodeAsc(String floor);
     List<ParkingSlot> findByZoneNameOrderBySlotCodeAsc(String zoneName);
     List<ParkingSlot> findByFloorAndZoneNameOrderBySlotCodeAsc(String floor, String zoneName);
+
+    List<ParkingSlot> findByFloorAndActiveTrueOrderBySlotCodeAsc(String floor);
+    List<ParkingSlot> findByZoneNameAndActiveTrueOrderBySlotCodeAsc(String zoneName);
+    List<ParkingSlot> findByFloorAndZoneNameAndActiveTrueOrderBySlotCodeAsc(String floor, String zoneName);
+
+    List<ParkingSlot> findByZone_IdAndActiveTrueOrderBySlotCodeAsc(Long zoneId);
+    List<ParkingSlot> findByZone_IdOrderBySlotCodeAsc(Long zoneId);
 
     @Query("SELECT DISTINCT s.floor FROM ParkingSlot s WHERE s.active = true ORDER BY s.floor ASC")
     List<String> findDistinctFloors();

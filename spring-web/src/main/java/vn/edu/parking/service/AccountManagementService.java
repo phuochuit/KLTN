@@ -266,11 +266,26 @@ public class AccountManagementService {
         return normalized;
     }
 
-    private static String newTemporaryPassword() {
-        byte[] random = new byte[32];
-        RANDOM.nextBytes(random);
-        try { return Base64.getUrlEncoder().withoutPadding().encodeToString(random); }
-        finally { java.util.Arrays.fill(random, (byte) 0); }
+    private static final String PWD_UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    private static final String PWD_LOWER = "abcdefghijkmnopqrstuvwxyz";
+    private static final String PWD_DIGITS = "23456789";
+    private static final String PWD_ALL = PWD_UPPER + PWD_LOWER + PWD_DIGITS;
+
+    static String newTemporaryPassword() {
+        char[] pwd = new char[12];
+        pwd[0] = PWD_UPPER.charAt(RANDOM.nextInt(PWD_UPPER.length()));
+        pwd[1] = PWD_LOWER.charAt(RANDOM.nextInt(PWD_LOWER.length()));
+        pwd[2] = PWD_DIGITS.charAt(RANDOM.nextInt(PWD_DIGITS.length()));
+        for (int i = 3; i < 12; i++) {
+            pwd[i] = PWD_ALL.charAt(RANDOM.nextInt(PWD_ALL.length()));
+        }
+        for (int i = 11; i > 0; i--) {
+            int j = RANDOM.nextInt(i + 1);
+            char tmp = pwd[i];
+            pwd[i] = pwd[j];
+            pwd[j] = tmp;
+        }
+        return new String(pwd);
     }
 
     private static String reference(SystemAccount account) {

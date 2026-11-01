@@ -1,6 +1,7 @@
 package vn.edu.parking.domain;
 
 public enum PaymentStatus {
+    PENDING("Chờ xác nhận"),
     PAID("Đã thu"),
     RECONCILED("Đã đối soát"),
     VOIDED("Đã hủy"),

@@ -18,6 +18,17 @@ public class ParkingSlot {
     @Column(length = 50)
     private String zoneName = "Khu A";
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "zone_id")
+    private ParkingZone zone;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "vehicle_type_id")
+    private VehicleTypeEntity vehicleTypeRef;
+
+    @Column(name = "deactivated_reason", length = 64)
+    private String deactivatedReason;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 30)
     private SlotType slotType = SlotType.RESIDENT_RESERVED;
@@ -46,6 +57,19 @@ public class ParkingSlot {
 
     private boolean active = true;
 
+    public void syncFromZone() {
+        if (this.zone != null) {
+            this.zoneName = this.zone.getName();
+            if (this.zone.getFloor() != null) {
+                this.floor = this.zone.getFloor().getName();
+            }
+            if (this.zone.getVehicleType() != null) {
+                this.vehicleTypeRef = this.zone.getVehicleType();
+                this.allowedVehicleType = this.zone.getVehicleType().getCategory();
+            }
+        }
+    }
+
     public boolean isOverdue(LocalDateTime now) {
         if (borrowedUntil == null) return false;
         LocalDateTime checkTime = (now != null) ? now : LocalDateTime.now();
@@ -69,6 +93,18 @@ public class ParkingSlot {
 
     public String getZoneName() { return zoneName; }
     public void setZoneName(String zoneName) { this.zoneName = zoneName; }
+
+    public ParkingZone getZone() { return zone; }
+    public void setZone(ParkingZone zone) {
+        this.zone = zone;
+        syncFromZone();
+    }
+
+    public VehicleTypeEntity getVehicleTypeRef() { return vehicleTypeRef; }
+    public void setVehicleTypeRef(VehicleTypeEntity vehicleTypeRef) { this.vehicleTypeRef = vehicleTypeRef; }
+
+    public String getDeactivatedReason() { return deactivatedReason; }
+    public void setDeactivatedReason(String deactivatedReason) { this.deactivatedReason = deactivatedReason; }
 
     public SlotType getSlotType() { return slotType; }
     public void setSlotType(SlotType slotType) { this.slotType = slotType; }

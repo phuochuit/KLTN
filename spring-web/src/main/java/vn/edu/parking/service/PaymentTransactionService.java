@@ -31,11 +31,86 @@ public class PaymentTransactionService {
     }
 
     @Transactional
+    public PaymentTransaction preparePendingParkingExit(ParkingSession session, BigDecimal estimatedFee) {
+        if (session == null || session.getId() == null) throw new IllegalArgumentException("Lượt gửi xe không hợp lệ.");
+        if (estimatedFee == null || estimatedFee.signum() <= 0) return null;
+
+        var existingOpt = transactions.findByParkingSession_Id(session.getId());
+        if (existingOpt.isPresent()) {
+            PaymentTransaction existing = existingOpt.get();
+            if (existing.getStatus() == PaymentStatus.PENDING) {
+                existing.updateAmount(estimatedFee);
+                return transactions.save(existing);
+            }
+            return existing;
+        }
+
+        SystemAccount collector = currentAccountSafe();
+        if (collector == null) {
+            collector = accounts.findAll().stream().findFirst().orElse(null);
+        }
+        if (collector == null) {
+            throw new IllegalStateException("Không tìm thấy tài khoản nhân viên để tạo phiếu thu.");
+        }
+
+        Instant now = Instant.now();
+        GateShiftAssignment shift = shifts
+            .findByAccount_IdAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByStartsAtDesc(
+                collector.getId(), now, now).stream().findFirst().orElse(null);
+
+        PaymentTransaction pending = PaymentTransaction.createPending(
+            receipt(now), PaymentType.PARKING_EXIT, PaymentMethod.CASH, estimatedFee,
+            session, collector, shift, now);
+        return transactions.save(pending);
+    }
+
+    @Transactional
+    public void cancelPendingParkingExit(Long sessionId) {
+        if (sessionId == null) return;
+        transactions.findByParkingSession_Id(sessionId).ifPresent(pt -> {
+            if (pt.getStatus() == PaymentStatus.PENDING) {
+                transactions.delete(pt);
+            }
+        });
+    }
+
+    @Transactional
     public PaymentTransaction recordParkingExit(ParkingSession session, PaymentMethod method,
             String externalReference) {
         if (session == null || session.getId() == null) throw new IllegalArgumentException("Lượt gửi xe không hợp lệ.");
-        if (transactions.existsByParkingSession_Id(session.getId()))
+
+        if (method == null) {
+            throw new IllegalArgumentException("Vui lòng chọn phương thức thanh toán.");
+        }
+
+        if (transactions.existsByParkingSession_Id(session.getId())) {
+            var existingOpt = transactions.findByParkingSession_Id(session.getId());
+            if (existingOpt.isPresent() && existingOpt.get().getStatus() == PaymentStatus.PENDING) {
+                PaymentTransaction existing = existingOpt.get();
+                PaymentMethod effectiveMethod = method;
+                String reference = normalize(externalReference, 120);
+                if (effectiveMethod.isExternalReferenceRequired() && reference == null)
+                    throw new IllegalArgumentException("Vui lòng nhập mã giao dịch chuyển khoản/POS.");
+                if (!effectiveMethod.isExternalReferenceRequired()) reference = null;
+
+                SystemAccount collector = currentAccountSafe();
+                if (collector == null) {
+                    collector = existing.getCollectedBy();
+                }
+                Instant now = Instant.now();
+                GateShiftAssignment shift = (collector != null) ? shifts
+                    .findByAccount_IdAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByStartsAtDesc(
+                        collector.getId(), now, now).stream().findFirst().orElse(null) : null;
+
+                existing.confirmPayment(effectiveMethod, session.getFee(), reference, collector, shift, now);
+                existing = transactions.save(existing);
+                audit.recordCurrent("PAYMENT_COLLECT", "PAYMENT_TRANSACTION",
+                    existing.getReceiptNumber(), "SUCCESS", null, null);
+                return existing;
+            }
             throw new IllegalStateException("Lượt gửi xe đã có giao dịch thanh toán.");
+        }
+
         return create(PaymentType.PARKING_EXIT, method, session.getFee(), externalReference,
             session, null);
     }
@@ -93,15 +168,21 @@ public class PaymentTransactionService {
     }
 
     private SystemAccount currentAccount() {
+        SystemAccount acc = currentAccountSafe();
+        if (acc == null) {
+            throw new IllegalStateException("Không xác định được nhân viên thực hiện giao dịch.");
+        }
+        return acc;
+    }
+
+    private SystemAccount currentAccountSafe() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated())
-            throw new IllegalStateException("Không xác định được nhân viên thực hiện giao dịch.");
+            return null;
         if (authentication.getPrincipal() instanceof AccountPrincipal principal) {
-            return accounts.findById(principal.getAccountId())
-                .orElseThrow(() -> new IllegalStateException("Tài khoản nhân viên không còn tồn tại."));
+            return accounts.findById(principal.getAccountId()).orElse(null);
         }
-        return accounts.findByUsername(authentication.getName())
-            .orElseThrow(() -> new IllegalStateException("Tài khoản nhân viên không còn tồn tại."));
+        return accounts.findByUsername(authentication.getName()).orElse(null);
     }
 
     private static String receipt(Instant now) {
