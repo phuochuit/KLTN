@@ -1,0 +1,34 @@
+:root {
+  color-scheme: light;
+  --ui-primary: #3042AA;
+  --ui-primary-hover: #2F3DA8;
+  --ui-primary-active: #293698;
+  --ui-on-primary: #FFFFFF;
+  --ui-canvas: #EAF1FF;
+  --ui-surface: #FFFFFF;
+  --ui-surface-soft: #EAF0FF;
+  --ui-text: #171E42;
+  --ui-text-muted: #42506B;
+  --ui-accent: #7541C9;
+  --ui-control-border: #7B89AB;
+  --ui-border: rgb(88 108 161 / 18%);
+  --ui-danger: #A32B25;
+  --ui-danger-soft: #FFF0EC;
+  --ui-success: #176052;
+  --ui-success-soft: #E4F2E6;
+  --ui-font: "Be Vietnam Pro", "Segoe UI", sans-serif;
+  --ui-radius-control: .875rem;
+  --ui-radius-panel: 2rem;
+  --ui-glass: rgb(255 255 255 / 32%);
+  --ui-shadow-panel: 0 28px 64px -30px rgb(64 79 151 / 32%), 0 3px 12px rgb(87 103 169 / 5%), inset 0 1px 0 white, inset 0 -1px 0 rgb(255 255 255 / 45%);
+  --ui-motion-fast: 180ms;
+}
+
+@theme inline {
+  --color-primary: var(--ui-primary);
+  --color-foreground: var(--ui-text);
+  --color-muted: var(--ui-text-muted);
+  --color-surface: var(--ui-surface);
+  --font-sans: var(--ui-font);
+  --radius-panel: var(--ui-radius-panel);
+}

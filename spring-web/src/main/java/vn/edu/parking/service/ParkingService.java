@@ -156,7 +156,7 @@ public class ParkingService {
         String correctedType = override.requested() ? request.vehicleType() : originalType;
         boolean faceVerified = trusted.legacy() ? request.faceVerified() : trusted.faceVerified();
         Double faceSimilarity = trusted.legacy() ? request.faceSimilarity() : trusted.faceSimilarity();
-        ParkingSession session = findOpenSession(plate, request.cardCode());
+        ParkingSession session = findOpenSessionForUpdate(plate, request.cardCode());
         verifyGuestExit(session, faceVerified, override.requested());
         session.setExitPlate(PlateNormalizer.normalize(plate));
         session.setExitTime(LocalDateTime.now());
@@ -281,6 +281,9 @@ public class ParkingService {
         ParkingSession session = sessions.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lượt gửi ID " + sessionId));
 
+        if (session.getStatus() != SessionStatus.OPEN) {
+            throw new IllegalStateException("Chỉ có thể điều phối lượt xe đang mở.");
+        }
         if (slot.getStatusOverride() == SlotStatusOverride.BLOCKED) {
             throw new IllegalStateException("Không thể điều phối xe vào ô đang cấm đỗ / bảo trì.");
         }
@@ -450,17 +453,40 @@ public class ParkingService {
     }
 
     private ParkingSession findOpenSession(String plate, String cardCode) {
+        return findOpenSession(plate, cardCode, false);
+    }
+
+    private ParkingSession findOpenSessionForUpdate(String plate, String cardCode) {
+        return findOpenSession(plate, cardCode, true);
+    }
+
+    private ParkingSession findOpenSession(String plate, String cardCode, boolean forUpdate) {
         String normalizedPlate = PlateNormalizer.normalize(plate);
-        var byPlate = normalizedPlate.isBlank() ? java.util.Optional.<ParkingSession>empty()
-            : sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(normalizedPlate, SessionStatus.OPEN);
-        if (byPlate.isPresent()) return byPlate.get();
+        if (!normalizedPlate.isBlank()) {
+            if (forUpdate) {
+                var byPlate = sessions.findLatestByEntryPlateAndStatusForUpdate(normalizedPlate,
+                    SessionStatus.OPEN, org.springframework.data.domain.PageRequest.of(0, 1));
+                if (!byPlate.isEmpty()) return byPlate.get(0);
+            } else {
+                var byPlate = sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+                    normalizedPlate, SessionStatus.OPEN);
+                if (byPlate.isPresent()) return byPlate.get();
+            }
+        }
         String normalizedIdentifier = PlateNormalizer.normalize(cardCode);
         ParkingCard card = normalizedIdentifier.isBlank() ? null
             : cards.findByCardCodeIgnoreCase(normalizedIdentifier).orElse(null);
         if (card != null && card.getVehicle() != null) {
-            return sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
-                card.getVehicle().getPlateNumber(), SessionStatus.OPEN)
-                .orElseThrow(() -> new IllegalStateException("Không tìm thấy lượt xe vào đang mở"));
+            String vehiclePlate = card.getVehicle().getPlateNumber();
+            if (forUpdate) {
+                var byCardVehicle = sessions.findLatestByEntryPlateAndStatusForUpdate(vehiclePlate,
+                    SessionStatus.OPEN, org.springframework.data.domain.PageRequest.of(0, 1));
+                if (!byCardVehicle.isEmpty()) return byCardVehicle.get(0);
+            } else {
+                var byCardVehicle = sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+                    vehiclePlate, SessionStatus.OPEN);
+                if (byCardVehicle.isPresent()) return byCardVehicle.get();
+            }
         }
         throw new IllegalStateException("Không tìm thấy lượt xe vào đang mở");
     }

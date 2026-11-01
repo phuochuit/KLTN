@@ -1,84 +1,219 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Vai trò và quyền hạn</title>
-    <link rel="stylesheet" th:href="@{/css/app.css}">
-    <style>
-        .role-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:18px; }
-        .form-grid { display:grid; grid-template-columns:repeat(2,minmax(200px,1fr)); gap:12px; }
-        .form-grid label { display:flex; flex-direction:column; gap:6px; }
-        .wide { grid-column:1/-1; }
-        .permissions { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:8px; margin:12px 0; }
-        .permission { display:flex; gap:9px; align-items:flex-start; padding:10px; border:1px solid #dbe2ea; border-radius:8px; }
-        .permission input { margin-top:4px; }
-        .permission small { display:block; color:#64748b; margin-top:3px; }
-        .role-meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
-        .role-meta span { background:#eef2ff; border-radius:999px; padding:4px 9px; font-size:12px; }
-        .error-notice { background:#fff1f0; color:#8a1c13; border:1px solid #efb2ad; border-radius:8px; padding:12px 16px; }
-        @media(max-width:650px) { .form-grid { grid-template-columns:1fr; } .wide { grid-column:auto; } }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vai trò &amp; quyền hạn · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <link rel="stylesheet" th:href="@{/css/management-core.css}">
+  <link rel="stylesheet" th:href="@{/css/security-roles.css}">
+  <script defer th:src="@{/js/management-core.js}"></script>
+  <script defer th:src="@{/js/security-roles.js}"></script>
 </head>
-<body>
-<header th:replace="~{fragments :: header}"></header>
-<main>
-    <h1>Vai trò và quyền hạn</h1>
-    <p class="help">Mỗi vai trò quy định công việc được phép thực hiện. Tiền tố được dùng để tự tạo mã nhân viên và không thể đổi sau khi tạo.</p>
-    <p class="notice" th:if="${message}" th:text="${message}"></p>
-    <p class="error-notice" th:if="${error}" th:text="${error}"></p>
+<body class="dashboard-page management-page security-roles-page" th:with="activePage='roles'">
+  <a href="#coreMain" class="skip-link">Đến nội dung chính</a>
+  <div class="dashboard-shell">
+    <aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside>
+    <div class="dashboard-workspace">
+      <header class="dashboard-topbar">
+        <div class="topbar-location">
+          <button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng"><img th:src="@{/images/lucide/menu.svg}" alt=""></button>
+          <span>Cấu hình &amp; quản trị <span>/</span> <strong>Vai trò &amp; quyền hạn</strong></span>
+        </div>
+        <a class="account-link" th:href="@{/account/password}" th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</a>
+      </header>
 
-    <section class="card">
-        <h2>Tạo vai trò mới</h2>
-        <form method="post" th:action="@{/roles/create}">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-            <div class="form-grid">
-                <label>Tên vai trò<input name="displayName" maxlength="120" placeholder="Ví dụ: Kế toán" required></label>
-                <label>Mã vai trò<input name="code" maxlength="48" pattern="[A-Za-z][A-Za-z0-9_]{2,47}" placeholder="Ví dụ: ACCOUNTANT" required></label>
-                <label>Tiền tố mã nhân viên<input name="employeePrefix" maxlength="8" pattern="[A-Za-z]{2,8}" placeholder="Ví dụ: KT" required></label>
-                <label class="wide">Mô tả<textarea name="description" maxlength="500" rows="2"></textarea></label>
+      <main id="coreMain" class="management-content" tabindex="-1">
+        <section class="roles-hero" aria-labelledby="rolesTitle">
+          <div class="roles-hero-copy">
+            <p class="eyebrow"><span class="roles-signal" aria-hidden="true"></span>TRUY CẬP · QUẢN TRỊ</p>
+            <div class="roles-title-row">
+              <span class="roles-heading-mark" aria-hidden="true"><img th:src="@{/images/lucide/shield-check.svg}" alt=""></span>
+              <h1 id="rolesTitle">Vai trò &amp; quyền hạn</h1>
             </div>
-            <h3>Quyền được cấp</h3>
-            <div class="permissions">
-                <label class="permission" th:each="option : ${permissionOptions}">
-                    <input type="checkbox" name="permissions" th:value="${option.permission}">
-                    <span><strong th:text="${option.label}"></strong><small th:text="${option.description}"></small></span>
-                </label>
-            </div>
-            <button type="submit">Tạo vai trò</button>
-        </form>
-    </section>
-
-    <h2>Vai trò hiện có</h2>
-    <div class="role-grid">
-        <section class="card" th:each="item : ${roles}">
-            <form method="post" th:action="@{/roles/update}">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                <input type="hidden" name="id" th:value="${item.role.id}">
-                <div class="role-meta">
-                    <span th:text="${'Mã: ' + item.role.code}"></span>
-                    <span th:text="${'Tiền tố: ' + item.role.employeePrefix}"></span>
-                    <span th:text="${item.accountCount + ' tài khoản'}"></span>
-                    <span th:if="${item.role.systemRole}">Vai trò hệ thống</span>
-                </div>
-                <div class="form-grid">
-                    <label>Tên vai trò<input name="displayName" maxlength="120" th:value="${item.role.displayName}" required></label>
-                    <label class="wide">Mô tả<textarea name="description" maxlength="500" rows="2" th:text="${item.role.description}"></textarea></label>
-                </div>
-                <input th:if="${item.role.systemRole}" type="hidden" name="enabled" value="true">
-                <label th:unless="${item.role.systemRole}"><input type="checkbox" name="enabled" value="true" th:checked="${item.role.enabled}"> Đang sử dụng</label>
-                <h3>Quyền được cấp</h3>
-                <div class="permissions">
-                    <label class="permission" th:each="option : ${permissionOptions}">
-                        <input type="checkbox" name="permissions" th:value="${option.permission}"
-                               th:checked="${item.role.permissions.contains(option.permission)}">
-                        <span><strong th:text="${option.label}"></strong><small th:text="${option.description}"></small></span>
-                    </label>
-                </div>
-                <button type="submit">Lưu thay đổi</button>
-            </form>
+            <p class="page-description">Một vai trò, một bộ quyền được rà soát rõ ràng. Thay đổi chỉ áp dụng khi bạn lưu.</p>
+          </div>
+          <button id="newRoleButton" class="roles-button-primary" type="button"><img th:src="@{/images/lucide/plus.svg}" alt="">Tạo vai trò</button>
         </section>
+
+        <p class="roles-flash is-success" role="status" th:if="${message}" th:text="${message}"></p>
+        <p class="roles-flash is-error" role="alert" tabindex="-1" th:if="${error}" th:text="${error}"></p>
+
+        <section class="roles-overview" aria-label="Tổng quan vai trò">
+          <article class="roles-stat glass-card"><span class="roles-stat-icon is-blue"><img th:src="@{/images/lucide/shield-check.svg}" alt=""></span><div><p>Vai trò</p><strong id="rolesTotal" th:text="${#lists.size(roles)}">0</strong></div></article>
+          <article class="roles-stat glass-card"><span class="roles-stat-icon is-violet"><img th:src="@{/images/lucide/lock-keyhole.svg}" alt=""></span><div><p>Vai trò hệ thống</p><strong id="systemRolesTotal">0</strong></div></article>
+          <article class="roles-stat glass-card"><span class="roles-stat-icon is-cyan"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><div><p>Tài khoản đang gán</p><strong id="assignedAccountsTotal">0</strong></div></article>
+        </section>
+
+        <section class="roles-workspace" aria-label="Danh sách và trình chỉnh sửa vai trò">
+          <section class="role-directory glass-card" aria-labelledby="roleDirectoryTitle">
+            <header class="roles-panel-heading">
+              <div><p class="eyebrow">THƯ MỤC</p><h2 id="roleDirectoryTitle">Danh sách vai trò</h2></div>
+              <span class="role-directory-count"><strong th:text="${#lists.size(roles)}">0</strong><span>vai trò</span></span>
+            </header>
+            <p class="role-directory-hint">Chọn một vai trò để xem cấu hình và giới hạn áp dụng.</p>
+            <div id="roleChoices" class="role-choices" th:if="${!#lists.isEmpty(roles)}">
+              <button class="role-choice" type="button" th:each="item : ${roles}"
+                th:attr="data-role-id=${item.role.id},data-code=${item.role.code},data-prefix=${item.role.employeePrefix},data-display-name=${item.role.displayName},data-description=${item.role.description ?: ''},data-enabled=${item.role.enabled},data-system=${item.role.systemRole},data-account-count=${item.accountCount}"
+                aria-pressed="false">
+                <span class="role-choice-mark" aria-hidden="true" th:text="${#strings.substring(item.role.displayName, 0, 1)}">V</span>
+                <span class="role-choice-main">
+                  <span class="role-choice-name" th:text="${item.role.displayName}">Tên vai trò</span>
+                  <span class="role-choice-code" th:text="${item.role.code}">ROLE_CODE</span>
+                  <span class="role-choice-meta">
+                    <span class="role-state" th:classappend="${item.role.enabled ? 'is-enabled' : 'is-disabled'}" th:text="${item.role.enabled ? 'Đang hoạt động' : 'Đã ngừng'}">Trạng thái</span>
+                    <span class="role-system-tag" th:if="${item.role.systemRole}">Hệ thống</span>
+                    <span class="role-assignment" th:text="${item.accountCount + ' tài khoản'}">0 tài khoản</span>
+                  </span>
+                </span>
+                <span class="role-choice-arrow" aria-hidden="true">›</span>
+                <span th:each="granted : ${item.role.permissions}" th:attr="data-role-permission=${granted.name()}" hidden></span>
+              </button>
+            </div>
+            <div class="role-directory-empty" th:if="${#lists.isEmpty(roles)}">
+              <span class="role-empty-mark" aria-hidden="true"><img th:src="@{/images/lucide/shield-check.svg}" alt=""></span>
+              <strong>Chưa có vai trò nào</strong>
+              <p>Tạo vai trò đầu tiên và chọn quyền phù hợp với nhiệm vụ.</p>
+            </div>
+            <div class="role-directory-footnote"><span aria-hidden="true">i</span><p>Quyền ẩn khỏi thao tác không thay thế kiểm soát quyền ở máy chủ.</p></div>
+          </section>
+
+          <section class="role-editor glass-card" aria-labelledby="roleEditorTitle">
+            <form id="roleEditorForm" method="post" th:action="@{/roles/create}"
+              th:attr="data-create-action=@{/roles/create},data-update-action=@{/roles/update}">
+              <input id="roleId" type="hidden" name="id" disabled>
+              <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+
+              <header class="role-editor-heading">
+                <div>
+                  <p id="roleEditorEyebrow" class="eyebrow">VAI TRÒ MỚI</p>
+                  <h2 id="roleEditorTitle">Tạo vai trò</h2>
+                  <p id="roleEditorDescription">Đặt tên, mã nhận diện và quyền cần thiết cho nhóm người dùng.</p>
+                </div>
+                <span id="roleSystemBadge" class="role-system-badge" hidden><img th:src="@{/images/lucide/lock-keyhole.svg}" alt="">Vai trò hệ thống</span>
+              </header>
+              <p id="roleSelectionStatus" class="sr-only" role="status" aria-live="polite"></p>
+
+              <div id="roleDiscardPrompt" class="role-discard-prompt" role="alert" hidden>
+                <div><strong>Có thay đổi chưa lưu</strong><p>Rời cấu hình này sẽ bỏ bản nháp hiện tại.</p></div>
+                <div class="role-prompt-actions"><button id="keepRoleDraft" class="roles-button-secondary" type="button">Tiếp tục chỉnh sửa</button><button id="discardRoleDraft" class="roles-button-danger" type="button">Bỏ bản nháp</button></div>
+              </div>
+
+              <p id="roleDraftState" class="role-draft-state" role="status" aria-live="polite">Chưa có thay đổi</p>
+
+              <div class="role-form-grid">
+                <label class="role-field role-field-name" for="roleDisplayName">Tên hiển thị <span aria-hidden="true">*</span>
+                  <input id="roleDisplayName" name="displayName" type="text" maxlength="120" required autocomplete="off" aria-describedby="roleNameHint">
+                  <small id="roleNameHint">Tên dễ nhận biết trong danh sách tài khoản · tối đa 120 ký tự.</small>
+                </label>
+                <label class="role-field" for="roleCode">Mã vai trò <span aria-hidden="true">*</span>
+                  <input id="roleCode" name="code" type="text" maxlength="48" required autocomplete="off" aria-describedby="roleCodeHint">
+                  <small id="roleCodeHint">3–48 ký tự A–Z, số hoặc gạch dưới. Không đổi được sau khi tạo.</small>
+                </label>
+                <label class="role-field" for="rolePrefix">Tiền tố mã nhân viên <span aria-hidden="true">*</span>
+                  <input id="rolePrefix" name="employeePrefix" type="text" maxlength="8" required autocomplete="off" aria-describedby="rolePrefixHint">
+                  <small id="rolePrefixHint">2–8 chữ cái A–Z; bất biến sau khi tạo.</small>
+                </label>
+                <label class="role-field role-field-description" for="roleDescription">Mô tả
+                  <textarea id="roleDescription" name="description" maxlength="500" rows="3" aria-describedby="roleDescriptionHint"></textarea>
+                  <small id="roleDescriptionHint">Thông tin ngắn về phạm vi nhiệm vụ · tối đa 500 ký tự.</small>
+                </label>
+              </div>
+
+              <fieldset id="roleEnabledField" class="role-enabled-field" hidden>
+                <legend>Trạng thái sử dụng</legend>
+                <label class="role-enabled-control" for="roleEnabled">
+                  <input id="roleEnabled" type="checkbox" name="enabled">
+                  <span class="role-toggle-visual" aria-hidden="true"></span>
+                  <span><strong id="roleEnabledLabel">Vai trò đang hoạt động</strong><small id="roleEnabledHint">Có thể chọn khi gán vai trò cho tài khoản.</small></span>
+                </label>
+                <input id="roleEnabledLockedValue" type="hidden" name="enabled" disabled>
+              </fieldset>
+
+              <fieldset class="role-permissions" aria-describedby="permissionSemantics">
+                <legend>Quyền hạn</legend>
+                <div class="role-permissions-intro">
+                  <p>Chọn theo công việc cần thực hiện; có thể bỏ chọn toàn bộ để lưu tập quyền rỗng.</p>
+                  <button id="clearRolePermissions" class="roles-text-button" type="button">Bỏ chọn tất cả</button>
+                </div>
+                <p id="permissionSemantics" class="permission-semantics">Những quyền được chọn bên dưới được lưu vào cấu hình của vai trò.</p>
+                <div class="permission-count-line"><span><strong id="selectedPermissionCount">0</strong> quyền được chọn</span><span id="permissionGroupCount"></span></div>
+
+                <div class="permission-groups">
+                  <section class="permission-group" aria-labelledby="permissionOverviewTitle">
+                    <h3 id="permissionOverviewTitle"><span class="permission-group-mark is-blue" aria-hidden="true">01</span>Tổng quan</h3>
+                    <div class="permission-options">
+                      <label class="permission-option" th:each="option : ${permissionOptions}" th:if="${option.permission.name() == 'DASHBOARD_VIEW'}" th:attr="data-permission-option=${option.permission.name()}">
+                        <input type="checkbox" name="permissions" th:id="${'rolePermission-' + option.permission.name()}" th:value="${option.permission.name()}">
+                        <span class="permission-option-copy"><strong th:text="${option.label}">Quyền</strong><small th:text="${option.description}">Mô tả quyền</small></span>
+                      </label>
+                    </div>
+                  </section>
+                  <section class="permission-group" aria-labelledby="permissionPeopleTitle">
+                    <h3 id="permissionPeopleTitle"><span class="permission-group-mark is-violet" aria-hidden="true">02</span>Hồ sơ &amp; tài khoản</h3>
+                    <div class="permission-options">
+                      <label class="permission-option" th:each="option : ${permissionOptions}" th:if="${option.permission.name() == 'ACCOUNT_MANAGE' or option.permission.name() == 'ROLE_MANAGE' or option.permission.name() == 'RESIDENT_MANAGE' or option.permission.name() == 'VEHICLE_MANAGE' or option.permission.name() == 'CARD_MANAGE'}" th:attr="data-permission-option=${option.permission.name()}">
+                        <input type="checkbox" name="permissions" th:id="${'rolePermission-' + option.permission.name()}" th:value="${option.permission.name()}">
+                        <span class="permission-option-copy"><strong th:text="${option.label}">Quyền</strong><small th:text="${option.description}">Mô tả quyền</small></span>
+                      </label>
+                    </div>
+                  </section>
+                  <section class="permission-group" aria-labelledby="permissionOperationsTitle">
+                    <h3 id="permissionOperationsTitle"><span class="permission-group-mark is-cyan" aria-hidden="true">03</span>Vận hành bãi</h3>
+                    <div class="permission-options">
+                      <label class="permission-option" th:each="option : ${permissionOptions}" th:if="${option.permission.name() == 'SHIFT_MANAGE' or option.permission.name() == 'SLOT_MANAGE' or option.permission.name() == 'GATE_OPERATE' or option.permission.name() == 'AI_RESULT_CORRECT'}" th:attr="data-permission-option=${option.permission.name()}">
+                        <input type="checkbox" name="permissions" th:id="${'rolePermission-' + option.permission.name()}" th:value="${option.permission.name()}">
+                        <span class="permission-option-copy"><strong th:text="${option.label}">Quyền</strong><small th:text="${option.description}">Mô tả quyền</small></span>
+                      </label>
+                    </div>
+                  </section>
+                  <section class="permission-group" aria-labelledby="permissionFinanceTitle">
+                    <h3 id="permissionFinanceTitle"><span class="permission-group-mark is-peach" aria-hidden="true">04</span>Tài chính &amp; lịch sử</h3>
+                    <div class="permission-options">
+                      <label class="permission-option" th:each="option : ${permissionOptions}" th:if="${option.permission.name() == 'PRICING_MANAGE' or option.permission.name() == 'HISTORY_VIEW' or option.permission.name() == 'PAYMENT_RECONCILE'}" th:attr="data-permission-option=${option.permission.name()}">
+                        <input type="checkbox" name="permissions" th:id="${'rolePermission-' + option.permission.name()}" th:value="${option.permission.name()}">
+                        <span class="permission-option-copy"><strong th:text="${option.label}">Quyền</strong><small th:text="${option.description}">Mô tả quyền</small></span>
+                      </label>
+                    </div>
+                  </section>
+                  <section class="permission-group" aria-labelledby="permissionSecurityTitle">
+                    <h3 id="permissionSecurityTitle"><span class="permission-group-mark is-rose" aria-hidden="true">05</span>Bảo mật &amp; riêng tư</h3>
+                    <div class="permission-options">
+                      <label class="permission-option" th:each="option : ${permissionOptions}" th:if="${option.permission.name() == 'SECURITY_AUDIT_VIEW' or option.permission.name() == 'PRIVATE_EVIDENCE_VIEW'}" th:attr="data-permission-option=${option.permission.name()}">
+                        <input type="checkbox" name="permissions" th:id="${'rolePermission-' + option.permission.name()}" th:value="${option.permission.name()}">
+                        <span class="permission-option-copy"><strong th:text="${option.label}">Quyền</strong><small th:text="${option.description}">Mô tả quyền</small></span>
+                      </label>
+                    </div>
+                  </section>
+                </div>
+
+                <div id="managementRoleNotice" class="management-role-notice" hidden>
+                  <span class="management-notice-icon" aria-hidden="true"><img th:src="@{/images/lucide/circle-alert.svg}" alt=""></span>
+                  <div><strong>Lưu ý riêng cho Quản trị viên (MANAGEMENT)</strong><p>Quản trị viên (MANAGEMENT) có cơ chế cấp quyền quản trị riêng. Vì vậy, bỏ chọn một quyền bên dưới không nhất thiết sẽ ngăn tài khoản Quản trị viên truy cập chức năng tương ứng.</p></div>
+                </div>
+              </fieldset>
+
+              <div id="roleSessionImpact" class="role-session-impact" hidden>
+                <span class="role-impact-icon" aria-hidden="true"><img th:src="@{/images/lucide/refresh-cw.svg}" alt=""></span>
+                <div><strong>Tác động đến phiên đăng nhập</strong><p id="roleSessionImpactText">Mọi lần cập nhật đều làm mới phiên của tài khoản được gán vai trò này — kể cả khi chỉ sửa tên hoặc mô tả. Người dùng liên quan cần đăng nhập lại.</p></div>
+              </div>
+
+              <p id="roleSavingState" class="role-saving-state" role="status" hidden>Đang lưu vai trò… Vui lòng chờ.</p>
+              <footer class="role-form-actions">
+                <p id="roleFormHint">Kiểm tra mã, tiền tố và quyền trước khi lưu.</p>
+                <div><button id="cancelRoleChanges" class="roles-button-secondary" type="button">Hủy</button><button id="saveRoleButton" class="roles-button-primary" type="submit">Tạo vai trò</button></div>
+              </footer>
+            </form>
+          </section>
+        </section>
+      </main>
     </div>
-</main>
+  </div>
+
+  <dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị">
+    <button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button>
+    <div th:replace="~{dashboard-shell :: navigation}"></div>
+  </dialog>
 </body>
 </html>

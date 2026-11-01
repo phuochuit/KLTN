@@ -3,6 +3,7 @@ package vn.edu.parking;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
@@ -13,7 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @TestPropertySource(properties = {
     "spring.datasource.url=jdbc:h2:mem:security-auth-test;DB_CLOSE_DELAY=-1",
     "spring.jpa.hibernate.ddl-auto=create-drop",
@@ -44,6 +45,24 @@ class SecurityAuthorizationIntegrationTest {
         mvc.perform(get("/")).andExpect(status().isOk());
         mvc.perform(get("/account-admin/accounts")).andExpect(status().isOk());
         mvc.perform(get("/account-management")).andExpect(status().isOk());
+        mvc.perform(get("/security-audit")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "shift-manager", authorities = "SHIFT_MANAGE")
+    void shiftManagerCannotReadAccountAdministrationJsonOrAuditEndpoints() throws Exception {
+        mvc.perform(get("/account-admin/accounts")).andExpect(status().isForbidden());
+        mvc.perform(get("/account-admin/accounts/synthetic-target")).andExpect(status().isForbidden());
+        mvc.perform(get("/account-admin/audit")).andExpect(status().isForbidden());
+        mvc.perform(get("/security-audit")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "auditor", authorities = "SECURITY_AUDIT_VIEW")
+    void auditViewerCanReadAuditButNotAccountAdministrationJson() throws Exception {
+        mvc.perform(get("/account-admin/accounts")).andExpect(status().isForbidden());
+        mvc.perform(get("/account-admin/accounts/synthetic-target")).andExpect(status().isForbidden());
+        mvc.perform(get("/account-admin/audit")).andExpect(status().isOk());
         mvc.perform(get("/security-audit")).andExpect(status().isOk());
     }
 

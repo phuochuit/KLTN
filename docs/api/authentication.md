@@ -4,6 +4,8 @@
 
 **Provenance:** đối chiếu source main `abd6183f9307472f604905dd9378c02deb563e2b` ngày 2026-10-24; không dùng `.artifacts/`/backup làm implementation authority. Đây là contract tĩnh, không test/live deployment evidence. Kết quả Security + WIP kế thừa ở [testing](../testing/strategy.md) là lịch sử, không chứng nhận revision này.
 
+**Working-tree contract update (2026-10-29):** server-side read boundary cho `/account-management` được bổ sung mà không đổi route grants/mutations; implementation và focused H2 evidence được tách biệt khỏi snapshot trên, xem [security](../security/overview.md) và [testing](../testing/strategy.md).
+
 ## Hai cơ chế độc lập
 
 - **Web:** HttpSession + form login; CSRF cho forms/account/QR/payment, nhưng `SecurityConfig` bỏ qua `/api/parking/**` và `/h2-console/**`. Revenue dùng Web session, không Desktop JWT. Forced-change principal chỉ có ROLE_PASSWORD_CHANGE_REQUIRED; `/account/password` nhận authenticated caller.
@@ -51,7 +53,7 @@ Refresh ambiguous/malformed không chứng minh token cũ chưa consume. Desktop
 | Method/path | Input/quyền | Output và tác động |
 | --- | --- | --- |
 | GET `/account/password` | Web authenticated, gồm ROLE_PASSWORD_CHANGE_REQUIRED | HTML `account-password` |
-| POST `/account/password` | Form `currentPassword`, `newPassword`, `confirmPassword` + CSRF | Sai confirmation/current password/độ dài trả lại HTML kèm error; password mới12–72 UTF-8 bytes. Thành công tăng security version, revoke Desktop sessions, clear Web security/session rồi redirect `/login?passwordChanged` |
+| POST `/account/password` | Form `currentPassword`, `newPassword`, `confirmPassword` + CSRF | Sai confirmation/current password/độ dài trả lại HTML kèm error; password mới12–72 UTF-8 bytes. DB/transaction error có kết quả chưa xác định trả lại HTML hướng dẫn xác thực lại trước khi gửi lại, không khẳng định đổi mật khẩu thất bại. Thành công tăng security version, revoke Desktop sessions, clear Web security/session rồi redirect `/login?passwordChanged` |
 
 Nguồn [AccountController](../../spring-web/src/main/java/vn/edu/parking/web/AccountController.java), AccountPasswordService. Không phải Desktop JSON password endpoint. Tracked properties main không khai Secure/HttpOnly/SameSite/timeout riêng; không giữ claim YAML Secure/Lax/30phút đã kiểm của feature. Effective cookie/TLS/proxy/browser chưa kiểm runtime. Login throttle in-memory theo **username chuẩn hóa + remote address**:10 failures/15phút, tối đa10.000 keys, không distributed quota/khóa bền vững.
 
@@ -71,7 +73,7 @@ Các route dùng **Web session** + CSRF cho POST/PUT. Main matcher `/account-adm
 | GET `/roles` | ROLE_MANAGE hoặc ROLE_MANAGEMENT | HTML roles/account counts/permission options |
 | POST `/roles/create` | Form code, displayName, employeePrefix; optional description/permissions | Service validation; flash + redirect `/roles` |
 | POST `/roles/update` | Form id/displayName, optional description/permissions, enabled default false | Grant changes tăng account versions/revoke Desktop sessions + audit; system/assigned roles không được disable; MANAGEMENT phải giữ ACCOUNT_MANAGE/ROLE_MANAGE; redirect/flash |
-| GET `/account-admin/audit`, `/account-admin/audit/overrides` | `SECURITY_AUDIT_VIEW`; pagination | 200 SecurityAuditPageResponse |
+| GET `/account-admin/audit`, `/account-admin/audit/overrides` | `SECURITY_AUDIT_VIEW`; pagination | 200 SecurityAuditPageResponse; override listing matches `OVERRIDE_` and `MANUAL_OVERRIDE_` action prefixes |
 
 Create profile fields required: fullName≤160, phone≤20, email≤160, citizenId≤20, dateOfBirth LocalDate NotNull, address≤500; strings NotBlank. Profile PUT cùng fields, không username. AccountSummaryResponse gồm id/username/**employeeCode/fullName/phone/email/citizenId/dateOfBirth/address**/roleId/roleCode/roleDisplayName/enabled/mustChangePassword, không passwordHash/securityVersion. Đây vẫn là PII, không chỉ role metadata. Temporary password trả một lần: coi là secret. Username normalize trim/lowercase/nonblank/max80; không tự thêm charset regex. Account/role row-lock source không chứng minh MySQL behavior.
 
@@ -81,7 +83,15 @@ Role forms dùng entity/model + RoleView(accountCount), không RoleResponse REST
 
 ### Web employee, ca trực và quản lý phiên
 
-`GET /account-management`, `/account-management/live` nhận bất kỳ ACCOUNT_MANAGE/SHIFT_MANAGE/SECURITY_AUDIT_VIEW/ROLE_MANAGEMENT. Các mutations khác dưới prefix cần ACCOUNT_MANAGE hoặc ROLE_MANAGEMENT, riêng shifts cần SHIFT_MANAGE hoặc ROLE_MANAGEMENT; đừng suy read page chỉ chứa đúng loại dữ liệu theo từng grant.
+`GET /account-management`, `/account-management/live` tiếp tục nhận bất kỳ ACCOUNT_MANAGE/SHIFT_MANAGE/SECURITY_AUDIT_VIEW/ROLE_MANAGEMENT. Trên working tree sau G4B-ACC-SEC-BE, server model/HTML được chia theo grants; đây là data boundary, không phải CSS/JavaScript hide:
+
+| Grant hiện có | Dữ liệu page/live |
+| --- | --- |
+| `ACCOUNT_MANAGE` hoặc `ROLE_MANAGEMENT` | Account directory/profile view DTO và role options; active Desktop/Web session views. Không đưa entity `SystemAccount`, password hash hoặc security version vào page model. |
+| `SHIFT_MANAGE` hoặc `ROLE_MANAGEMENT` | Phân công ca; staff selector là username-only projection của tài khoản enabled có `GATE_OPERATE`. Không nhận account directory/role options/session views. |
+| Chỉ `SECURITY_AUDIT_VIEW` | Không nhận account/shift/session data qua page hoặc live fragment; dùng `/security-audit` và audit JSON routes theo guard hiện hành. |
+
+Các grants kết hợp nhận hợp phần tương ứng; fallback `ROLE_MANAGEMENT` tiếp tục cho cả account/session lẫn shift data. Temporary-password flash bị gỡ khỏi page model nếu request hiện tại thiếu quyền account management và bị loại khỏi live-fragment model luôn. Các mutations khác dưới prefix cần ACCOUNT_MANAGE hoặc ROLE_MANAGEMENT, riêng shifts cần SHIFT_MANAGE hoặc ROLE_MANAGEMENT; role-assignment contract và các guards không đổi. `/account-admin/accounts` là API riêng, tiếp tục trả AccountSummaryResponse có PII trong phạm vi guard hiện hành.
 
 | Method/path | Form input / output |
 | --- | --- |

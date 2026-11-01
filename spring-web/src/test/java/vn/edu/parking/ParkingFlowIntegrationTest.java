@@ -50,6 +50,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
     "parking.evidence.required=false"
 })
 class ParkingFlowIntegrationTest {
+    @org.springframework.test.context.DynamicPropertySource
+    static void isolatedProperties(org.springframework.test.context.DynamicPropertyRegistry registry) throws java.io.IOException {
+        LoginTestIsolation.register(registry, "parking-flow");
+    }
     @Autowired MockMvc mvc;
     @Autowired VehicleRepository vehicles;
     @Autowired ParkingCardRepository cards;
@@ -201,6 +205,11 @@ class ParkingFlowIntegrationTest {
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
         MockMultipartFile face = new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image);
         MockMultipartFile registration = new MockMultipartFile("registrationImage", "registration.png", "image/png", image);
+        ParkingSession existingOpenSession = new ParkingSession();
+        existingOpenSession.setEntryPlate("61A123456");
+        existingOpenSession.setEntryTime(java.time.LocalDateTime.now().minusMinutes(2));
+        existingOpenSession.setDetectedVehicleType(VehicleType.CAR);
+        existingOpenSession = parkingSessions.saveAndFlush(existingOpenSession);
         mvc.perform(multipart("/registrations").file(face).file(registration).with(csrf())
                 .param("householdCode", "HH-COMBINED-01").param("apartmentNumber", "C1-0101")
                 .param("buildingName", "C1").param("contactPhone", "0901000001")
@@ -217,6 +226,9 @@ class ParkingFlowIntegrationTest {
         assertEquals("HH-COMBINED-01", vehicle.getHousehold().getHouseholdCode());
         assertEquals("Cư dân đăng ký tổng hợp", vehicle.getRegisteredOwner().getFullName());
         assertTrue(vehicle.getRegisteredOwner().getRegistrationFaceImagePath().startsWith("resident:"));
+        ParkingSession updatedOpenSession = parkingSessions.findById(existingOpenSession.getId()).orElseThrow();
+        assertEquals(vehicle.getId(), updatedOpenSession.getVehicle().getId());
+        assertEquals(VehicleType.MOTORBIKE, updatedOpenSession.getDetectedVehicleType());
     }
 
     @Test
@@ -309,7 +321,9 @@ class ParkingFlowIntegrationTest {
         wife.setFullName("Người vợ kiểm thử");
         wife = members.save(wife);
 
-        mvc.perform(post("/vehicles").with(csrf())
+        MockMultipartFile registrationImage = new MockMultipartFile("registrationImage", "registration.png", "image/png",
+                java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="));
+        mvc.perform(multipart("/vehicles").file(registrationImage).with(csrf())
                 .param("householdId", household.getId().toString())
                 .param("registeredOwnerId", husband.getId().toString())
                 .param("authorizedMemberIds", wife.getId().toString())
@@ -321,8 +335,7 @@ class ParkingFlowIntegrationTest {
                 .param("modelName", "Vision")
                 .param("color", "Đen")
                 .param("chassisNumber", "RLH-TEST-CHASSIS")
-                .param("engineNumber", "JF66E-TEST-ENGINE")
-                .param("registrationImagePath", "uploads/test-registration.jpg"))
+                .param("engineNumber", "JF66E-TEST-ENGINE"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/vehicles"));
 

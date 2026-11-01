@@ -1,2 +1,145 @@
-<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Lịch sử</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body><header th:replace="~{fragments :: header}"></header><main><h1>Lịch sử xe vào/ra</h1>
-<table><thead><tr><th>ID</th><th>Biển số vào</th><th>Biển số ra</th><th>Loại xe AI</th><th>Thẻ</th><th>Thời gian vào</th><th>Thời gian ra</th><th>Trạng thái</th><th>Phí</th></tr></thead><tbody><tr th:each="s:${sessions}"><td th:text="${s.id}"></td><td th:text="${s.entryPlate}"></td><td th:text="${s.exitPlate ?: '-'}"></td><td th:text="${s.detectedVehicleType.displayName}"></td><td th:text="${s.parkingCard?.cardCode ?: '-'}"></td><td th:text="${#temporals.format(s.entryTime,'dd/MM/yyyy HH:mm')}"></td><td th:text="${s.exitTime == null ? '-' : #temporals.format(s.exitTime,'dd/MM/yyyy HH:mm')}"></td><td th:text="${s.status.displayName}" th:class="${s.status.name() == 'OPEN' ? 'status-open' : 'status-completed'}"></td><td th:text="${#numbers.formatDecimal(s.fee,0,'COMMA',0,'POINT') + ' đ'}"></td></tr></tbody></table></main></body></html>
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lịch sử xe · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <script th:src="@{/js/sessions.js}" type="module"></script>
+</head>
+<body class="dashboard-page sessions-page">
+<a href="#sessionsMain" class="skip-link">Đến nội dung chính</a>
+<div class="dashboard-shell">
+  <aside class="sidebar" aria-label="Điều hướng quản trị">
+    <div th:replace="~{dashboard-shell :: navigation}"></div>
+  </aside>
+  <div class="dashboard-workspace">
+    <header class="dashboard-topbar">
+      <div class="topbar-location">
+        <button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng" aria-haspopup="dialog"><img th:src="@{/images/lucide/menu.svg}" alt=""></button>
+        <span>Không gian quản trị <span aria-hidden="true">/</span> <strong>Lịch sử xe</strong></span>
+      </div>
+      <a class="account-link" th:href="@{/account/password}"><span class="account-avatar" aria-hidden="true"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span></a>
+    </header>
+
+    <main id="sessionsMain" tabindex="-1">
+      <section class="page-heading sessions-heading">
+        <div>
+          <p class="eyebrow">LUMIPARK / VẬN HÀNH</p>
+          <h1>Lịch sử lượt xe</h1>
+          <p class="page-description">Tra cứu các lượt xe đã vào, đang trong bãi hoặc đã kết thúc.</p>
+        </div>
+        <a class="secondary-button sessions-refresh" th:href="@{/sessions(q=${searchQuery},status=${selectedStatus},from=${selectedFrom},to=${selectedTo},sort=${selectedSort},size=${pageSize},page=${pageNumber})}">Tải lại dữ liệu</a>
+      </section>
+
+      <section class="glass-card sessions-controls" aria-labelledby="sessionsFilterTitle">
+        <div class="panel-heading">
+          <div><p class="eyebrow">TRA CỨU LƯỢT XE</p><h2 id="sessionsFilterTitle">Tìm và lọc lịch sử</h2></div>
+        </div>
+        <form class="sessions-filter-form" method="get" th:action="@{/sessions}">
+          <label class="sessions-query-field">Biển số vào/ra hoặc mã thẻ
+            <input type="search" name="q" maxlength="80" placeholder="Nhập biển số hoặc mã thẻ" th:value="${searchQuery}" autocomplete="off">
+          </label>
+          <label class="sessions-status-field">Trạng thái
+            <select name="status" class="select-standard">
+              <option value="" th:selected="${selectedStatus.isBlank()}">Tất cả trạng thái</option>
+              <option value="OPEN" th:selected="${selectedStatus == 'OPEN'}">Trong bãi</option>
+              <option value="COMPLETED" th:selected="${selectedStatus == 'COMPLETED'}">Đã ra</option>
+              <option value="CANCELLED" th:selected="${selectedStatus == 'CANCELLED'}">Đã hủy</option>
+            </select>
+          </label>
+          <label>Xe vào từ
+            <input type="date" name="from" th:value="${selectedFrom}">
+          </label>
+          <label>Xe vào đến hết ngày
+            <input type="date" name="to" th:value="${selectedTo}">
+          </label>
+          <div class="sessions-list-row">
+          <details class="sessions-secondary-filters">
+            <summary th:text="${'Sắp xếp và số dòng · ' + (selectedSort == 'oldest' ? 'cũ nhất trước' : 'mới nhất trước') + ' · ' + pageSize + ' dòng/trang'}">Sắp xếp và số dòng</summary>
+            <div class="sessions-secondary-controls">
+              <label>Sắp xếp thời gian vào
+                <select name="sort" class="select-standard">
+                  <option value="newest" th:selected="${selectedSort == 'newest'}">Mới nhất trước</option>
+                  <option value="oldest" th:selected="${selectedSort == 'oldest'}">Cũ nhất trước</option>
+                </select>
+              </label>
+              <label>Số dòng mỗi trang
+                <select name="size" class="select-compact">
+                  <option value="10" th:selected="${pageSize == 10}">10 dòng</option>
+                  <option value="20" th:selected="${pageSize == 20}">20 dòng</option>
+                  <option value="50" th:selected="${pageSize == 50}">50 dòng</option>
+                </select>
+              </label>
+            </div>
+          </details>
+          <input type="hidden" name="page" value="0">
+          <div class="sessions-filter-actions">
+            <button type="submit" class="primary-button">Áp dụng</button>
+            <a class="secondary-button" th:if="${!searchQuery.isBlank() or !selectedStatus.isBlank() or !selectedFrom.isBlank() or !selectedTo.isBlank() or selectedSort != 'newest' or pageSize != 10}" th:href="@{/sessions}">Xóa bộ lọc</a>
+          </div>
+          </div>
+        </form>
+        <p class="feedback sessions-date-error" th:if="${dateRangeError != null}" role="alert" th:text="${dateRangeError}">Khoảng ngày không hợp lệ.</p>
+        <div class="sessions-result-summary" aria-live="polite" aria-atomic="true">
+          <p th:if="${dateRangeError == null and sessionPage.totalElements > 0}">
+            Hiển thị <strong th:text="${firstResult}">1</strong>–<strong th:text="${lastResult}">10</strong>
+            trong <strong th:text="${sessionPage.totalElements}">0</strong> lượt phù hợp.
+          </p>
+          <p th:if="${dateRangeError == null and sessionPage.totalElements == 0 and (searchQuery.isBlank() and selectedStatus.isBlank() and selectedFrom.isBlank() and selectedTo.isBlank())}">Chưa có lượt xe nào được ghi nhận.</p>
+          <p th:if="${dateRangeError == null and sessionPage.totalElements == 0 and (!searchQuery.isBlank() or !selectedStatus.isBlank() or !selectedFrom.isBlank() or !selectedTo.isBlank())}">Không có lượt xe phù hợp với từ khóa, khoảng ngày hoặc bộ lọc hiện tại.</p>
+          <div class="sessions-status-context" th:if="${!selectedStatus.isBlank()}">
+            <span th:if="${selectedStatus == 'OPEN'}" class="sessions-status-note">Lượt đang trong bãi</span>
+            <a class="sessions-all-statuses" th:href="@{/sessions(q=${searchQuery},from=${selectedFrom},to=${selectedTo},sort=${selectedSort},size=${pageSize},page=0)}">Xem tất cả trạng thái</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="sessions-table-section" aria-labelledby="sessionsTableTitle">
+        <div class="sessions-table-heading">
+          <div><p class="eyebrow">DANH SÁCH</p><h2 id="sessionsTableTitle">Các lượt xe</h2></div>
+          <span class="sessions-page-count" th:if="${sessionPage.totalPages > 0}" th:text="${'Trang ' + (sessionPage.number + 1) + ' / ' + sessionPage.totalPages}">Trang 1 / 1</span>
+        </div>
+        <div class="glass-card sessions-table-card">
+          <div class="sessions-table-scroll" role="region" aria-label="Bảng lịch sử xe; có thể cuộn ngang trên màn hình nhỏ" tabindex="0">
+            <table>
+              <caption class="sr-only">Lịch sử lượt xe với biển số, thời gian, trạng thái và phí</caption>
+              <thead><tr>
+                <th scope="col" class="session-id">Mã lượt</th><th scope="col" class="session-entry-plate">Biển số vào</th><th scope="col">Biển số ra</th>
+                <th scope="col">Loại xe ghi nhận</th><th scope="col">Thẻ</th><th scope="col">Thời gian vào</th>
+                <th scope="col">Thời gian ra</th><th scope="col">Trạng thái</th><th scope="col">Phí lượt</th>
+              </tr></thead>
+              <tbody>
+                <tr th:each="s : ${sessions}">
+                  <td class="session-id" th:text="${s.id}">1</td>
+                  <td class="session-entry-plate"><strong th:text="${s.entryPlate}">51A00000</strong></td>
+                  <td><span th:text="${s.exitPlate ?: '—'}">—</span><span class="session-plate-difference" th:if="${plateMismatchSessionIds.contains(s.id)}">Khác biển số vào</span></td>
+                  <td th:text="${s.detectedVehicleType.displayName}">Xe hai bánh</td>
+                  <td th:text="${s.parkingCard?.cardCode ?: '—'}">—</td>
+                  <td class="session-time" th:text="${#temporals.format(s.entryTime, 'dd/MM/yyyy HH:mm')}">01/01/2026 08:00</td>
+                  <td class="session-time" th:text="${s.exitTime == null ? '—' : #temporals.format(s.exitTime, 'dd/MM/yyyy HH:mm')}">—</td>
+                  <td><span class="session-status" th:classappend="${' is-' + #strings.toLowerCase(s.status.name())}" th:text="${s.status.displayName}">Trong bãi</span></td>
+                  <td class="session-fee" th:text="${#numbers.formatDecimal(s.fee, 0, 'COMMA', 0, 'POINT') + ' đ'}">0 đ</td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(sessions) and sessionPage.totalElements == 0}"><td colspan="9" class="sessions-empty-row" th:text="${dateRangeError != null ? 'Sửa khoảng ngày để xem lịch sử.' : 'Không có dữ liệu lượt xe để hiển thị.'}">Không có dữ liệu lượt xe để hiển thị.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <nav class="sessions-pagination" aria-label="Phân trang lịch sử xe">
+            <a class="secondary-button" th:if="${sessionPage.hasPrevious()}" th:href="@{/sessions(q=${searchQuery},status=${selectedStatus},from=${selectedFrom},to=${selectedTo},sort=${selectedSort},size=${pageSize},page=${sessionPage.number - 1})}">← Trang trước</a>
+            <span th:if="${sessionPage.totalPages > 0}" aria-current="page" th:text="${'Trang ' + (sessionPage.number + 1) + ' trên ' + sessionPage.totalPages}">Trang 1 trên 1</span>
+            <a class="secondary-button" th:if="${sessionPage.hasNext()}" th:href="@{/sessions(q=${searchQuery},status=${selectedStatus},from=${selectedFrom},to=${selectedTo},sort=${selectedSort},size=${pageSize},page=${sessionPage.number + 1})}">Trang sau →</a>
+          </nav>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị">
+  <button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button>
+  <div th:replace="~{dashboard-shell :: navigation}"></div>
+</dialog>
+</body>
+</html>

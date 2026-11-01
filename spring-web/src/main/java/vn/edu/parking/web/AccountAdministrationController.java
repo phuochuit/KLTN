@@ -117,8 +117,7 @@ public class AccountAdministrationController {
     @GetMapping("/audit/overrides")
     public SecurityAuditPageResponse overrides(@RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return auditPage(auditEvents.findByActionStartingWithOrderByOccurredAtDesc(
-            "OVERRIDE_", pageRequest(page, size)));
+        return auditPage(auditEvents.findOverrideEvents(pageRequest(page, size)));
     }
 
     private static PageRequest pageRequest(int page, int size) {

@@ -6,6 +6,10 @@ Main sinh mã thẻ từ plate chuẩn hóa, dùng PricingRule và ngày entry k
 
 **Phạm vi lịch sử:** các mục “Actual code”, source/code conflicts và test observation bên dưới giữ snapshot Security + WIP. Các công thức cần đối chiếu technical owners hiện hành, không dùng claims thiếu payment/receipt của snapshot làm main status. Quy trình và acceptance theo nguồn vẫn được bảo toàn.
 
+### Local Group 4B worktree — G4B-CARD-BE (2026-11-01)
+
+Trong local worktree, `AdminController.saveCard` giao orchestration cho `CardManagementWriteService.saveCard`, mở transaction bao card, kỳ subscription, ledger payment và liên kết receipt; `PaymentTransactionService.recordSubscription` tham gia transaction này. `GET /cards` cung cấp giá monthly hiện hành theo loại xe để preview. Đây là implementation observation có focused H2 evidence, không đổi giá/kỳ/chính sách gia hạn hoặc POST/auth/schema contract và không phải `CARD-V`/nghiệm thu Build. Không chứng minh MySQL concurrency, response-loss/duplicate safety, provider settlement, debt/refund hay exactly-once. Xem [database boundaries](../architecture/database.md), [API contracts](../api/contracts.md), [implementation status](../implementation-status.md) và [test evidence](../testing/strategy.md).
+
 [Phạm vi nghiệp vụ](README.md) · [NV01](nv01-registration.md) · [NV06](nv06-vehicle-classification.md)
 
 ## Mục tiêu và phạm vi

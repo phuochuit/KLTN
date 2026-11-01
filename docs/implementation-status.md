@@ -4,7 +4,7 @@
 
 ## Cách đọc trạng thái
 
-Đây là tổng hợp evidence đã thu thập, không full repository audit hay application readiness certificate. Acceptance tài liệu không xác nhận code đã đáp ứng nghiệp vụ. Verification lịch sử ngày 2026-10-09/10 ghi nhận Spring 108/108, Desktop 12/12 và Release build sạch; ANPR 10/10 là lượt chạy trước. Lượt Spring mới nhất ngày 2026-10-24 trên nhánh RBAC đạt 128/128, gồm permission/role regressions và H2 V1–V6 rehearsal (`20261024T020410Z-spring-04215e1a`); Desktop/ANPR không chạy lại trong lượt này. Các kết quả H2/fake không xác nhận MySQL thật, TLS, Spring–FastAPI/camera thực hoặc backup/restore; các mục này vẫn PENDING. Mức inspection trong tài liệu cũ là snapshot; [testing](testing/strategy.md) ghi test IDs/assertions và executions, còn [architecture](architecture/system.md) và [operations](operations/setup-and-troubleshooting.md) ghi actual boundaries.
+Đây là tổng hợp evidence đã thu thập, không full repository audit hay application readiness certificate. Acceptance tài liệu không xác nhận code đã đáp ứng nghiệp vụ. Verification lịch sử ngày 2026-10-09/10 ghi nhận Spring 108/108, Desktop 12/12 và Release build sạch; ANPR 10/10 là lượt chạy trước. Lượt Spring mới nhất ngày 2026-10-24 trên nhánh RBAC đạt 128/128, gồm permission/role regressions và H2 V1–V6 rehearsal (`20261024T020410Z-spring-04215e1a`); Desktop/ANPR không chạy lại trong lượt này. Các kết quả H2/fake không xác nhận MySQL thật, TLS, Spring–FastAPI/camera thực hoặc backup/restore; các mục này vẫn PENDING. Mức inspection trong tài liệu cũ là snapshot; [testing](testing/strategy.md) ghi test IDs/assertions và executions, còn [architecture](architecture/system.md) và [operations](operations/setup-and-troubleshooting.md) ghi actual boundaries. Focused Group 4B worktree evidence ngày 2026-10-29 đến 2026-11-01 được ghi riêng bên dưới và không chuyển thành current-main result.
 
 | Nhãn | Ý nghĩa |
 | --- | --- |
@@ -34,6 +34,18 @@
 | Media/startup | Private root residents/evidence, TTL/retention, scheduled cleanup mặc định tắt; properties MySQL/Hibernate update, SQL thủ công, no Flyway | Không finite holds của feature; runtime roots/encryption/backup/restore chưa verified. Health identity fields khớp launcher nhưng UP không full readiness |
 
 Chi tiết field/constraints tại [dictionary](architecture/data-dictionary.md), controls tại [security](security/overview.md), API tại [contracts](api/contracts.md), các nhánh và failure boundaries tại [system](architecture/system.md).
+
+### Local Group 4A worktree — WIP, not main (2026-10-27)
+
+The uncommitted local worktree adds a shared transactional write boundary for household/member/vehicle/combined-registration/settings forms, transfer/quota/authorization synchronization, rollback cleanup for newly saved resident images, scoped POST error states, audit-query failure distinction, and broader override-event matching. It retains existing RBAC, upsert identities, redirects and password rules. The approved `registrationImagePath` contract change requires a server upload for a vehicle without an existing image, and only allows a client path echo matching that vehicle's DB reference. Existing stored references are preserved without proving files exist. This is an implementation observation, not a release claim. Focused H2 evidence is in [testing strategy](testing/strategy.md); MySQL races, process-crash media recovery and browser recovery remain unverified.
+
+### Local Group 4B worktree — G4B-ACC-SEC-BE (2026-10-29)
+
+The `/account-management` and `/account-management/live` page models now select account/profile DTOs and sessions for `ACCOUNT_MANAGE`/`ROLE_MANAGEMENT`, username-only gate-staff options and shift assignments for `SHIFT_MANAGE`/`ROLE_MANAGEMENT`, and no account/shift/session payload for audit-only reads. Existing route grants, role-assignment behavior, mutations, auth, schema and session/shift services remain unchanged. Focused MockMvc/H2 evidence is **17/17** in [testing strategy](testing/strategy.md). This is a scoped working-tree observation, not a full authorization review, ACC-V, live/deployment proof or user acceptance; DB-backed grant mapping and broader runtime behavior remain unverified.
+
+### Local Group 4B worktree — G4B-REG-FE / G4B-CARD-BE (2026-10-31–2026-11-01)
+
+`G4B-REG-FE` Build and final synthetic visual review were completed and the user accepted its UI/UX; `REG-V` remains pending, so this is not functional acceptance. `G4B-CARD-BE` adds the scoped transaction boundary for card/subscription/payment/receipt writes and a current server `monthlyPrices` view-model value. Focused isolated H2 evidence is **7/7** in [testing strategy](testing/strategy.md); the Build awaits user acceptance and is not `CARD-V`. No schema or business pricing/period/renewal policy changed. The shared management-write error handler does not cover `/cards`, and failure-page/status mapping remains unverified for the CARD-FE contract checkpoint. Full Spring regression, MySQL behavior, live E2E, settlement, response-loss/concurrent duplicate behavior, and aggregate TEST/VERIFY remain unverified; `CARD-FE` and `CARD-V` have not started.
 
 ## Snapshot NV và supporting components lịch sử — Security + WIP
 

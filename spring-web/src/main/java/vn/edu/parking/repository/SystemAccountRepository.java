@@ -16,6 +16,10 @@ public interface SystemAccountRepository extends JpaRepository<SystemAccount, Lo
     Optional<SystemAccount> findByEmailIgnoreCase(String email);
     Optional<SystemAccount> findByCitizenId(String citizenId);
     List<SystemAccount> findAllByOrderByUsernameAsc();
+    @Query("select account.username from SystemAccount account join account.securityRole securityRole "
+        + "join securityRole.permissions permission where permission = :permission "
+        + "and account.enabled = true order by account.username")
+    List<String> findEnabledUsernamesByPermission(@Param("permission") SecurityPermission permission);
     long countBySecurityRole_Id(Long roleId);
     List<SystemAccount> findBySecurityRole_Id(Long roleId);
 

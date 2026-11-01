@@ -1,0 +1,23 @@
+# Slots override — `/slots`
+
+[MASTER](../MASTER.md) áp dụng, trừ geometry của lưới ô và state mapping sau. Không override business constraints.
+
+## Lý do riêng
+Đây là sơ đồ điều phối với trạng thái derived, không table CRUD thường. Source có gán cư dân, đỗ nhờ, lượt chưa phân ô, khóa/giải phóng và batch tạo ô; không phải sensor floor plan hay trạm sạc.
+
+- Thứ tự trang: heading/refresh → GET search/filter và số ô khớp → tổng quan sáu KPI của phạm vi lọc → lưới ô. Tổng quan gọn, không che tra cứu; các ý nghĩa và số đếm con vẫn hiển thị. GET filters `floor`, `zone`, `status`, `q` (mã ô/biển số), giữ URL và có xóa bộ lọc. Hiển thị số lượng ô khớp, tầng/khu đang chọn và thời điểm tải; refresh là GET thủ công, không polling. Legend luôn có text, không chỉ chấm màu.
+- Thứ tự mã ô trong lưới dùng natural sort cho các đoạn chữ/số sau khi Web lọc danh sách; thứ tự này chỉ giúp đọc mã như `A2`, `A10`, không biểu diễn vị trí vật lý và không đổi repository/API/thứ tự nghiệp vụ dùng chung. Select native theo [MASTER](../MASTER.md): Standard cho floor/zone/status và loại ô/xe, Fluid/Entity cho option xe/lượt dài, Compact cho thời hạn ngắn; chỉ trang này nhận CSS/picker enhancement.
+- Grid `repeat(auto-fill,minmax(160px,1fr))`, gap16; dưới360px 1 cột, không ép3 cột mobile. Slot button min-height128, radius16, G0/semantic tint; **không backdrop-filter từng ô**. Nội dung: mã ô, loại xe Lucide, trạng thái đầy đủ, biển số/chủ thể phù hợp. Badge trạng thái và mô tả KPI dùng chữ tối thiểu 12px, line-height thoáng; trạng thái dài có padding và được xuống dòng, không cắt mất code/biển số hoặc chỉ dựa hover.
+- Mapping: available=success; reserved_empty=info; occupied_valid=neutral + “Đang đỗ”; occupied_borrowed/reserved_borrowed=warning; occupied_mismatch=warning + icon cảnh báo/text; overdue_alert=danger + “Quá giờ”; blocked=neutral + lock/text. Đây là visual mapping các status source, không thay enum/state calculation. Quá giờ không pulse.
+- Mở detail bằng keyboard Enter/Space; native dialog đặt tên theo mã ô, tóm tắt Assigned / Occupied / Borrowed riêng, không gộp vì có thể khác xe. Tabs dùng role/selected/roving tabindex và Arrow/Home/End; Escape đóng và focus trở về ô. Forms POST/CSRF giữ input IDs; release confirmation nằm trong cùng dialog để không lồng modal.
+- Confirm giải phóng ghi rõ **bỏ gán cư dân, xóa thiết lập đỗ nhờ và bỏ liên kết lượt xe đang chiếm ô**; parking session vẫn OPEN, không đóng lượt hay hoàn tiền. Không nested confirm modal mất focus: đóng/tạm suspend detail hợp lý, focus return về action rồi slot gốc. Batch modal độc lập chỉ một modal tại một thời điểm.
+- KPI “Cần chú ý” đếm mỗi ô một lần nếu thuộc mismatch, quá giờ hoặc blocked; số đếm con vẫn giải thích từng nhóm.
+- Gán tối đa1 ô/xe, lựa chọn xe chưa gán; mỗi lần mở ô phải bắt đầu ở placeholder chưa chọn và chỉ bật lưu sau khi người dùng chọn xe. Gỡ gán là action riêng, chỉ hiện khi ô đã có xe cư dân; việc gỡ giữ nguyên lượt xe đang đỗ. UI không thay server reject. Ghi rõ danh sách dispatch là tối đa30 OPEN gần đây, không chắc chưa có ô; điều phối chuyển liên kết ô cũ và POST kiểm tra session còn OPEN. Giữ hours/notes và statusOverride NORMAL/BLOCKED. Batch count1–50 và single/batch slotType strings hiện khác nhau: giữ contract từng form, không “đồng nhất enum” bằng CSS redesign.
+- Source hiện là server-render/reload, không polling slots. Không gắn nhãn “thời gian thực”; hiển thị “Cập nhật khi tải trang”, refresh GET có giữ filter. Muốn realtime cần scope khác.
+
+Acceptance Phase2: tất cả7 trạng thái + reserved_borrowed, keyboard/modal tabs/Escape/return, destructive cancel, small viewport, gán/đỗ nhờ/dispatch/block/release/batch giữ endpoint và không gọi Desktop/ANPR trực tiếp. Chưa chạy những checks này.
+
+## Post-implementation review — Group 3
+
+- Synthetic H2 browser review (2026-10-27): final render inspected at 1440×900; the earlier interaction review covered 1366×768 and 390×844. The short viewport starts with search/filter controls, the grid remains one column on mobile, and the assignment dialog exposes a disabled save until explicit selection. Opening another slot resets the prior selection. GET filters and refresh remain server rendered.
+- Screenshots and harness reports: `.artifacts/test-runs/20261026T185719Z-group3-render-50801148/` (responsive views and interactions) and `.artifacts/test-runs/20261026T190929Z-group3-final-browser-4a9a5465/` (exact 1440×900 final capture).

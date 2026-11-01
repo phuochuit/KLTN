@@ -1,446 +1,191 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sơ đồ & Điều phối bãi xe</title>
-    <link rel="stylesheet" th:href="@{/css/app.css}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sơ đồ bãi · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <script th:src="@{/js/slots.js}" type="module"></script>
 </head>
+<body class="dashboard-page slots-page">
+<a href="#slotsMain" class="skip-link">Đến nội dung chính</a>
+<div class="dashboard-shell">
+  <aside class="sidebar" aria-label="Điều hướng quản trị">
+    <div th:replace="~{dashboard-shell :: navigation}"></div>
+  </aside>
+  <div class="dashboard-workspace">
+    <header class="dashboard-topbar">
+      <div class="topbar-location">
+        <button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng" aria-haspopup="dialog"><img th:src="@{/images/lucide/menu.svg}" alt=""></button>
+        <span>Không gian quản trị <span aria-hidden="true">/</span> <strong>Sơ đồ bãi</strong></span>
+      </div>
+      <a class="account-link" th:href="@{/account/password}"><span class="account-avatar" aria-hidden="true"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span></a>
+    </header>
 
-<body>
-    <header th:replace="~{fragments :: header}"></header>
-    <main class="slots-container">
-        <div class="slots-header">
-            <div>
-                <h1>Sơ đồ và điều phối bãi đỗ xe</h1>
-                <p class="help">Quản lý sơ đồ tầng hầm, phân chỗ cư dân & vãng lai, theo dõi xe đỗ nhờ hẹn giờ và trạng thái ô đỗ theo thời gian thực.</p>
-            </div>
-            <div class="header-actions">
-                <button type="button" class="btn btn-primary" onclick="openBatchModal()">➕ Tạo sơ đồ nhanh</button>
-                <button type="button" class="btn btn-outline" onclick="toggleAddForm()">Tạo ô lẻ</button>
-            </div>
+    <main id="slotsMain" tabindex="-1">
+      <noscript><style>.icon-button.mobile-menu{display:none}</style><details class="noscript-navigation"><summary>Mở điều hướng</summary><div th:replace="~{dashboard-shell :: navigation}"></div></details></noscript>
+      <section class="page-heading slots-heading">
+        <div>
+          <p class="eyebrow">LUMIPARK / VẬN HÀNH</p>
+          <h1>Sơ đồ bãi đỗ xe</h1>
+          <p class="page-description">Theo dõi trạng thái từng ô và thực hiện các thao tác phân chỗ hiện có.</p>
         </div>
-
-        <p class="notice" th:if="${message}" th:text="${message}"></p>
-
-        <!-- Thống kê tổng quan -->
-        <div class="slot-summary-grid">
-            <div class="summary-card">
-                <div class="summary-label">Tổng số vị trí</div>
-                <div class="summary-value" th:text="${totalSlots}">0</div>
-            </div>
-            <div class="summary-card stat-available">
-                <div class="summary-label">Ô trống sẵn sàng</div>
-                <div class="summary-value" th:text="${availableCount}">0</div>
-            </div>
-            <div class="summary-card stat-reserved">
-                <div class="summary-label">Đã cấp cư dân</div>
-                <div class="summary-value" th:text="${reservedCount}">0</div>
-            </div>
-            <div class="summary-card stat-occupied">
-                <div class="summary-label">Đang có xe đỗ</div>
-                <div class="summary-value" th:text="${occupiedCount}">0</div>
-            </div>
-            <div class="summary-card stat-borrowed">
-                <div class="summary-label">Hàng xóm đỗ nhờ</div>
-                <div class="summary-value" th:text="${borrowedCount}">0</div>
-            </div>
-            <div class="summary-card stat-overdue" th:if="${overdueCount > 0}">
-                <div class="summary-label">⚠️ Quá giờ đỗ nhờ</div>
-                <div class="summary-value" th:text="${overdueCount}">0</div>
-            </div>
-            <div class="summary-card stat-blocked">
-                <div class="summary-label">Cấm đỗ / Bảo trì</div>
-                <div class="summary-value" th:text="${blockedCount}">0</div>
-            </div>
+        <div class="slots-heading-actions">
+          <span class="snapshot-label"><img th:src="@{/images/lucide/clock-3.svg}" alt="">Cập nhật khi tải trang · <time th:text="${#temporals.format(lastUpdated, 'HH:mm:ss dd/MM/yyyy')}">--:--</time></span>
+          <a class="secondary-button slots-refresh" th:href="@{/slots(floor=${selectedFloor},zone=${selectedZone},status=${selectedStatus},q=${searchQuery})}"><img th:src="@{/images/lucide/refresh-cw.svg}" alt=""> Tải lại dữ liệu</a>
         </div>
+      </section>
 
-        <!-- Bộ lọc Tầng & Khu vực -->
-        <div class="card filter-bar">
-            <form method="get" th:action="@{/slots}" class="filter-form">
-                <label>Tầng hầm:
-                    <select name="floor" onchange="this.form.submit()">
-                        <option value="">-- Tất cả các tầng --</option>
-                        <option th:each="f : ${floors}" th:value="${f}" th:text="${f}" th:selected="${f == selectedFloor}"></option>
-                    </select>
-                </label>
-                <label>Khu vực:
-                    <select name="zone" onchange="this.form.submit()">
-                        <option value="">-- Tất cả khu vực --</option>
-                        <option th:each="z : ${zones}" th:value="${z}" th:text="${z}" th:selected="${z == selectedZone}"></option>
-                    </select>
-                </label>
-                <a th:href="@{/slots}" class="btn btn-reset" th:if="${!selectedFloor.isBlank() or !selectedZone.isBlank()}">Bỏ lọc</a>
-            </form>
-            <div class="filter-hint">
-                💡 <em>Nhấp chuột vào bất kỳ ô nào trên sơ đồ để xem chi tiết, gán xe, hoặc cho hàng xóm đỗ nhờ.</em>
-            </div>
+      <p class="feedback slots-notice is-success" th:if="${message}" role="status"><img th:src="@{/images/lucide/circle-check.svg}" alt=""><span th:text="${message}">Thao tác đã hoàn tất.</span></p>
+      <p class="feedback slots-notice is-error" th:if="${error}" role="alert"><img th:src="@{/images/lucide/circle-alert.svg}" alt=""><span th:text="${error}">Thao tác chưa hoàn tất.</span></p>
+
+      <section class="glass-card slots-controls" aria-labelledby="slotFilterTitle">
+        <div class="panel-heading slots-panel-heading">
+          <div><p class="eyebrow">TRA CỨU SƠ ĐỒ</p><h2 id="slotFilterTitle">Tìm và lọc ô đỗ</h2></div>
+          <button type="button" class="primary-button" id="openBatchDialog"><img th:src="@{/images/lucide/plus.svg}" alt=""> Tạo nhanh nhiều ô</button>
         </div>
+        <form class="slots-filter-form" method="get" th:action="@{/slots}">
+          <label class="slots-search-field">Mã ô hoặc biển số<input type="search" name="q" maxlength="80" placeholder="Ví dụ: A01, 51H…" th:value="${searchQuery}"></label>
+          <label>Tầng<select name="floor" class="select-standard"><option value="">Tất cả</option><option th:each="f : ${floors}" th:value="${f}" th:text="${f}" th:selected="${f == selectedFloor}"></option></select></label>
+          <label>Khu vực<select name="zone" class="select-standard"><option value="">Tất cả</option><option th:each="z : ${zones}" th:value="${z}" th:text="${z}" th:selected="${z == selectedZone}"></option></select></label>
+          <label>Trạng thái<select name="status" class="select-standard">
+            <option value="">Tất cả</option>
+            <option value="AVAILABLE" th:selected="${selectedStatus == 'AVAILABLE'}">Trống sẵn sàng</option>
+            <option value="RESERVED_EMPTY" th:selected="${selectedStatus == 'RESERVED_EMPTY'}">Đã cấp · chưa có xe</option>
+            <option value="OCCUPIED_VALID" th:selected="${selectedStatus == 'OCCUPIED_VALID'}">Đang có xe</option>
+            <option value="OCCUPIED_BORROWED" th:selected="${selectedStatus == 'OCCUPIED_BORROWED'}">Xe đỗ nhờ</option>
+            <option value="RESERVED_BORROWED" th:selected="${selectedStatus == 'RESERVED_BORROWED'}">Đã hẹn đỗ nhờ</option>
+            <option value="OCCUPIED_MISMATCH" th:selected="${selectedStatus == 'OCCUPIED_MISMATCH'}">Đỗ sai vị trí</option>
+            <option value="OVERDUE_ALERT" th:selected="${selectedStatus == 'OVERDUE_ALERT'}">Đỗ nhờ quá giờ</option>
+            <option value="BLOCKED" th:selected="${selectedStatus == 'BLOCKED'}">Cấm đỗ / bảo trì</option>
+          </select></label>
+          <div class="slots-filter-actions"><button type="submit" class="primary-button"><img th:src="@{/images/lucide/search.svg}" alt=""> Áp dụng</button><a class="secondary-button" th:if="${!searchQuery.isBlank() or !selectedFloor.isBlank() or !selectedZone.isBlank() or !selectedStatus.isBlank()}" th:href="@{/slots}">Xóa bộ lọc</a></div>
+        </form>
+        <div class="slots-scope-line"><p><strong th:text="${totalSlots}">0</strong> ô phù hợp <span aria-hidden="true">·</span> <span th:text="${selectedFloor.isBlank() ? 'Tất cả tầng' : selectedFloor}">Tất cả tầng</span> <span aria-hidden="true">·</span> <span th:text="${selectedZone.isBlank() ? 'Tất cả khu vực' : selectedZone}">Tất cả khu vực</span></p><button type="button" id="toggleSingleSlot" class="text-button"><img th:src="@{/images/lucide/plus.svg}" alt=""> Tạo một ô</button></div>
+      </section>
 
-        <!-- Form tạo ô lẻ (Mặc định ẩn) -->
-        <div id="addSlotSection" class="card single-add-card" style="display: none; margin-bottom: 20px;">
-            <h3>Thêm vị trí đỗ lẻ</h3>
-            <form method="post" th:action="@{/slots}" class="form-grid">
-                <label>Mã vị trí *<input name="slotCode" required placeholder="Ví dụ: A16, B11"></label>
-                <label>Tầng hầm<input name="floor" value="Tầng hầm B1" placeholder="Tầng hầm B1"></label>
-                <label>Khu vực<input name="zoneName" value="Khu A" placeholder="Khu A"></label>
-                <label>Phân loại ô
-                    <select name="slotType">
-                        <option value="RESIDENT_RESERVED">Cư dân đăng ký</option>
-                        <option value="VISITOR_FLEXIBLE">Khách vãng lai</option>
-                    </select>
-                </label>
-                <label>Loại xe
-                    <select name="vehicleType">
-                        <option value="CAR">Ô tô</option>
-                        <option value="MOTORBIKE">Xe máy</option>
-                    </select>
-                </label>
-                <label class="span-2">Gán trước cho xe cư dân (nếu có)
-                    <select name="assignedVehicleId">
-                        <option value="">-- Để trống (chưa gán) --</option>
-                        <option th:each="v : ${unassignedVehicles}" th:value="${v.id}"
-                            th:text="${v.plateNumber + ' - ' + v.effectiveOwnerName + ' (' + v.effectiveApartmentNumber + ')'}"></option>
-                    </select>
-                </label>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Lưu vị trí</button>
-                    <button type="button" class="btn btn-outline" onclick="toggleAddForm()">Hủy</button>
-                </div>
-            </form>
+      <section id="singleSlotSection" class="glass-card single-slot-section" aria-labelledby="singleSlotTitle" hidden>
+        <div class="panel-heading"><div><p class="eyebrow">THÊM VỊ TRÍ</p><h2 id="singleSlotTitle">Tạo một ô đỗ</h2></div><button type="button" class="text-button" id="closeSingleSlot">Đóng</button></div>
+        <form method="post" th:action="@{/slots}" class="single-slot-form">
+          <label>Mã ô *<input name="slotCode" required maxlength="20" placeholder="Ví dụ: A16, B11"></label>
+          <label>Tầng<input name="floor" value="Tầng hầm B1" maxlength="50"></label>
+          <label>Khu vực<input name="zoneName" value="Khu A" maxlength="50"></label>
+          <label>Phân loại ô<select name="slotType" class="select-standard"><option value="RESIDENT_RESERVED">Cư dân đăng ký</option><option value="VISITOR_FLEXIBLE">Khách vãng lai</option></select></label>
+          <label>Loại xe<select name="vehicleType" class="select-standard"><option value="CAR">Ô tô</option><option value="MOTORBIKE">Xe hai bánh</option></select></label>
+          <label class="single-slot-wide">Gán trước xe cư dân (không bắt buộc)<select name="assignedVehicleId" class="select-entity"><button type="button"><selectedcontent></selectedcontent></button><option value="">Chưa gán</option><option th:each="v : ${unassignedVehicles}" th:value="${v.id}" th:text="${v.plateNumber + ' · ' + v.effectiveOwnerName + ' · ' + v.effectiveApartmentNumber}"></option></select></label>
+          <div class="slots-form-actions"><button type="submit" class="primary-button">Lưu ô đỗ</button><button type="button" class="secondary-button" id="cancelSingleSlot">Hủy</button></div>
+        </form>
+      </section>
+
+      <section class="slots-summary" aria-label="Tổng quan phạm vi đang xem">
+        <article class="glass-card slots-stat slots-stat-total"><div class="slots-stat-label"><span>Ô trong phạm vi</span><img th:src="@{/images/lucide/map.svg}" alt=""></div><p class="slots-stat-value" th:text="${totalSlots}">0</p><p class="slots-stat-note">Theo bộ lọc hiện tại</p></article>
+        <article class="glass-card slots-stat slots-stat-available"><div class="slots-stat-label"><span>Trống sẵn sàng</span><img th:src="@{/images/lucide/circle-check.svg}" alt=""></div><p class="slots-stat-value" th:text="${availableCount}">0</p><p class="slots-stat-note">Chưa gán và chưa có xe</p></article>
+        <article class="glass-card slots-stat slots-stat-occupied"><div class="slots-stat-label"><span>Đang có xe</span><img th:src="@{/images/lucide/car-front.svg}" alt=""></div><p class="slots-stat-value" th:text="${occupiedCount}">0</p><p class="slots-stat-note">Gồm xe đỗ nhờ và cảnh báo</p></article>
+        <article class="glass-card slots-stat slots-stat-reserved"><div class="slots-stat-label"><span>Đã cấp cư dân</span><img th:src="@{/images/lucide/house.svg}" alt=""></div><p class="slots-stat-value" th:text="${reservedCount}">0</p><p class="slots-stat-note">Có thể đồng thời đang có xe</p></article>
+        <article class="glass-card slots-stat slots-stat-borrowed"><div class="slots-stat-label"><span>Có thiết lập đỗ nhờ</span><img th:src="@{/images/lucide/clock-3.svg}" alt=""></div><p class="slots-stat-value" th:text="${borrowedCount}">0</p><p class="slots-stat-note">Kể cả lịch hẹn chưa có xe</p></article>
+        <article class="glass-card slots-stat slots-stat-alert"><div class="slots-stat-label"><span>Cần chú ý</span><img th:src="@{/images/lucide/circle-alert.svg}" alt=""></div><p class="slots-stat-value" th:text="${attentionCount}">0</p><p class="slots-stat-note"><span th:text="${mismatchCount}">0</span> sai vị trí · <span th:text="${overdueCount}">0</span> quá giờ · <span th:text="${blockedCount}">0</span> cấm/bảo trì</p></article>
+      </section>
+
+      <section class="slots-map-section" aria-labelledby="slotMapTitle">
+        <div class="slots-map-heading"><div><p class="eyebrow">SƠ ĐỒ THEO TRẠNG THÁI</p><h2 id="slotMapTitle">Các vị trí đỗ</h2><p class="muted">Chọn một ô để xem thông tin và các thao tác được hỗ trợ.</p></div><span class="slots-result-count" th:text="${totalSlots + ' ô'}">0 ô</span></div>
+        <ul class="slot-legend" aria-label="Chú giải trạng thái">
+          <li class="legend-available"><span></span>Trống sẵn sàng</li><li class="legend-reserved"><span></span>Đã cấp / đã hẹn</li><li class="legend-occupied"><span></span>Đang có xe</li><li class="legend-alert"><span></span>Cần chú ý</li><li class="legend-blocked"><span></span>Cấm đỗ / bảo trì</li>
+        </ul>
+        <div class="slot-grid" th:if="${!#lists.isEmpty(slots)}">
+          <button th:each="s : ${slots}" type="button" class="slot-tile" th:classappend="${'is-' + #strings.toLowerCase(s.status).replace('_','-')}"
+            th:data-id="${s.id}" th:data-code="${s.slotCode}" th:data-floor="${s.floor}" th:data-zone="${s.zoneName}"
+            th:data-slot-type="${s.slotType}" th:data-vehicle-type="${s.allowedVehicleType}" th:data-status-override="${s.statusOverride}"
+            th:data-assigned-plate="${s.assignedPlate}" th:data-assigned-owner="${s.assignedOwnerName}" th:data-assigned-phone="${s.assignedOwnerPhone}" th:data-assigned-apt="${s.assignedApartment}"
+            th:data-occupied-plate="${s.occupiedPlate}" th:data-entry-time="${s.occupiedEntryTime}" th:data-borrowed-plate="${s.borrowedPlate}" th:data-borrowed-until="${s.borrowedUntil}"
+            th:data-borrow-notes="${s.borrowNotes}" th:data-overdue="${s.overdue}" th:data-status="${s.status}" th:data-status-desc="${s.statusDescription}"
+            th:attr="aria-label=${'Mở chi tiết ô ' + s.slotCode + ', ' + s.floor + ', ' + s.zoneName + ', ' + s.statusDescription}" aria-haspopup="dialog">
+            <span class="slot-tile-top"><span th:text="${s.zoneName}">Khu A</span><img th:src="${s.allowedVehicleType == 'MOTORBIKE' ? '/images/lucide/bike.svg' : '/images/lucide/car-front.svg'}" alt="" width="19" height="19"></span>
+            <strong class="slot-code" th:text="${s.slotCode}">A01</strong>
+            <span class="slot-plate" th:if="${!s.occupiedPlate.isBlank()}" th:text="${s.occupiedPlate}">51H88888</span>
+            <span class="slot-plate" th:if="${s.occupiedPlate.isBlank() and !s.borrowedPlate.isBlank()}" th:text="${'Hẹn: ' + s.borrowedPlate}">Hẹn: 59X1…</span>
+            <span class="slot-plate" th:if="${s.occupiedPlate.isBlank() and s.borrowedPlate.isBlank() and !s.assignedPlate.isBlank()}" th:text="${'Cấp: ' + s.assignedPlate}">Cấp: 51H…</span>
+            <span class="slot-state" th:text="${s.statusDescription}">Trạng thái</span>
+          </button>
         </div>
+        <div class="glass-card slots-empty" th:if="${#lists.isEmpty(slots) and allSlotCount == 0}"><img th:src="@{/images/lucide/map.svg}" alt=""><h3>Chưa có ô đỗ</h3><p>Tạo một ô hoặc tạo nhiều ô để bắt đầu lập sơ đồ.</p><button type="button" class="primary-button" id="emptyCreateSlot">Tạo một ô</button></div>
+        <div class="glass-card slots-empty" th:if="${#lists.isEmpty(slots) and allSlotCount > 0}"><img th:src="@{/images/lucide/search.svg}" alt=""><h3>Không tìm thấy ô phù hợp</h3><p>Thử đổi từ khóa hoặc nới bộ lọc tầng, khu vực và trạng thái.</p><a class="secondary-button" th:href="@{/slots}">Xóa bộ lọc</a></div>
+      </section>
 
-        <!-- Chú thích màu sắc (Legend) -->
-        <div class="slot-legend">
-            <span class="legend-item legend-available"><span class="color-dot dot-available"></span> Trống sẵn sàng</span>
-            <span class="legend-item legend-reserved"><span class="color-dot dot-reserved"></span> Cư dân (xe chưa về)</span>
-            <span class="legend-item legend-occupied"><span class="color-dot dot-occupied"></span> Đang có xe đỗ</span>
-            <span class="legend-item legend-borrowed"><span class="color-dot dot-borrowed"></span> Hàng xóm đỗ nhờ</span>
-            <span class="legend-item legend-overdue"><span class="color-dot dot-overdue"></span> ⚠️ Quá hạn đỗ nhờ</span>
-            <span class="legend-item legend-mismatch"><span class="color-dot dot-mismatch"></span> Đỗ sai vị trí</span>
-            <span class="legend-item legend-blocked"><span class="color-dot dot-blocked"></span> Cấm đỗ / Bảo trì</span>
-        </div>
-
-        <!-- Lưới sơ đồ bãi đỗ xe -->
-        <div class="slot-grid-interactive">
-            <div th:each="s : ${slots}" class="slot-card"
-                 th:classappend="${s.status.toLowerCase()}"
-                 th:data-id="${s.id}"
-                 th:data-code="${s.slotCode}"
-                 th:data-floor="${s.floor}"
-                 th:data-zone="${s.zoneName}"
-                 th:data-slottype="${s.slotType}"
-                 th:data-vehicletype="${s.allowedVehicleType}"
-                 th:data-statusoverride="${s.statusOverride}"
-                 th:data-assignedplate="${s.assignedPlate}"
-                 th:data-assignedowner="${s.assignedOwnerName}"
-                 th:data-assignedphone="${s.assignedOwnerPhone}"
-                 th:data-assignedapt="${s.assignedApartment}"
-                 th:data-occupiedplate="${s.occupiedPlate}"
-                 th:data-entrytime="${s.occupiedEntryTime}"
-                 th:data-borrowedplate="${s.borrowedPlate}"
-                 th:data-borroweduntil="${s.borrowedUntil}"
-                 th:data-borrownotes="${s.borrowNotes}"
-                 th:data-overdue="${s.overdue}"
-                 th:data-status="${s.status}"
-                 th:data-statusdesc="${s.statusDescription}"
-                 onclick="openSlotModal(this)">
-                
-                <div class="slot-card-top">
-                    <span class="slot-zone" th:text="${s.zoneName}">Khu A</span>
-                    <span class="slot-vtype" th:text="${s.allowedVehicleType == 'MOTORBIKE' ? '🛵' : '🚗'}">🚗</span>
-                </div>
-                <div class="slot-card-code" th:text="${s.slotCode}">A01</div>
-                
-                <div class="slot-card-plate">
-                    <span th:if="${!s.occupiedPlate.isBlank()}" th:text="${s.occupiedPlate}">51H88888</span>
-                    <span th:if="${s.occupiedPlate.isBlank() and !s.borrowedPlate.isBlank()}" th:text="'Nhờ: ' + ${s.borrowedPlate}">Nhờ: 59X1...</span>
-                    <span th:if="${s.occupiedPlate.isBlank() and s.borrowedPlate.isBlank() and !s.assignedPlate.isBlank()}" th:text="'Cấp: ' + ${s.assignedPlate}">Cấp: 51H...</span>
-                    <span th:if="${s.occupiedPlate.isBlank() and s.borrowedPlate.isBlank() and s.assignedPlate.isBlank()}" class="plate-empty">Trống</span>
-                </div>
-
-                <div class="slot-card-status">
-                    <span th:if="${s.overdue}" class="badge-overdue">⚠️ QUÁ GIỜ</span>
-                    <span th:if="${!s.overdue}" th:text="${s.statusDescription}">Trạng thái</span>
-                </div>
-            </div>
-        </div>
     </main>
+  </div>
+</div>
 
-    <!-- Modal Chi tiết & Điều phối Ô đỗ -->
-    <div id="slotModal" class="modal-backdrop" style="display: none;" onclick="closeOnBackdrop(event)">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <div>
-                    <h2 id="modalSlotTitle">Vị trí A01</h2>
-                    <span id="modalLocationBadge" class="modal-badge-location">Tầng hầm B1 - Khu A</span>
-                    <span id="modalStatusBadge" class="modal-badge-status">Trống</span>
-                </div>
-                <button type="button" class="btn-close" onclick="closeSlotModal()">✕</button>
-            </div>
+<dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị"><button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button><div th:replace="~{dashboard-shell :: navigation}"></div></dialog>
 
-            <div class="modal-body">
-                <!-- Thẻ tóm tắt thông tin hiện tại -->
-                <div class="slot-info-box">
-                    <div class="info-row" id="rowAssigned">
-                        <strong>Xe cấp cố định:</strong>
-                        <span id="infoAssigned">-</span>
-                    </div>
-                    <div class="info-row" id="rowOccupied">
-                        <strong>Xe đang đỗ:</strong>
-                        <span id="infoOccupied">-</span>
-                    </div>
-                    <div class="info-row" id="rowBorrowed">
-                        <strong>Xe mượn đỗ nhờ:</strong>
-                        <span id="infoBorrowed">-</span>
-                    </div>
-                </div>
+<dialog id="slotDialog" class="operation-dialog slot-dialog" aria-labelledby="modalSlotTitle" aria-describedby="slotDialogDescription">
+  <div class="operation-dialog-header"><div><p class="eyebrow">CHI TIẾT VỊ TRÍ</p><h2 id="modalSlotTitle">Ô đỗ</h2><p id="modalLocationBadge" class="muted">Tầng · Khu · Loại xe</p><span id="modalStatusBadge" class="slot-status-badge">Trạng thái</span></div><button type="button" class="icon-button dialog-close" data-close-slot aria-label="Đóng chi tiết ô">×</button></div>
+  <p id="slotDialogDescription" class="sr-only">Thông tin phân chỗ và các thao tác vận hành hiện có cho ô đỗ này.</p>
+  <div class="slot-detail-summary" aria-label="Thông tin hiện tại">
+    <div><span>Xe được cấp</span><strong id="infoAssigned">Chưa cấp cho cư dân</strong></div>
+    <div><span>Xe đang đỗ</span><strong id="infoOccupied">Hiện không có xe</strong></div>
+    <div><span>Thiết lập đỗ nhờ</span><strong id="infoBorrowed">Không có thiết lập đỗ nhờ</strong></div>
+  </div>
+  <div class="slot-tabs" role="tablist" aria-label="Thao tác với ô đỗ">
+    <button type="button" id="residentTab" role="tab" aria-controls="tabResident" aria-selected="true" tabindex="0">Gán xe</button>
+    <button type="button" id="borrowTab" role="tab" aria-controls="tabBorrow" aria-selected="false" tabindex="-1">Đỗ nhờ</button>
+    <button type="button" id="dispatchTab" role="tab" aria-controls="tabDispatch" aria-selected="false" tabindex="-1">Điều phối</button>
+    <button type="button" id="manageTab" role="tab" aria-controls="tabManage" aria-selected="false" tabindex="-1">Quản lý ô</button>
+  </div>
+  <div class="slot-tab-content">
+    <section id="tabResident" class="slot-tab-panel" role="tabpanel" aria-labelledby="residentTab" tabindex="0">
+      <h3>Gán xe cư dân</h3><p class="muted">Mỗi xe chỉ được gán tối đa một ô. Thao tác gỡ gán giữ nguyên lượt xe đang đỗ.</p>
+      <form method="post" th:action="@{/slots/assign}" class="slot-operation-form"><input type="hidden" name="slotId" id="assignSlotId">
+        <label>Xe cư dân chưa có ô<select name="vehicleId" id="assignVehicleSelect" class="select-entity" required><button type="button"><selectedcontent></selectedcontent></button><option value="" disabled selected>Chọn xe cư dân chưa có ô</option><option th:each="v : ${unassignedVehicles}" th:value="${v.id}" th:text="${v.plateNumber + ' · ' + v.effectiveOwnerName + ' · ' + v.effectiveApartmentNumber + ' · ' + v.vehicleType.displayName}"></option></select></label>
+        <button type="submit" id="assignVehicleButton" class="primary-button" disabled>Lưu gán xe</button>
+      </form>
+      <form id="unassignSlotForm" method="post" th:action="@{/slots/assign}" class="slot-secondary-form" hidden><input type="hidden" name="slotId" id="unassignSlotId"><button type="submit" class="secondary-button">Gỡ gán xe cư dân</button></form>
+    </section>
+    <section id="tabBorrow" class="slot-tab-panel" role="tabpanel" aria-labelledby="borrowTab" tabindex="0" hidden>
+      <h3>Thiết lập đỗ nhờ</h3><p class="muted">Thiết lập biển số và thời hạn cho ô này; đây không phải xác nhận xe đã vào bãi.</p>
+      <form method="post" th:action="@{/slots/borrow}" class="slot-operation-form"><input type="hidden" name="slotId" id="borrowSlotId">
+        <label>Biển số xe đỗ nhờ *<input name="borrowedPlate" id="borrowedPlateInput" required maxlength="20" placeholder="Ví dụ: 59X199999" autocomplete="off"></label>
+        <label>Thời hạn<select name="hours" class="select-compact"><option value="1">1 giờ</option><option value="2" selected>2 giờ</option><option value="4">4 giờ</option><option value="8">8 giờ</option><option value="12">12 giờ</option><option value="24">24 giờ · 1 ngày</option><option value="48">48 giờ · 2 ngày</option></select></label>
+        <label class="slot-form-wide">Ghi chú (không bắt buộc)<input name="borrowNotes" id="borrowNotesInput" maxlength="255" placeholder="Lý do hoặc ghi chú vận hành"></label>
+        <button type="submit" class="primary-button">Lưu thiết lập đỗ nhờ</button>
+      </form>
+      <form id="cancelBorrowForm" method="post" th:action="@{/slots/cancel-borrow}" class="slot-secondary-form" hidden><input type="hidden" name="slotId" id="cancelBorrowSlotId"><button type="submit" class="secondary-button">Hủy thiết lập đỗ nhờ</button></form>
+    </section>
+    <section id="tabDispatch" class="slot-tab-panel" role="tabpanel" aria-labelledby="dispatchTab" tabindex="0" hidden>
+      <h3>Điều phối lượt xe OPEN</h3><p class="muted dispatch-warning">Danh sách gồm tối đa 30 lượt OPEN gần đây; không khẳng định lượt chưa có ô. Điều phối lượt đang gắn ô sẽ chuyển liên kết khỏi ô cũ. Máy chủ kiểm tra trạng thái lúc lưu.</p>
+      <form method="post" th:action="@{/slots/dispatch-session}" class="slot-operation-form"><input type="hidden" name="slotId" id="dispatchSlotId">
+        <label>Chọn lượt xe<select name="sessionId" class="select-entity" required><button type="button"><selectedcontent></selectedcontent></button><option value="">Chọn lượt OPEN</option><option th:each="sess : ${recentOpenSessions}" th:value="${sess.id}" th:text="${sess.entryPlate + ' · vào ' + #temporals.format(sess.entryTime, 'HH:mm dd/MM/yyyy')}"></option></select></label>
+        <button type="submit" class="primary-button" th:disabled="${#lists.isEmpty(recentOpenSessions)}">Điều phối vào ô này</button>
+        <p class="muted slots-no-sessions" th:if="${#lists.isEmpty(recentOpenSessions)}">Hiện không có lượt OPEN trong danh sách gần đây.</p>
+      </form>
+    </section>
+    <section id="tabManage" class="slot-tab-panel" role="tabpanel" aria-labelledby="manageTab" tabindex="0" hidden>
+      <h3>Khóa hoặc mở lại ô</h3><p class="muted">Không thể khóa ô khi đang có lượt xe đỗ; xử lý lượt theo quy trình hiện có trước.</p>
+      <form method="post" th:action="@{/slots/status}" class="slot-manage-form"><input type="hidden" name="slotId" id="statusSlotId"><input type="hidden" name="statusOverride" id="statusOverrideVal" value="BLOCKED"><button type="submit" id="btnToggleBlock" class="secondary-button">Đặt ô vào trạng thái cấm đỗ / bảo trì</button></form>
+      <div class="slot-release-area"><h4>Giải phóng ô</h4><p>Bỏ gán cư dân, xóa thiết lập đỗ nhờ và bỏ liên kết lượt đang chiếm ô. Lượt xe vẫn còn OPEN; thao tác này không đóng lượt hoặc hoàn tiền.</p>
+        <button type="button" id="showReleaseConfirm" class="danger-button">Giải phóng ô…</button>
+        <div id="releaseConfirmation" class="release-confirmation" hidden><p><strong>Xác nhận giải phóng ô này?</strong> Các liên kết và thiết lập đã nêu sẽ bị xóa.</p><form method="post" th:action="@{/slots/release}"><input type="hidden" name="slotId" id="releaseSlotId"><button type="submit" class="danger-button">Xác nhận giải phóng</button><button type="button" id="cancelRelease" class="secondary-button">Không, quay lại</button></form></div>
+      </div>
+    </section>
+  </div>
+  <div class="operation-dialog-footer"><button type="button" class="secondary-button" data-close-slot>Đóng</button></div>
+</dialog>
 
-                <!-- Tabs chức năng điều phối -->
-                <div class="modal-tabs">
-                    <button type="button" class="tab-btn active" onclick="showTab('tabResident')">Gán xe cư dân</button>
-                    <button type="button" class="tab-btn" onclick="showTab('tabBorrow')">Đỗ nhờ (Hàng xóm)</button>
-                    <button type="button" class="tab-btn" onclick="showTab('tabGuest')">Điều phối xe vừa vào</button>
-                    <button type="button" class="tab-btn" onclick="showTab('tabManage')">Khóa / Giải phóng</button>
-                </div>
-
-                <!-- Tab 1: Gán xe cư dân -->
-                <div id="tabResident" class="tab-content active">
-                    <form method="post" th:action="@{/slots/assign}">
-                        <input type="hidden" name="slotId" id="assignSlotId">
-                        <label>Chọn xe cư dân chưa có vị trí đỗ (Ràng buộc 1 xe - 1 ô):
-                            <select name="vehicleId" id="assignVehicleSelect">
-                                <option value="">-- Bỏ gán (Để vị trí trống) --</option>
-                                <option th:each="v : ${unassignedVehicles}" th:value="${v.id}"
-                                    th:text="${v.plateNumber + ' - ' + v.effectiveOwnerName + ' (' + v.effectiveApartmentNumber + ') - ' + v.vehicleType.displayName}"></option>
-                            </select>
-                        </label>
-                        <p class="tab-hint">💡 <em>Mỗi xe chỉ được gán tối đa 1 ô. Nếu xe đã có ô khác, hệ thống sẽ từ chối để tránh trùng lặp.</em></p>
-                        <div class="modal-actions">
-                            <button type="submit" class="btn btn-primary">Lưu gán xe cư dân</button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Tab 2: Cho đỗ nhờ tạm thời (Hàng xóm) -->
-                <div id="tabBorrow" class="tab-content">
-                    <form method="post" th:action="@{/slots/borrow}">
-                        <input type="hidden" name="slotId" id="borrowSlotId">
-                        <label>Biển số xe đỗ nhờ (Xe B) *
-                            <input name="borrowedPlate" id="borrowedPlateInput" required placeholder="Ví dụ: 59X199999" style="text-transform: uppercase;">
-                        </label>
-                        <label>Thời hạn cho phép đỗ nhờ:
-                            <select name="hours">
-                                <option value="1">1 giờ</option>
-                                <option value="2" selected>2 giờ</option>
-                                <option value="4">4 giờ</option>
-                                <option value="8">8 giờ</option>
-                                <option value="12">12 giờ</option>
-                                <option value="24">24 giờ (1 ngày)</option>
-                                <option value="48">48 giờ (2 ngày)</option>
-                            </select>
-                        </label>
-                        <label>Ghi chú lý do đỗ nhờ:
-                            <input name="borrowNotes" id="borrowNotesInput" placeholder="Chủ nhà đi vắng cho hàng xóm để nhờ">
-                        </label>
-                        <p class="tab-hint">⚠️ <em>Nếu xe đỗ nhờ vượt quá thời gian thiết lập ở trên, hệ thống sẽ tự động đổi màu ô và báo động QUÁ HẠN.</em></p>
-                        <div class="modal-actions">
-                            <button type="submit" class="btn btn-warning">Xác nhận cho đỗ nhờ</button>
-                        </div>
-                    </form>
-
-                    <div id="cancelBorrowBox" style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px; display: none;">
-                        <form method="post" th:action="@{/slots/cancel-borrow}">
-                            <input type="hidden" name="slotId" id="cancelBorrowSlotId">
-                            <button type="submit" class="btn btn-outline" style="color: #b42318; border-color: #b42318;">Hủy thiết lập đỗ nhờ</button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Tab 3: Điều phối xe vãng lai vừa quét camera -->
-                <div id="tabGuest" class="tab-content">
-                    <form method="post" th:action="@{/slots/dispatch-session}">
-                        <input type="hidden" name="slotId" id="dispatchSlotId">
-                        <label>Chọn xe vừa quét camera vào trạm (chưa có ô):
-                            <select name="sessionId">
-                                <option value="">-- Chọn lượt xe --</option>
-                                <option th:each="sess : ${unassignedSessions}" th:value="${sess.id}"
-                                    th:text="${sess.entryPlate + ' - Vào lúc: ' + #temporals.format(sess.entryTime, 'HH:mm:ss dd/MM')}"></option>
-                            </select>
-                        </label>
-                        <p class="tab-hint">💡 <em>Danh sách này tự động lấy các xe vừa nhận diện tại WinForms nhưng chưa được phân ô.</em></p>
-                        <div class="modal-actions">
-                            <button type="submit" class="btn btn-primary" th:disabled="${#lists.isEmpty(unassignedSessions)}">Điều phối vào ô này</button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Tab 4: Khóa cấm đỗ / Giải phóng ô -->
-                <div id="tabManage" class="tab-content">
-                    <div style="display: flex; gap: 12px; flex-direction: column;">
-                        <form method="post" th:action="@{/slots/status}">
-                            <input type="hidden" name="slotId" id="statusSlotId">
-                            <input type="hidden" name="statusOverride" id="statusOverrideVal" value="BLOCKED">
-                            <button type="submit" id="btnToggleBlock" class="btn btn-outline" style="width: 100%;">🚫 Đặt làm ô Cấm đỗ / Đang bảo trì</button>
-                        </form>
-                        <form method="post" th:action="@{/slots/release}"
-                              data-confirm="Ô đỗ sẽ được chuyển về trạng thái trống và sẵn sàng tiếp nhận xe khác. Bạn có muốn tiếp tục?"
-                              data-confirm-title="Giải phóng ô đỗ">
-                            <input type="hidden" name="slotId" id="releaseSlotId">
-                            <button type="submit" class="btn btn-danger" style="width: 100%;">🗑️ Giải phóng ô (Xóa toàn bộ gán xe & đỗ nhờ)</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
+<dialog id="batchDialog" class="operation-dialog batch-dialog" aria-labelledby="batchDialogTitle">
+  <div class="operation-dialog-header"><div><p class="eyebrow">TẠO VỊ TRÍ</p><h2 id="batchDialogTitle">Tạo nhanh nhiều ô</h2></div><button type="button" class="icon-button dialog-close" data-close-batch aria-label="Đóng tạo nhiều ô">×</button></div>
+  <form method="post" th:action="@{/slots/batch-generate}">
+    <div class="batch-form-grid">
+      <label>Tầng *<input name="floor" required maxlength="50" value="Tầng hầm B1" placeholder="Tầng hầm B1, B2"></label>
+      <label>Khu vực *<input name="zoneName" required maxlength="50" value="Khu A" placeholder="Khu A · Ô tô"></label>
+      <label>Tiền tố mã ô *<input name="prefix" required maxlength="10" value="A" placeholder="A, B, C"></label>
+      <label>Số thứ tự bắt đầu *<input type="number" name="startNumber" required value="1" min="1"></label>
+      <label>Số lượng ô *<input type="number" name="count" required value="15" min="1" max="50"></label>
+      <label>Phân loại ô<select name="slotType" class="select-standard"><option value="RESIDENT">Cư dân đăng ký cố định</option><option value="VISITOR">Khách vãng lai linh hoạt</option></select></label>
+      <label class="slot-form-wide">Loại phương tiện<select name="vehicleType" class="select-standard"><option value="CAR">Ô tô</option><option value="MOTORBIKE">Xe hai bánh</option></select></label>
     </div>
-
-    <!-- Modal Tạo sơ đồ nhanh (Batch Generator) -->
-    <div id="batchModal" class="modal-backdrop" style="display: none;" onclick="closeBatchOnBackdrop(event)">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h2>➕ Tạo nhanh sơ đồ tầng / khu</h2>
-                <button type="button" class="btn-close" onclick="closeBatchModal()">✕</button>
-            </div>
-            <form method="post" th:action="@{/slots/batch-generate}">
-                <div class="modal-body">
-                    <div class="form-grid">
-                        <label>Tầng hầm *
-                            <input name="floor" required value="Tầng hầm B1" placeholder="Ví dụ: Tầng hầm B1, B2">
-                        </label>
-                        <label>Tên khu vực *
-                            <input name="zoneName" required value="Khu A" placeholder="Ví dụ: Khu A - Ô tô">
-                        </label>
-                        <label>Tiền tố mã ô *
-                            <input name="prefix" required value="A" placeholder="Ví dụ: A, B, C">
-                        </label>
-                        <label>Số thứ tự bắt đầu *
-                            <input type="number" name="startNumber" required value="1" min="1">
-                        </label>
-                        <label>Số lượng ô cần tạo *
-                            <input type="number" name="count" required value="15" min="1" max="50">
-                        </label>
-                        <label>Phân loại chỗ đỗ
-                            <select name="slotType">
-                                <option value="RESIDENT">Cư dân đăng ký cố định</option>
-                                <option value="VISITOR">Khách vãng lai linh hoạt</option>
-                            </select>
-                        </label>
-                        <label class="span-2">Loại phương tiện cho phép
-                            <select name="vehicleType">
-                                <option value="CAR">Ô tô (4-9 chỗ)</option>
-                                <option value="MOTORBIKE">Xe máy / Mô tô</option>
-                            </select>
-                        </label>
-                    </div>
-                    <p class="tab-hint">💡 <em>Hệ thống sẽ tự động tạo các ô đỗ liên tiếp (Ví dụ: Tiền tố A, bắt đầu 1, số lượng 15 -> A01, A02, ... A15).</em></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Tạo sơ đồ ngay</button>
-                    <button type="button" class="btn btn-outline" onclick="closeBatchModal()">Hủy</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- JavaScript tương tác Modal & Tabs -->
-    <script>
-        function toggleAddForm() {
-            const form = document.getElementById('addSlotSection');
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        }
-
-        function openBatchModal() {
-            document.getElementById('batchModal').style.display = 'flex';
-        }
-
-        function closeBatchModal() {
-            document.getElementById('batchModal').style.display = 'none';
-        }
-
-        function closeBatchOnBackdrop(e) {
-            if (e.target.id === 'batchModal') closeBatchModal();
-        }
-
-        function openSlotModal(el) {
-            const d = el.dataset;
-            document.getElementById('modalSlotTitle').innerText = 'Vị trí đỗ ' + d.code;
-            document.getElementById('modalLocationBadge').innerText = d.floor + ' - ' + d.zone + ' (' + (d.vehicletype === 'MOTORBIKE' ? 'Xe máy' : 'Ô tô') + ')';
-            
-            const badge = document.getElementById('modalStatusBadge');
-            badge.innerText = d.statusdesc || d.status;
-            badge.className = 'modal-badge-status status-' + d.status.toLowerCase();
-
-            // Điền thông tin tóm tắt
-            const infoAssigned = document.getElementById('infoAssigned');
-            if (d.assignedplate) {
-                infoAssigned.innerText = d.assignedplate + ' (Chủ xe: ' + (d.assignedowner || '-') + ' | Căn: ' + (d.assignedapt || '-') + ' | SĐT: ' + (d.assignedphone || '-') + ')';
-            } else {
-                infoAssigned.innerText = 'Chưa cấp cho cư dân nào';
-            }
-
-            const infoOccupied = document.getElementById('infoOccupied');
-            if (d.occupiedplate) {
-                infoOccupied.innerText = d.occupiedplate + (d.entrytime ? ' (Giờ vào: ' + d.entrytime.replace('T', ' ').substring(0, 19) + ')' : '');
-            } else {
-                infoOccupied.innerText = 'Hiện tại không có xe đỗ';
-            }
-
-            const infoBorrowed = document.getElementById('infoBorrowed');
-            const cancelBox = document.getElementById('cancelBorrowBox');
-            if (d.borrowedplate) {
-                const until = d.borroweduntil ? d.borroweduntil.replace('T', ' ').substring(0, 16) : '';
-                infoBorrowed.innerText = d.borrowedplate + ' (Hạn đến: ' + until + (d.overdue === 'true' ? ' - ⚠️ ĐÃ QUÁ GIỜ!' : '') + ')';
-                cancelBox.style.display = 'block';
-            } else {
-                infoBorrowed.innerText = 'Không có xe mượn đỗ nhờ';
-                cancelBox.style.display = 'none';
-            }
-
-            // Gán slotId cho các form
-            document.getElementById('assignSlotId').value = d.id;
-            document.getElementById('borrowSlotId').value = d.id;
-            document.getElementById('cancelBorrowSlotId').value = d.id;
-            document.getElementById('dispatchSlotId').value = d.id;
-            document.getElementById('statusSlotId').value = d.id;
-            document.getElementById('releaseSlotId').value = d.id;
-
-            // Nút toggle block
-            const btnBlock = document.getElementById('btnToggleBlock');
-            const statusVal = document.getElementById('statusOverrideVal');
-            if (d.statusoverride === 'BLOCKED') {
-                btnBlock.innerText = '✅ Mở lại vị trí đỗ (Bỏ cấm đỗ)';
-                statusVal.value = 'NORMAL';
-            } else {
-                btnBlock.innerText = '🚫 Đặt làm ô Cấm đỗ / Đang bảo trì';
-                statusVal.value = 'BLOCKED';
-            }
-
-            // Mở modal
-            showTab('tabResident');
-            document.getElementById('slotModal').style.display = 'flex';
-        }
-
-        function closeSlotModal() {
-            document.getElementById('slotModal').style.display = 'none';
-        }
-
-        function closeOnBackdrop(e) {
-            if (e.target.id === 'slotModal') closeSlotModal();
-        }
-
-        function showTab(tabId) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
-            const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
-            if (btn) btn.classList.add('active');
-            
-            const target = document.getElementById(tabId);
-            if (target) target.classList.add('active');
-        }
-    </script>
+    <p class="muted">Số lượng tối đa 50 ô cho mỗi lần tạo. Mã ô được tạo liên tiếp theo tiền tố và số thứ tự.</p>
+    <div class="operation-dialog-footer"><button type="submit" class="primary-button">Tạo ô đỗ</button><button type="button" class="secondary-button" data-close-batch>Hủy</button></div>
+  </form>
+</dialog>
 </body>
-
 </html>

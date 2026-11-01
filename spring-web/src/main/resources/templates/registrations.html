@@ -1,47 +1,331 @@
 <!DOCTYPE html>
-<html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Đăng ký hồ sơ gửi xe</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
-<body><header th:replace="~{fragments :: header}"></header><main>
-<h1>Đăng ký cư dân và phương tiện</h1>
-<div class="card help"><strong>Luồng đăng ký:</strong> nhập một lần thông tin hộ/căn hộ, người đăng ký và phương tiện. Sau khi lưu, hệ thống chuyển sang bước tạo thẻ hoặc gói 30 ngày và tự chọn đúng chiếc xe vừa đăng ký.</div>
-<form id="registrationForm" class="registration-form" method="post" enctype="multipart/form-data" th:action="@{/registrations}">
-<section class="card registration-section"><h2><span class="step-number">1</span> Thông tin hộ và căn hộ</h2><div class="form-grid">
- <label>Mã hộ<input name="householdCode" required placeholder="HH-A1-1205"></label><label>Căn hộ/phòng<input name="apartmentNumber" required placeholder="A1-1205"></label>
- <label>Tòa/block<input name="buildingName" placeholder="A1"></label><label>Điện thoại liên hệ<input name="contactPhone" placeholder="0901234567"></label>
- <label>Hạn mức xe hai bánh riêng<input name="maxTwoWheelers" type="number" min="0" th:placeholder="${'Mặc định ' + policy.defaultMaxTwoWheelers}"></label><label>Hạn mức ô tô riêng<input name="maxCars" type="number" min="0" th:placeholder="${'Mặc định ' + policy.defaultMaxCars}"></label>
-</div></section>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đăng ký hồ sơ gửi xe · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <link rel="stylesheet" th:href="@{/css/registration.css}">
+  <script type="module" defer th:src="@{/js/registration.mjs}"></script>
+</head>
+<body class="dashboard-page registrations-page" th:with="activePage='registrations'">
+  <a class="skip-link" href="#registrationMain">Đến nội dung chính</a>
+  <div class="dashboard-shell">
+    <aside class="sidebar" aria-label="Điều hướng quản trị">
+      <div th:replace="~{dashboard-shell :: navigation}"></div>
+    </aside>
+    <div class="dashboard-workspace">
+      <header class="dashboard-topbar">
+        <div class="topbar-location">
+          <button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng">
+            <img th:src="@{/images/lucide/menu.svg}" alt="">
+          </button>
+          <span>Hồ sơ <span aria-hidden="true">/</span> <strong>Đăng ký hồ sơ</strong></span>
+        </div>
+        <a class="account-link" th:href="@{/account/password}">
+          <span class="account-avatar"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span>
+          <span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span>
+        </a>
+      </header>
 
-<section class="card registration-section"><h2><span class="step-number">2</span> Người đại diện đăng ký</h2><div class="form-grid">
- <label>Họ và tên<input name="fullName" required></label><label>Số CCCD<input id="citizenId" name="citizenId" required inputmode="numeric" minlength="12" maxlength="12"></label>
- <label>Số CMND cũ<input id="oldCitizenId" name="oldCitizenId" inputmode="numeric"></label><label>Ngày sinh<input name="dateOfBirth" type="date"></label>
- <label>Giới tính<select name="gender"><option value="">-- Chọn --</option><option>Nam</option><option>Nữ</option><option>Khác</option></select></label><label>Quan hệ với chủ hộ<input name="relationshipToHead" value="Chủ hộ"></label>
- <label>Điện thoại cá nhân<input name="phone"></label><label>Email<input name="email" type="email"></label>
- <label class="span-2">Địa chỉ thường trú<input name="permanentAddress"></label><label>Ngày cấp CCCD<input name="cccdIssueDate" type="date"></label><label>Nơi cấp<input name="cccdIssuePlace"></label>
- <fieldset class="span-2"><legend>Quét QR trên CCCD để tự điền</legend><input id="cccdQrFile" type="file" accept="image/*" capture="environment"><button id="scanQr" type="button">Quét từ ảnh đã chọn</button><button id="openQrCamera" type="button">Mở camera quét QR</button><button id="captureQr" type="button" hidden>Chụp và đọc QR</button><video id="qrVideo" autoplay playsinline hidden></video><canvas id="qrCanvas" hidden></canvas><input id="cccdQrRaw" name="cccdQrRaw" type="hidden"><small id="qrStatus">Chọn ảnh QR rõ nét hoặc mở camera và đưa mặt sau CCCD vào khung hình.</small></fieldset>
- <fieldset class="span-2"><legend>Ảnh khuôn mặt đăng ký</legend><input name="registrationFaceImage" id="faceUpload" type="file" accept="image/*"><video id="faceVideo" autoplay playsinline hidden></video><img id="facePreview" alt="Ảnh khuôn mặt" hidden><canvas id="faceCanvas" hidden></canvas><input id="registrationFaceCapture" name="registrationFaceCapture" type="hidden"><button id="openCamera" type="button">Mở camera</button><button id="captureFace" type="button" hidden>Chụp ảnh</button><small>Phải tải ảnh hoặc chụp trực tiếp để đối chiếu tại cổng. Mỗi ảnh tối đa 10 MB.</small></fieldset>
-</div></section>
+      <main id="registrationMain" class="management-content" tabindex="-1">
+        <div class="page-heading registration-heading">
+          <div>
+            <p class="eyebrow">HỒ SƠ CƯ DÂN &amp; PHƯƠNG TIỆN</p>
+            <h1>Đăng ký hồ sơ gửi xe</h1>
+            <p class="page-description">Một lần nhập cho hộ gia đình, người đăng ký và phương tiện.</p>
+          </div>
+          <div class="registration-heading-mark" aria-hidden="true">
+            <img th:src="@{/images/lucide/clipboard-list.svg}" alt="">
+          </div>
+        </div>
 
-<section class="card registration-section"><h2><span class="step-number">3</span> Thông tin phương tiện</h2><div class="form-grid">
- <label>Biển số<input name="plateNumber" required placeholder="59A1-123.45"></label><label>Loại xe<select name="vehicleType" required><option th:each="t:${types}" th:value="${t}" th:text="${t.displayName}"></option></select></label>
- <label>Nhiên liệu<select name="fuelType" required><option th:each="f:${fuelTypes}" th:value="${f}" th:text="${f.displayName}"></option></select></label><label>Số giấy đăng ký xe<input name="registrationNumber" required></label>
- <label>Hãng xe<input name="brand" required></label><label>Dòng xe<input name="modelName" required></label><label>Màu xe<input name="color" required></label><label>Năm sản xuất<input name="manufactureYear" type="number" min="1950" max="2100"></label>
- <label>Số khung<input name="chassisNumber" required></label><label>Số máy<input name="engineNumber" required></label><label>Số chỗ ngồi<input name="seatCount" type="number" min="1"></label><label>Dung tích xi-lanh (cc)<input name="cylinderCapacityCc" type="number" min="0"></label>
- <label class="span-all">Ảnh giấy đăng ký xe<input id="registrationImage" type="file" name="registrationImage" accept="image/*" required><small>Mỗi ảnh tối đa 10 MB.</small></label>
-</div></section>
-<div class="registration-submit"><button type="submit">LƯU HỒ SƠ VÀ CHUYỂN SANG ĐĂNG KÝ GÓI</button></div>
-</form>
-</main><script>
-const q=id=>document.getElementById(id);let stream,qrStream;
-const MAX_IMAGE_BYTES=10*1024*1024;
-function validateImage(input,label){const file=input.files&&input.files[0];if(!file)return true;if(file.size>MAX_IMAGE_BYTES){alert(label+' vượt quá 10 MB. Hãy chọn ảnh nhỏ hơn.');input.value='';return false;}if(!file.type.startsWith('image/')){alert(label+' phải là tệp hình ảnh.');input.value='';return false;}return true;}
-function captureCompressed(video,canvas,maxSide=1280){const scale=Math.min(1,maxSide/Math.max(video.videoWidth,video.videoHeight));canvas.width=Math.max(1,Math.round(video.videoWidth*scale));canvas.height=Math.max(1,Math.round(video.videoHeight*scale));canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/jpeg',.78);}
-q('openCamera').onclick=async()=>{try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});q('faceVideo').srcObject=stream;q('faceVideo').hidden=false;q('captureFace').hidden=false;}catch(e){alert('Không mở được camera: '+e.message)}};
-q('captureFace').onclick=()=>{const v=q('faceVideo'),data=captureCompressed(v,q('faceCanvas'));q('registrationFaceCapture').value=data;q('facePreview').src=data;q('facePreview').hidden=false;v.hidden=true;if(stream)stream.getTracks().forEach(t=>t.stop());};
-q('faceUpload').onchange=e=>{if(!validateImage(e.target,'Ảnh khuôn mặt'))return;if(e.target.files[0]){q('registrationFaceCapture').value='';q('facePreview').src=URL.createObjectURL(e.target.files[0]);q('facePreview').hidden=false;}};
-q('registrationImage').onchange=e=>validateImage(e.target,'Ảnh giấy đăng ký xe');
-q('registrationForm').addEventListener('submit',e=>{if(!validateImage(q('faceUpload'),'Ảnh khuôn mặt')||!validateImage(q('registrationImage'),'Ảnh giấy đăng ký xe'))e.preventDefault();});
-const parseDate=s=>s&&s.length===8?s.slice(4)+'-'+s.slice(2,4)+'-'+s.slice(0,2):'';
-async function scanQrBlob(blob){q('qrStatus').textContent='Đang đọc QR...';try{const form=new FormData();form.append('file',blob,'cccd-qr.jpg');const response=await fetch('/api/cccd/scan-qr',{method:'POST',body:form});const data=await response.json();if(!response.ok)throw new Error(data.message||'Không đọc được QR');q('cccdQrRaw').value=data.raw||'';q('citizenId').value=data.citizenId||'';q('oldCitizenId').value=data.oldCitizenId||'';document.querySelector('[name=fullName]').value=data.fullName||'';document.querySelector('[name=dateOfBirth]').value=data.dateOfBirth||'';document.querySelector('[name=gender]').value=data.gender||'';document.querySelector('[name=permanentAddress]').value=data.permanentAddress||'';document.querySelector('[name=cccdIssueDate]').value=data.cccdIssueDate||'';q('qrStatus').textContent=data.message;}catch(e){q('qrStatus').textContent='Không đọc được QR: '+e.message;}}
-q('scanQr').onclick=()=>{const f=q('cccdQrFile').files[0];if(!f)return alert('Hãy chọn ảnh có mã QR trên CCCD');scanQrBlob(f);};
-q('openQrCamera').onclick=async()=>{try{qrStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});q('qrVideo').srcObject=qrStream;q('qrVideo').hidden=false;q('captureQr').hidden=false;q('qrStatus').textContent='Đưa mã QR vào giữa khung, giữ thẳng và tránh phản sáng.';}catch(e){q('qrStatus').textContent='Không mở được camera: '+e.message;}};
-q('captureQr').onclick=()=>{const v=q('qrVideo'),c=q('qrCanvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);c.toBlob(blob=>{if(blob)scanQrBlob(blob);},'image/jpeg',.95);if(qrStream)qrStream.getTracks().forEach(t=>t.stop());v.hidden=true;q('captureQr').hidden=true;};
-</script></body></html>
+        <div class="registration-intro glass-card">
+          <img th:src="@{/images/lucide/circle-help.svg}" alt="">
+          <p><strong>Lưu hồ sơ trước, tiếp tục sau.</strong> Sau khi lưu, bạn sẽ đến bước tiếp theo theo quyền hiện tại. Thông tin QR chỉ hỗ trợ điền biểu mẫu và cần được kiểm tra trước khi áp dụng.</p>
+        </div>
+
+        <div id="registrationFeedback" class="registration-feedback" role="status" aria-live="polite" tabindex="-1" hidden></div>
+
+        <nav class="registration-steps" aria-label="Các phần của biểu mẫu">
+          <a href="#householdSection"><span>01</span><img th:src="@{/images/lucide/house.svg}" alt=""><span>Hộ / căn hộ</span></a>
+          <a href="#residentSection"><span>02</span><img th:src="@{/images/lucide/user-round.svg}" alt=""><span>Người đăng ký</span></a>
+          <a href="#vehicleSection"><span>03</span><img th:src="@{/images/lucide/car-front.svg}" alt=""><span>Phương tiện</span></a>
+        </nav>
+
+        <form id="registrationForm" class="registration-form" method="post" enctype="multipart/form-data" th:action="@{/registrations}">
+          <div id="registrationErrors" class="registration-error-summary" role="alert" tabindex="-1" aria-labelledby="registrationErrorsTitle" hidden>
+            <h2 id="registrationErrorsTitle">Kiểm tra lại thông tin</h2>
+            <p>Các trường cần xử lý được gom theo từng phần của biểu mẫu.</p>
+            <div id="registrationErrorGroups" class="registration-error-groups"></div>
+          </div>
+
+          <section id="householdSection" class="registration-section glass-card" aria-labelledby="householdHeading">
+            <header class="registration-section-heading">
+              <span class="registration-step-number">01</span>
+              <div>
+                <p class="eyebrow">THÔNG TIN NƠI Ở</p>
+                <h2 id="householdHeading">Hộ gia đình &amp; căn hộ</h2>
+                <p>Hạn mức riêng có thể để trống để dùng mức mặc định của hệ thống.</p>
+              </div>
+            </header>
+            <div class="registration-field-grid">
+              <label class="registration-field" for="householdCode">
+                <span class="registration-field-label">Mã hộ <span class="registration-required">Bắt buộc</span></span>
+                <input id="householdCode" name="householdCode" required maxlength="40" placeholder="HH-A1-1205" autocomplete="off">
+              </label>
+              <label class="registration-field" for="apartmentNumber">
+                <span class="registration-field-label">Căn hộ / phòng <span class="registration-required">Bắt buộc</span></span>
+                <input id="apartmentNumber" name="apartmentNumber" required maxlength="40" placeholder="A1-1205" autocomplete="off">
+              </label>
+              <label class="registration-field" for="buildingName">
+                <span class="registration-field-label">Tòa / block</span>
+                <input id="buildingName" name="buildingName" maxlength="255" placeholder="A1" autocomplete="off">
+              </label>
+              <label class="registration-field" for="contactPhone">
+                <span class="registration-field-label">Điện thoại liên hệ</span>
+                <input id="contactPhone" name="contactPhone" type="tel" maxlength="255" placeholder="0901234567" autocomplete="tel">
+              </label>
+              <label class="registration-field" for="maxTwoWheelers">
+                <span class="registration-field-label">Hạn mức xe hai bánh riêng</span>
+                <input id="maxTwoWheelers" name="maxTwoWheelers" type="number" min="0" th:placeholder="${'Mặc định ' + policy.defaultMaxTwoWheelers}" aria-describedby="twoWheelerLimitHint">
+                <small id="twoWheelerLimitHint" class="registration-field-hint">Để trống để dùng hạn mức mặc định.</small>
+              </label>
+              <label class="registration-field" for="maxCars">
+                <span class="registration-field-label">Hạn mức ô tô riêng</span>
+                <input id="maxCars" name="maxCars" type="number" min="0" th:placeholder="${'Mặc định ' + policy.defaultMaxCars}" aria-describedby="carLimitHint">
+                <small id="carLimitHint" class="registration-field-hint">Để trống để dùng hạn mức mặc định.</small>
+              </label>
+            </div>
+          </section>
+
+          <section id="residentSection" class="registration-section glass-card" aria-labelledby="residentHeading">
+            <header class="registration-section-heading">
+              <span class="registration-step-number registration-step-resident">02</span>
+              <div>
+                <p class="eyebrow">THÔNG TIN NGƯỜI ĐĂNG KÝ</p>
+                <h2 id="residentHeading">Người đại diện</h2>
+                <p>Điền thủ công hoặc quét QR rồi chọn áp dụng các thông tin đã xem lại.</p>
+              </div>
+            </header>
+            <div class="registration-field-grid">
+              <label class="registration-field" for="fullName">
+                <span class="registration-field-label">Họ và tên <span class="registration-required">Bắt buộc</span></span>
+                <input id="fullName" name="fullName" required maxlength="255" autocomplete="name" placeholder="Nguyễn Văn An">
+              </label>
+              <label class="registration-field" for="citizenId">
+                <span class="registration-field-label">Số CCCD <span class="registration-required">Bắt buộc</span></span>
+                <input id="citizenId" name="citizenId" required inputmode="numeric" minlength="12" maxlength="12" autocomplete="off">
+              </label>
+              <label class="registration-field" for="oldCitizenId">
+                <span class="registration-field-label">Số CMND cũ</span>
+                <input id="oldCitizenId" name="oldCitizenId" inputmode="numeric" maxlength="20" autocomplete="off">
+              </label>
+              <label class="registration-field" for="dateOfBirth">
+                <span class="registration-field-label">Ngày sinh</span>
+                <input id="dateOfBirth" name="dateOfBirth" type="date" autocomplete="bday" aria-describedby="dateOfBirthHint">
+                <small id="dateOfBirthHint" class="registration-field-hint">Chọn ngày theo lịch trên thiết bị.</small>
+              </label>
+              <label class="registration-field" for="gender">
+                <span class="registration-field-label">Giới tính</span>
+                <select id="gender" name="gender">
+                  <option value="">Chọn giới tính</option>
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </label>
+              <label class="registration-field" for="relationshipToHead">
+                <span class="registration-field-label">Quan hệ với chủ hộ</span>
+                <input id="relationshipToHead" name="relationshipToHead" value="Chủ hộ" maxlength="255">
+              </label>
+              <label class="registration-field" for="phone">
+                <span class="registration-field-label">Điện thoại cá nhân</span>
+                <input id="phone" name="phone" type="tel" maxlength="255" autocomplete="tel">
+              </label>
+              <label class="registration-field" for="email">
+                <span class="registration-field-label">Email</span>
+                <input id="email" name="email" type="email" maxlength="255" autocomplete="email">
+              </label>
+              <label class="registration-field registration-field-wide" for="permanentAddress">
+                <span class="registration-field-label">Địa chỉ thường trú</span>
+                <input id="permanentAddress" name="permanentAddress" maxlength="500" autocomplete="street-address">
+              </label>
+              <label class="registration-field" for="cccdIssueDate">
+                <span class="registration-field-label">Ngày cấp CCCD</span>
+                <input id="cccdIssueDate" name="cccdIssueDate" type="date" aria-describedby="cccdIssueDateHint">
+                <small id="cccdIssueDateHint" class="registration-field-hint">Chọn ngày theo lịch trên thiết bị.</small>
+              </label>
+              <label class="registration-field" for="cccdIssuePlace">
+                <span class="registration-field-label">Nơi cấp</span>
+                <input id="cccdIssuePlace" name="cccdIssuePlace" maxlength="255">
+              </label>
+            </div>
+
+            <div class="registration-media-grid">
+              <fieldset id="qrMedia" class="registration-media-card">
+                <legend><img th:src="@{/images/lucide/scan-line.svg}" alt="">Quét QR CCCD <span>Không bắt buộc</span></legend>
+                <p class="registration-media-description">QR chỉ gợi ý dữ liệu. Hãy xem lại nội dung trước khi áp dụng vào biểu mẫu.</p>
+                <label class="registration-field" for="cccdQrFile">
+                  <span class="registration-field-label">Ảnh có mã QR</span>
+                  <input id="cccdQrFile" type="file" accept="image/*" aria-describedby="qrFileHint">
+                  <small id="qrFileHint" class="registration-field-hint">Chọn ảnh rõ nét, tối đa 10 MB.</small>
+                </label>
+                <div id="qrPreviewFrame" class="registration-preview-frame" hidden>
+                  <img id="qrPreview" alt="Ảnh CCCD có mã QR đã chọn" hidden>
+                  <video id="qrVideo" autoplay muted playsinline hidden></video>
+                  <p id="qrPreviewFallback" class="registration-preview-fallback" hidden></p>
+                </div>
+                <canvas id="qrCanvas" hidden></canvas>
+                <div class="registration-media-actions">
+                  <button id="scanQr" class="registration-button registration-button-secondary" type="button" disabled>
+                    <img th:src="@{/images/lucide/scan-line.svg}" alt="">Đọc ảnh QR
+                  </button>
+                  <button id="openQrCamera" class="registration-button registration-button-quiet" type="button">
+                    <img th:src="@{/images/lucide/camera.svg}" alt="">Mở camera
+                  </button>
+                  <button id="captureQr" class="registration-button registration-button-secondary" type="button" hidden>Chụp &amp; đọc</button>
+                  <button id="stopQrCamera" class="registration-button registration-button-quiet" type="button" hidden>Hủy / dừng</button>
+                </div>
+                <p id="qrStatus" class="registration-media-status" role="status" aria-live="polite">Chọn ảnh QR hoặc mở camera. Bạn cũng có thể điền CCCD thủ công.</p>
+                <div id="qrReview" class="registration-qr-review" hidden>
+                  <div class="registration-qr-review-heading">
+                    <img th:src="@{/images/lucide/circle-check.svg}" alt="">
+                    <div><strong>Đã đọc QR</strong><p>Kiểm tra từng trường trước khi áp dụng.</p></div>
+                  </div>
+                  <dl id="qrReviewFields" class="registration-qr-values"></dl>
+                  <div class="registration-media-actions">
+                    <button id="applyQr" class="registration-button registration-button-primary" type="button">Áp dụng dữ liệu đã đọc</button>
+                    <button id="discardQr" class="registration-button registration-button-quiet" type="button">Bỏ dữ liệu này</button>
+                  </div>
+                </div>
+                <input id="cccdQrRaw" name="cccdQrRaw" type="hidden">
+              </fieldset>
+
+              <fieldset id="faceMedia" class="registration-media-card">
+                <legend><img th:src="@{/images/lucide/image.svg}" alt="">Ảnh khuôn mặt đăng ký <span>Bắt buộc một nguồn</span></legend>
+                <p class="registration-media-description">Tải ảnh lên hoặc chụp trực tiếp. Khi đổi nguồn, ảnh trước đó sẽ được bỏ.</p>
+                <label class="registration-field" for="faceUpload">
+                  <span class="registration-field-label">Tệp ảnh khuôn mặt</span>
+                  <input name="registrationFaceImage" id="faceUpload" type="file" accept="image/*" required aria-describedby="faceFileHint">
+                  <small id="faceFileHint" class="registration-field-hint">Ảnh tối đa 10 MB, ở định dạng được hỗ trợ.</small>
+                </label>
+                <div id="facePreviewFrame" class="registration-preview-frame" hidden>
+                  <img id="facePreview" alt="Ảnh khuôn mặt đăng ký đã chọn" hidden>
+                  <video id="faceVideo" autoplay muted playsinline hidden></video>
+                  <p id="facePreviewFallback" class="registration-preview-fallback" hidden></p>
+                </div>
+                <canvas id="faceCanvas" hidden></canvas>
+                <input id="registrationFaceCapture" name="registrationFaceCapture" type="hidden">
+                <div class="registration-media-actions">
+                  <button id="openFaceCamera" class="registration-button registration-button-quiet" type="button">
+                    <img th:src="@{/images/lucide/camera.svg}" alt="">Mở camera
+                  </button>
+                  <button id="captureFace" class="registration-button registration-button-secondary" type="button" hidden>Chụp ảnh</button>
+                  <button id="stopFaceCamera" class="registration-button registration-button-quiet" type="button" hidden>Hủy / dừng</button>
+                </div>
+                <p id="faceStatus" class="registration-media-status" role="status" aria-live="polite">Chưa có ảnh. Camera chỉ bật khi bạn chọn mở; nếu không cấp quyền, hãy tải ảnh lên.</p>
+              </fieldset>
+            </div>
+          </section>
+
+          <section id="vehicleSection" class="registration-section glass-card" aria-labelledby="vehicleHeading">
+            <header class="registration-section-heading">
+              <span class="registration-step-number registration-step-vehicle">03</span>
+              <div>
+                <p class="eyebrow">THÔNG TIN PHƯƠNG TIỆN</p>
+                <h2 id="vehicleHeading">Phương tiện đăng ký</h2>
+                <p>Nhập theo giấy tờ đăng ký xe để đối chiếu khi cần.</p>
+              </div>
+            </header>
+            <div class="registration-field-grid">
+              <label class="registration-field" for="plateNumber">
+                <span class="registration-field-label">Biển số <span class="registration-required">Bắt buộc</span></span>
+                <input id="plateNumber" name="plateNumber" required maxlength="20" placeholder="59A1-123.45" autocomplete="off">
+              </label>
+              <label class="registration-field" for="vehicleType">
+                <span class="registration-field-label">Loại xe <span class="registration-required">Bắt buộc</span></span>
+                <select id="vehicleType" name="vehicleType" required>
+                  <option value="">Chọn loại xe</option>
+                  <option th:each="type:${types}" th:value="${type}" th:text="${type.displayName}"></option>
+                </select>
+              </label>
+              <label class="registration-field" for="fuelType">
+                <span class="registration-field-label">Nhiên liệu <span class="registration-required">Bắt buộc</span></span>
+                <select id="fuelType" name="fuelType" required>
+                  <option value="">Chọn loại nhiên liệu</option>
+                  <option th:each="fuel:${fuelTypes}" th:value="${fuel}" th:text="${fuel.displayName}"></option>
+                </select>
+              </label>
+              <label class="registration-field" for="registrationNumber">
+                <span class="registration-field-label">Số giấy đăng ký xe <span class="registration-required">Bắt buộc</span></span>
+                <input id="registrationNumber" name="registrationNumber" required maxlength="255">
+              </label>
+              <label class="registration-field" for="brand">
+                <span class="registration-field-label">Hãng xe <span class="registration-required">Bắt buộc</span></span>
+                <input id="brand" name="brand" required maxlength="255">
+              </label>
+              <label class="registration-field" for="modelName">
+                <span class="registration-field-label">Dòng xe <span class="registration-required">Bắt buộc</span></span>
+                <input id="modelName" name="modelName" required maxlength="255">
+              </label>
+              <label class="registration-field" for="color">
+                <span class="registration-field-label">Màu xe <span class="registration-required">Bắt buộc</span></span>
+                <input id="color" name="color" required maxlength="255">
+              </label>
+              <label class="registration-field" for="manufactureYear">
+                <span class="registration-field-label">Năm sản xuất</span>
+                <input id="manufactureYear" name="manufactureYear" type="number" min="1950" max="2100" inputmode="numeric">
+              </label>
+              <label class="registration-field" for="chassisNumber">
+                <span class="registration-field-label">Số khung <span class="registration-required">Bắt buộc</span></span>
+                <input id="chassisNumber" name="chassisNumber" required maxlength="255" autocomplete="off">
+              </label>
+              <label class="registration-field" for="engineNumber">
+                <span class="registration-field-label">Số máy <span class="registration-required">Bắt buộc</span></span>
+                <input id="engineNumber" name="engineNumber" required maxlength="255" autocomplete="off">
+              </label>
+              <label class="registration-field" for="seatCount">
+                <span class="registration-field-label">Số chỗ ngồi</span>
+                <input id="seatCount" name="seatCount" type="number" min="1" inputmode="numeric">
+              </label>
+              <label class="registration-field" for="cylinderCapacityCc">
+                <span class="registration-field-label">Dung tích xi-lanh (cc)</span>
+                <input id="cylinderCapacityCc" name="cylinderCapacityCc" type="number" min="0" inputmode="numeric">
+              </label>
+              <label class="registration-field registration-field-wide" for="registrationImage">
+                <span class="registration-field-label">Ảnh giấy đăng ký xe <span class="registration-required">Bắt buộc</span></span>
+                <input id="registrationImage" type="file" name="registrationImage" accept="image/*" required aria-describedby="registrationImageHint">
+                <small id="registrationImageHint" class="registration-field-hint">Tệp ảnh tối đa 10 MB.</small>
+                <span id="registrationImageStatus" class="registration-file-status" role="status" aria-live="polite">Chưa chọn ảnh.</span>
+                <span id="registrationImagePreviewFrame" class="registration-preview-frame" hidden>
+                  <img id="registrationImagePreview" alt="Ảnh giấy đăng ký xe đã chọn" hidden>
+                  <span id="registrationImagePreviewFallback" class="registration-preview-fallback" hidden></span>
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <footer class="registration-submit-panel glass-card">
+            <div>
+              <strong>Một lần gửi để lưu hồ sơ</strong>
+              <p>Hãy kiểm tra các mục bắt buộc và ảnh đã chọn trước khi tiếp tục.</p>
+            </div>
+            <button id="saveRegistrationButton" class="registration-button registration-button-primary" type="submit">
+              <img th:src="@{/images/lucide/check.svg}" alt="">
+              <span th:if="${#sets.contains(currentAuthorities, 'CARD_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Lưu hồ sơ và tiếp tục tạo gói</span>
+              <span th:unless="${#sets.contains(currentAuthorities, 'CARD_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Lưu hồ sơ</span>
+            </button>
+          </footer>
+        </form>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị">
+    <button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng</button>
+    <div th:replace="~{dashboard-shell :: navigation}"></div>
+  </dialog>
+</body>
+</html>

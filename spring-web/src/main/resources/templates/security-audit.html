@@ -1,45 +1,84 @@
-<!DOCTYPE html>
-<html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Nhật ký bảo mật</title>
-    <link rel="stylesheet" th:href="@{/css/app.css}">
-    <style>
-        .audit-success { color:var(--green); font-weight:700; }
-        .audit-failure { color:var(--red); font-weight:700; }
-        .pagination { display:flex; justify-content:space-between; align-items:center; margin-top:16px; }
-        .pagination a { text-decoration:none; }
-        td { vertical-align:top; overflow-wrap:anywhere; }
-        @media(max-width:900px) { header { align-items:flex-start; } nav { display:flex; flex-wrap:wrap; gap:10px; } nav a { margin-left:0; } }
-    </style>
-</head>
-<body>
-<header th:replace="~{fragments :: header}"></header>
-<main>
-    <h1>Nhật ký bảo mật</h1>
-    <p class="help">Các sự kiện đăng nhập, thay đổi tài khoản và quyết định bảo mật được lưu để truy vết.</p>
-    <div class="table-scroll">
-        <table>
-            <thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Đối tượng</th><th>Kết quả</th><th>Lý do</th></tr></thead>
-            <tbody>
-            <tr th:each="event : ${events.content}">
-                <td th:text="${#temporals.format(event.occurredAt, 'dd/MM/yyyy HH:mm:ss')}"></td>
-                <td th:text="${event.actorUsername ?: 'Hệ thống/ẩn danh'}"></td>
-                <td th:text="${event.action}"></td>
-                <td th:text="${(event.targetType ?: '') + (event.targetReference != null ? ' / ' + event.targetReference : '')}"></td>
-                <td th:class="${event.outcome == 'SUCCESS' ? 'audit-success' : 'audit-failure'}" th:text="${event.outcome}"></td>
-                <td th:text="${event.reason ?: '-'}"></td>
-            </tr>
-            <tr th:if="${events.empty}"><td colspan="6" class="muted">Chưa có sự kiện bảo mật.</td></tr>
-            </tbody>
-        </table>
+<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Nhật ký bảo mật · LumiPark</title>
+<link rel="stylesheet" th:href="@{/css/dashboard-ui.css}"><link rel="stylesheet" th:href="@{/css/management-core.css}"><script defer th:src="@{/js/management-core.js}"></script>
+</head><body class="dashboard-page management-page security-audit-page" th:with="activePage='audit'">
+<a href="#auditMain" class="skip-link">Đến nội dung chính</a><div class="dashboard-shell">
+<aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside>
+<div class="dashboard-workspace"><header class="dashboard-topbar"><div class="topbar-location"><button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng"><img th:src="@{/images/lucide/menu.svg}" alt=""></button><span>Quản trị / <strong>Nhật ký bảo mật</strong></span></div><a class="account-link" th:href="@{/account/password}" th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</a></header>
+<main id="auditMain" tabindex="-1"><noscript><details><summary>Mở điều hướng</summary><div th:replace="~{dashboard-shell :: navigation}"></div></details></noscript>
+<section class="page-heading audit-heading" aria-labelledby="auditTitle">
+  <div class="audit-heading-copy">
+    <p class="eyebrow">LUMIPARK / QUẢN TRỊ / EVENT RECORD</p>
+    <div class="audit-title-row"><span class="audit-heading-mark" aria-hidden="true"><img th:src="@{/images/lucide/shield-check.svg}" alt=""></span><h1 id="auditTitle">Nhật ký bảo mật</h1></div>
+    <p class="page-description">Theo dõi các dấu mốc hệ thống và tra cứu lại ngữ cảnh của từng sự kiện.</p>
+  </div>
+  <p class="audit-readonly"><span aria-hidden="true"></span>Chỉ đọc · Không sửa bản ghi</p>
+</section>
+
+<section class="glass-card management-wide audit-filter-panel" aria-labelledby="auditFilterTitle">
+  <div class="audit-panel-heading">
+    <span class="audit-panel-icon" aria-hidden="true"><img th:src="@{/images/lucide/search.svg}" alt=""></span>
+    <div><p class="eyebrow">TRUY VẤN / SERVER FILTER</p><h2 id="auditFilterTitle">Lọc sự kiện</h2><p>Đặt mốc thời gian và kết quả trước; điều kiện chi tiết có thể thu gọn.</p></div>
+  </div>
+  <form method="get" th:action="@{/security-audit}" class="audit-filter-form">
+    <div class="audit-primary-filters">
+      <fieldset class="audit-date-range">
+        <legend>Khoảng ngày</legend>
+        <label><span>Từ ngày</span><input type="date" name="from" th:value="${filterFrom}"></label>
+        <span class="audit-date-connector" aria-hidden="true">đến hết</span>
+        <label><span>Đến hết ngày</span><input type="date" name="to" th:value="${filterTo}"></label>
+      </fieldset>
+      <label class="audit-outcome-field"><span>Kết quả</span><small>Trạng thái ghi nhận</small><select name="outcome">
+        <option value="" th:selected="${#strings.isEmpty(filterOutcome)}">Tất cả kết quả</option>
+        <option value="SUCCESS" th:selected="${filterOutcome == 'SUCCESS'}">Thành công · SUCCESS</option>
+        <option value="FAILURE" th:selected="${filterOutcome == 'FAILURE'}">Thất bại · FAILURE</option>
+      </select></label>
     </div>
-    <nav class="pagination" aria-label="Phân trang nhật ký">
-        <a class="btn btn-outline" th:if="${events.hasPrevious()}" th:href="@{/security-audit(page=${events.number - 1})}">Trang trước</a>
-        <span th:text="${'Trang ' + (events.number + 1) + ' / ' + (events.totalPages == 0 ? 1 : events.totalPages)}"></span>
-        <a class="btn btn-outline" th:if="${events.hasNext()}" th:href="@{/security-audit(page=${events.number + 1})}">Trang sau</a>
-    </nav>
-</main>
-</body>
-</html>
+    <details class="audit-advanced">
+      <summary><span class="audit-advanced-copy"><strong>Điều kiện bổ sung</strong><small>Thu hẹp theo người thực hiện hoặc mã hành động</small></span><span class="audit-advanced-state" th:classappend="${(!#strings.isEmpty(filterActor) or !#strings.isEmpty(filterAction)) ? 'is-active' : ''}" th:text="${(!#strings.isEmpty(filterActor) or !#strings.isEmpty(filterAction)) ? 'Đang áp dụng' : 'Tùy chọn'}">Tùy chọn</span></summary>
+      <div class="audit-advanced-fields">
+        <label><span>Người thực hiện</span><small>Tài khoản đã tạo sự kiện</small><input type="search" name="actor" maxlength="80" autocomplete="off" th:value="${filterActor}"></label>
+        <label><span>Mã hành động</span><small>Tìm theo mã kỹ thuật, không đổi giá trị</small><input type="search" name="action" maxlength="48" autocomplete="off" th:value="${filterAction}"></label>
+      </div>
+    </details>
+    <div class="audit-filter-actions">
+      <p class="audit-timezone-note"><img th:src="@{/images/lucide/clock-3.svg}" alt="" aria-hidden="true">Ngày tính theo giờ Việt Nam; ngày kết thúc được tính trọn ngày.</p>
+      <div class="audit-filter-buttons"><a class="secondary-button" th:href="@{/security-audit}">Đặt lại</a><button class="primary-button audit-apply-button" type="submit"><img th:src="@{/images/lucide/search.svg}" alt="" aria-hidden="true">Tìm sự kiện</button></div>
+    </div>
+  </form>
+  <aside class="audit-context-note" aria-label="Cách đọc người thực hiện"><img th:src="@{/images/lucide/circle-help.svg}" alt="" aria-hidden="true"><p><strong>Người thực hiện</strong> là tác nhân ghi sự kiện. Với lần đăng nhập thất bại, tên đăng nhập được thử có thể nằm ở <strong>đối tượng</strong>, không phải cột người thực hiện.</p></aside>
+</section>
+
+<section class="glass-card management-wide audit-results-panel" aria-labelledby="auditResultsTitle">
+  <header class="audit-results-heading">
+    <div><p class="eyebrow">EVENT STREAM · MỚI NHẤT TRƯỚC</p><h2 id="auditResultsTitle"><img th:src="@{/images/lucide/clipboard-list.svg}" alt="" aria-hidden="true">Nhật ký sự kiện</h2><p>Giữ nguyên mã và giá trị gốc để hỗ trợ truy vết.</p></div>
+    <p class="audit-result-count" th:if="${filterError == null and !auditUnavailable}"><strong th:text="${events.totalElements}">0</strong><span>sự kiện phù hợp</span></p>
+  </header>
+
+  <div class="audit-alert is-invalid" th:if="${filterError}" role="alert"><img th:src="@{/images/lucide/circle-alert.svg}" alt="" aria-hidden="true"><div><strong>Chưa thể áp dụng bộ lọc</strong><p th:text="${filterError}">Kiểm tra lại khoảng ngày và nội dung tìm kiếm.</p></div></div>
+  <div class="audit-alert is-unavailable" th:if="${auditUnavailable}" role="alert"><img th:src="@{/images/lucide/circle-alert.svg}" alt="" aria-hidden="true"><div><strong>Nhật ký tạm thời không khả dụng</strong><p>Không thể truy vấn dữ liệu lúc này. Bộ lọc vẫn được giữ lại; hãy thử lại sau.</p></div></div>
+
+  <div class="audit-table-area" th:unless="${filterError != null or auditUnavailable}">
+    <p class="management-table-hint">Bảng có vùng cuộn ngang riêng. Trên màn hình hẹp, cuộn trong bảng để xem đủ trường; không làm tràn toàn trang.</p>
+    <div class="table-scroll audit-table-scroll" role="region" tabindex="0" aria-label="Bảng nhật ký bảo mật. Có thể cuộn ngang để xem mọi cột.">
+      <table class="audit-table">
+        <caption class="sr-only">Các sự kiện mới nhất trước, thời gian hiển thị theo giờ Việt Nam.</caption>
+        <colgroup><col class="audit-col-time"><col class="audit-col-actor"><col class="audit-col-action"><col class="audit-col-target"><col class="audit-col-outcome"><col class="audit-col-reason"></colgroup>
+        <thead><tr><th scope="col">Thời điểm · VN</th><th scope="col">Người thực hiện</th><th scope="col">Hành động · mã gốc</th><th scope="col">Đối tượng</th><th scope="col">Kết quả</th><th scope="col">Lý do</th></tr></thead>
+        <tbody>
+          <tr th:each="event : ${events.content}">
+            <td class="audit-time-cell"><time th:datetime="${event.occurredAt}" th:text="${#temporals.format(event.occurredAt.atZone(T(java.time.ZoneId).of('Asia/Ho_Chi_Minh')), 'dd/MM/yyyy HH:mm:ss')}">28/10/2026 09:30:00</time></td>
+            <td class="audit-actor-cell"><span th:text="${event.actorUsername ?: 'Hệ thống / ẩn danh'}">Hệ thống / ẩn danh</span></td>
+            <td class="audit-action-cell"><span class="audit-action-label" th:switch="${event.action}"><span th:case="'LOGIN_SUCCESS'">Đăng nhập thành công</span><span th:case="'LOGIN_FAILURE'">Đăng nhập thất bại</span><span th:case="'LOGIN_THROTTLED'">Giới hạn đăng nhập</span><span th:case="'ACCOUNT_PASSWORD_CHANGE'">Đổi mật khẩu</span><span th:case="'SESSION_REVOKE'">Kết thúc phiên</span><span th:case="'ACCOUNT_CREATE'">Tạo tài khoản</span><span th:case="'ACCOUNT_PROFILE_UPDATE'">Cập nhật hồ sơ tài khoản</span><span th:case="'ACCOUNT_PROFILE_AND_ROLE_UPDATE'">Cập nhật hồ sơ và vai trò</span><span th:case="'ACCOUNT_ENABLE'">Mở khóa tài khoản</span><span th:case="'ACCOUNT_DISABLE'">Khóa tài khoản</span><span th:case="'ACCOUNT_ROLE_CHANGE'">Thay đổi vai trò</span><span th:case="'ACCOUNT_FULL_NAME_CHANGE'">Đổi tên tài khoản</span><span th:case="'ACCOUNT_PASSWORD_RESET'">Đặt lại mật khẩu</span><span th:case="*">Sự kiện bảo mật</span></span><code class="audit-technical-code" th:text="${event.action}">LOGIN_FAILURE</code></td>
+            <td class="audit-target-cell"><span class="audit-target-type" th:text="${event.targetType ?: '—'}">SYSTEM_ACCOUNT</span><details class="audit-value-disclosure" th:if="${event.targetReference != null and #strings.length(event.targetReference) > 58}"><summary><span th:text="${#strings.substring(event.targetReference, 0, 58) + '…'}">account-reference-preview…</span><span class="audit-disclosure-action"><span class="audit-disclosure-more">Mở</span><span class="audit-disclosure-less">Thu gọn</span></span></summary><p th:text="${event.targetReference}">full account reference</p></details><span class="audit-target-reference" th:unless="${event.targetReference != null and #strings.length(event.targetReference) > 58}" th:text="${event.targetReference ?: '—'}">—</span></td>
+            <td class="audit-outcome-cell"><span class="audit-outcome" th:classappend="${event.outcome == 'SUCCESS' ? 'is-success' : (event.outcome == 'FAILURE' ? 'is-failure' : 'is-unknown')}"><img th:if="${event.outcome == 'SUCCESS'}" th:src="@{/images/lucide/circle-check.svg}" alt="" aria-hidden="true"><img th:if="${event.outcome == 'FAILURE'}" th:src="@{/images/lucide/circle-alert.svg}" alt="" aria-hidden="true"><span th:switch="${event.outcome}"><span th:case="'SUCCESS'">Thành công</span><span th:case="'FAILURE'">Thất bại</span><span th:case="*">Khác</span></span></span><code class="audit-outcome-code" th:text="${event.outcome}">SUCCESS</code></td>
+            <td class="audit-reason-cell"><details class="audit-value-disclosure" th:if="${event.reason != null and #strings.length(event.reason) > 120}"><summary><span th:text="${#strings.substring(event.reason, 0, 120) + '…'}">reason-preview…</span><span class="audit-disclosure-action"><span class="audit-disclosure-more">Mở</span><span class="audit-disclosure-less">Thu gọn</span></span></summary><p th:text="${event.reason}">full event reason</p></details><span class="audit-reason-value" th:unless="${event.reason != null and #strings.length(event.reason) > 120}" th:text="${event.reason ?: '—'}">—</span></td>
+          </tr>
+          <tr th:if="${events.empty}"><td colspan="6"><div class="audit-empty-state"><img th:src="@{/images/lucide/circle-help.svg}" alt="" aria-hidden="true"><div><h3 th:text="${#strings.isEmpty(filterFrom) and #strings.isEmpty(filterTo) and #strings.isEmpty(filterActor) and #strings.isEmpty(filterAction) and #strings.isEmpty(filterOutcome) ? 'Chưa có sự kiện bảo mật' : 'Không có sự kiện phù hợp'}">Chưa có sự kiện bảo mật</h3><p th:text="${#strings.isEmpty(filterFrom) and #strings.isEmpty(filterTo) and #strings.isEmpty(filterActor) and #strings.isEmpty(filterAction) and #strings.isEmpty(filterOutcome) ? 'Sự kiện sẽ xuất hiện tại đây khi được hệ thống ghi nhận.' : 'Thử mở rộng khoảng ngày hoặc xóa bớt điều kiện lọc.'}">Sự kiện sẽ xuất hiện tại đây khi được hệ thống ghi nhận.</p></div></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <nav class="audit-pagination" aria-label="Phân trang nhật ký" th:if="${!events.empty and events.totalPages > 1}"><a class="secondary-button" th:if="${events.hasPrevious()}" th:href="@{/security-audit(page=${events.number - 1},from=${filterFrom},to=${filterTo},actor=${filterActor},action=${filterAction},outcome=${filterOutcome})}">Trang trước</a><p aria-live="polite" th:text="${'Trang ' + (events.number + 1) + ' / ' + events.totalPages}">Trang 1 / 1</p><a class="secondary-button" th:if="${events.hasNext()}" th:href="@{/security-audit(page=${events.number + 1},from=${filterFrom},to=${filterTo},actor=${filterActor},action=${filterAction},outcome=${filterOutcome})}">Trang sau</a></nav>
+  </div>
+</section>
+</main></div></div><dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị"><button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button><div th:replace="~{dashboard-shell :: navigation}"></div></dialog><script>const advancedAuditFilters=document.querySelector('.audit-advanced');if([...advancedAuditFilters.querySelectorAll('input')].some(input=>input.value.trim()!==''))advancedAuditFilters.open=true;</script></body></html>

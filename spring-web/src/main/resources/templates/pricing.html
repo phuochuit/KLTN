@@ -1,13 +1,41 @@
-<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Bảng giá</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body><header th:replace="~{fragments :: header}"></header><main><h1>Bảng giá do Admin quản lý</h1>
-<p class="notice" th:if="${message}" th:text="${message}"></p>
-<div class="card help"><strong>Giá mặc định:</strong> lấy từ tài liệu khảo sát. Admin có thể điều chỉnh từng nhóm; thay đổi chỉ áp dụng cho giao dịch được tính sau thời điểm lưu.</div>
-<div class="price-grid"><form class="card price-form" method="post" th:action="@{/pricing}" th:each="p:${prices}">
-<input type="hidden" name="vehicleType" th:value="${p.vehicleType}"><h2 th:text="${p.vehicleType.displayName}"></h2>
-<label th:text="${p.vehicleType.car ? 'Giá 4 giờ đầu' : 'Giá lượt ban ngày'}"></label><input name="basePrice" type="number" min="0" required th:value="${p.basePrice}">
-<label>Giá lượt ban đêm</label><input name="nightPrice" type="number" min="0" required th:value="${p.nightPrice}" th:readonly="${p.vehicleType.car}">
-<label th:text="${p.vehicleType.car ? 'Tối thiểu mỗi đêm' : 'Giá mỗi chu kỳ qua đêm'}"></label><input name="overnightFee" type="number" min="0" required th:value="${p.overnightFee}">
-<label>Giá gói 30 ngày</label><input name="monthlyPrice" type="number" min="0" required th:value="${p.monthlyPrice}">
-<div class="car-fields" th:if="${p.vehicleType.car}"><label>Số giờ đầu<input name="baseHours" type="number" min="1" th:value="${p.baseHours}"></label><label>Số giờ mỗi block thêm<input name="extraBlockHours" type="number" min="1" th:value="${p.extraBlockHours}"></label><label>Giá mỗi block thêm<input name="extraBlockPrice" type="number" min="0" th:value="${p.extraBlockPrice}"></label></div>
-<input th:unless="${p.vehicleType.car}" type="hidden" name="baseHours" value="0"><input th:unless="${p.vehicleType.car}" type="hidden" name="extraBlockHours" value="0"><input th:unless="${p.vehicleType.car}" type="hidden" name="extraBlockPrice" value="0">
-<button>Cập nhật giá</button></form></div>
-</main></body></html>
+<!doctype html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bảng giá · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}"><link rel="stylesheet" th:href="@{/css/pricing.css}">
+  <script type="module" defer th:src="@{/js/pricing.mjs}"></script>
+</head>
+<body class="dashboard-page pricing-page" th:with="activePage='pricing'">
+  <a class="skip-link" href="#pricingMain">Đến nội dung chính</a>
+  <div class="dashboard-shell">
+    <aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside>
+    <div class="dashboard-workspace">
+      <header class="dashboard-topbar"><div class="topbar-location"><button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng"><img th:src="@{/images/lucide/menu.svg}" alt=""></button><span>Cấu hình <span aria-hidden="true">/</span> <strong>Bảng giá</strong></span></div><a class="account-link" th:href="@{/account/password}"><span class="account-avatar"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span></a></header>
+      <main id="pricingMain" class="management-content" tabindex="-1">
+        <div class="page-heading"><div><p class="eyebrow">CẤU HÌNH VẬN HÀNH</p><h1>Bảng giá gửi xe</h1><p class="page-description">Xem và cập nhật mức giá theo từng nhóm phương tiện.</p></div></div>
+        <div th:if="${message}" class="pricing-feedback pricing-success" role="status"><p th:text="${message}"></p></div>
+        <div id="pricingFeedback" class="pricing-feedback" role="status" aria-live="polite" tabindex="-1" hidden><p id="pricingFeedbackMessage"></p><a id="pricingReload" th:href="@{/pricing}" hidden>Tải lại bảng giá để kiểm tra</a></div>
+        <section class="glass-card pricing-intro" aria-labelledby="pricingIntroHeading"><img th:src="@{/images/lucide/circle-help.svg}" alt=""><div><h2 id="pricingIntroHeading">Giá hiện có trên hệ thống</h2><p>Các giá trị được tải khi mở trang. Hệ thống không cung cấp thời điểm áp dụng hoặc lịch sử phiên bản tại đây; hãy tải lại trước khi chỉnh sửa nếu dữ liệu có thể đã thay đổi.</p></div></section>
+        <section aria-labelledby="pricingListHeading"><div class="pricing-section-heading"><div><p class="eyebrow">THIẾT LẬP THEO PHƯƠNG TIỆN</p><h2 id="pricingListHeading">Mức giá theo nhóm xe</h2><p>Kiểm tra từng mức phí trước khi cập nhật.</p></div></div>
+          <p class="glass-card pricing-empty" th:if="${#lists.isEmpty(prices)}">Chưa có bảng giá được ghi nhận.</p>
+          <div class="pricing-grid"><form class="glass-card pricing-form" method="post" th:action="@{/pricing}" th:each="p:${prices}" th:attr="data-type=${p.vehicleType.displayName}">
+            <input type="hidden" name="vehicleType" th:value="${p.vehicleType}">
+            <div class="pricing-card-header"><div><p class="eyebrow" th:text="${p.vehicleType.car ? 'Ô TÔ' : 'XE HAI BÁNH'}">NHÓM XE</p><h3 th:text="${p.vehicleType.displayName}"></h3></div><img th:src="${p.vehicleType.car} ? @{/images/lucide/car-front.svg} : @{/images/lucide/bike.svg}" alt=""></div>
+            <div class="pricing-fields">
+              <label><span th:text="${p.vehicleType.car ? 'Giá khoảng giờ đầu' : 'Giá lượt ban ngày'}"></span><div class="pricing-input"><input name="basePrice" type="number" min="0" step="any" required th:value="${p.basePrice}"><span>đ</span></div></label>
+              <label><span>Giá lượt ban đêm</span><div class="pricing-input"><input name="nightPrice" type="number" min="0" step="any" required th:value="${p.nightPrice}" th:readonly="${p.vehicleType.car}"><span>đ</span></div><small th:if="${p.vehicleType.car}">Trường hiện được giữ nguyên cho ô tô.</small></label>
+              <label><span th:text="${p.vehicleType.car ? 'Tối thiểu mỗi đêm' : 'Mỗi chu kỳ qua đêm'}"></span><div class="pricing-input"><input name="overnightFee" type="number" min="0" step="any" required th:value="${p.overnightFee}"><span>đ</span></div></label>
+              <label><span>Giá gói 30 ngày</span><div class="pricing-input"><input name="monthlyPrice" type="number" min="0" step="any" required th:value="${p.monthlyPrice}"><span>đ</span></div></label>
+              <th:block th:if="${p.vehicleType.car}"><label><span>Số giờ đầu</span><div class="pricing-input"><input name="baseHours" type="number" min="1" required th:value="${p.baseHours}"><span>giờ</span></div></label><label><span>Mỗi block thêm</span><div class="pricing-input"><input name="extraBlockHours" type="number" min="1" required th:value="${p.extraBlockHours}"><span>giờ</span></div></label><label><span>Giá mỗi block thêm</span><div class="pricing-input"><input name="extraBlockPrice" type="number" min="0" step="any" required th:value="${p.extraBlockPrice}"><span>đ</span></div></label></th:block>
+              <th:block th:unless="${p.vehicleType.car}"><input type="hidden" name="baseHours" value="0"><input type="hidden" name="extraBlockHours" value="0"><input type="hidden" name="extraBlockPrice" value="0"></th:block>
+            </div><div class="pricing-card-actions"><span>Chỉ cập nhật nhóm xe này</span><button class="pricing-button" type="submit">Xem lại thay đổi</button></div>
+          </form></div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị"><button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng</button><div th:replace="~{dashboard-shell :: navigation}"></div></dialog>
+  <dialog id="pricingReview" class="pricing-review" aria-labelledby="pricingReviewTitle"><p class="eyebrow">XÁC NHẬN CẬP NHẬT</p><h2 id="pricingReviewTitle" tabindex="-1">Kiểm tra trước khi lưu</h2><p id="pricingReviewType"></p><dl id="pricingReviewValues"></dl><p>Máy chủ quyết định kết quả lưu. Hãy kiểm tra các mức giá trước khi gửi.</p><div class="pricing-review-actions"><button type="button" id="pricingCancel" class="pricing-secondary">Quay lại chỉnh sửa</button><button type="button" id="pricingConfirm" class="pricing-button">Xác nhận cập nhật</button></div></dialog>
+</body></html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Không thể lưu · LumiPark</title>
+    <link rel="stylesheet" th:href="@{/css/management-core.css}">
+</head>
+<body th:class="${returnPath == '/settings' ? 'settings-write-error' : ''}">
+<main class="management-content" th:classappend="${returnPath == '/settings' ? 'settings-write-panel' : ''}" role="main">
+    <div class="settings-write-heading" th:if="${returnPath == '/settings'}">
+        <img th:src="@{/images/lucide/circle-alert.svg}" alt="">
+        <div><p>HẠN MỨC PHƯƠNG TIỆN</p><h1>Kết quả thao tác lưu</h1></div>
+    </div>
+    <h1 th:unless="${returnPath == '/settings'}">Kết quả thao tác lưu</h1>
+    <p class="settings-write-message" role="alert" th:text="${message}">Dữ liệu chưa được lưu.</p>
+    <p th:if="${retrySafe}">Thao tác đã bị từ chối; hãy sửa dữ liệu rồi gửi lại.</p>
+    <p th:unless="${retrySafe}">Không gửi lại ngay. Tải lại danh sách để kiểm tra trạng thái trước.</p>
+    <a class="secondary-button" th:href="@{${returnPath}}"
+       onclick="if (window.history.length > 1) { window.history.back(); return false; }">Quay lại biểu mẫu</a>
+</main>
+</body>
+</html>

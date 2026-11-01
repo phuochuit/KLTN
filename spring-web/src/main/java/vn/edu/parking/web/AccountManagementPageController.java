@@ -2,6 +2,7 @@ package vn.edu.parking.web;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.session.SessionRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import vn.edu.parking.domain.AccountRole;
 import vn.edu.parking.domain.GateShiftAssignment;
 import vn.edu.parking.domain.SecurityPermission;
+import vn.edu.parking.domain.SystemAccount;
 import vn.edu.parking.repository.DesktopSessionRepository;
 import vn.edu.parking.repository.GateShiftAssignmentRepository;
 import vn.edu.parking.repository.SecurityAuditRepository;
@@ -66,47 +68,95 @@ public class AccountManagementPageController {
     }
 
     @GetMapping("/account-management")
-    String accounts(Model model) {
-        model.addAttribute("accounts", accounts.findAllByOrderByUsernameAsc());
-        model.addAttribute("roles", roles.findByEnabledTrueOrderByDisplayNameAsc());
-        model.addAttribute("gateStaff", accounts.findAllByOrderByUsernameAsc().stream()
-            .filter(a -> a.isEnabled() && a.getSecurityRole() != null
-                && a.getSecurityRole().getPermissions().contains(SecurityPermission.GATE_OPERATE)).toList());
-        populateLiveModel(model);
+    String accounts(Model model, Authentication authentication) {
+        boolean canManageAccounts = hasAuthority(authentication, SecurityPermission.ACCOUNT_MANAGE.name())
+            || hasAuthority(authentication, "ROLE_MANAGEMENT");
+        boolean canManageShifts = hasAuthority(authentication, SecurityPermission.SHIFT_MANAGE.name())
+            || hasAuthority(authentication, "ROLE_MANAGEMENT");
+        addPageCapabilities(model, canManageAccounts, canManageShifts);
+        if (!canManageAccounts) model.asMap().remove("temporaryPassword");
+        if (canManageAccounts) {
+            model.addAttribute("accounts", accounts.findAllByOrderByUsernameAsc().stream()
+                .map(AccountManagementPageController::accountView).toList());
+            model.addAttribute("roles", roles.findByEnabledTrueOrderByDisplayNameAsc().stream()
+                .map(role -> new RoleOption(role.getId(), role.getDisplayName())).toList());
+        }
+        if (canManageShifts) {
+            model.addAttribute("gateStaff", accounts.findEnabledUsernamesByPermission(SecurityPermission.GATE_OPERATE));
+        }
+        populateLiveModel(model, canManageAccounts, canManageShifts);
         return "account-management";
     }
 
     @GetMapping("/account-management/live")
-    String live(Model model) {
-        populateLiveModel(model);
+    String live(Model model, Authentication authentication) {
+        boolean canManageAccounts = hasAuthority(authentication, SecurityPermission.ACCOUNT_MANAGE.name())
+            || hasAuthority(authentication, "ROLE_MANAGEMENT");
+        boolean canManageShifts = hasAuthority(authentication, SecurityPermission.SHIFT_MANAGE.name())
+            || hasAuthority(authentication, "ROLE_MANAGEMENT");
+        model.asMap().remove("temporaryPassword");
+        addPageCapabilities(model, canManageAccounts, canManageShifts);
+        populateLiveModel(model, canManageAccounts, canManageShifts);
         return "account-management-live";
     }
 
-    private void populateLiveModel(Model model) {
+    private static void addPageCapabilities(Model model, boolean canManageAccounts, boolean canManageShifts) {
+        model.addAttribute("canManageAccounts", canManageAccounts);
+        model.addAttribute("canManageSessions", canManageAccounts);
+        model.addAttribute("canManageShifts", canManageShifts);
+        model.addAttribute("canReadLiveData", canManageAccounts || canManageShifts);
+    }
+
+    private void populateLiveModel(Model model, boolean canManageAccounts, boolean canManageShifts) {
         var now = Instant.now();
-        model.addAttribute("activeDesktopSessions", desktopSessions.findTop100ByOrderByCreatedAtDesc().stream()
-            .filter(session -> session.isActiveAt(now))
-            .map(session -> {
-                var currentShift = shifts
-                    .findByAccount_IdAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByStartsAtDesc(
-                        session.getAccount().getId(), now, now).stream().findFirst().orElse(null);
-                return new ActiveSessionView(session.getSessionId(), session.getAccount().getUsername(), session.getDeviceLabel(),
-                    local(session.getCreatedAt()), local(session.getLastSeenAt()),
-                    currentShift == null ? null : currentShift.getShiftName(),
-                    currentShift == null ? null : currentShift.getDuty());
-            }).toList());
-        model.addAttribute("activeWebSessions", webSessions.getAllPrincipals().stream()
-            .filter(AccountPrincipal.class::isInstance)
-            .map(AccountPrincipal.class::cast)
-            .flatMap(principal -> webSessions.getAllSessions(principal, false).stream()
-                .map(info -> new WebSessionView(info.getSessionId(), principal.getUsername(),
-                    local(info.getLastRequest().toInstant()))))
-            .toList());
-        model.addAttribute("shiftAssignments", shifts.findTop50ByOrderByStartsAtDesc().stream()
-            .map(shift -> new ShiftView(shift.getId(), shift.getAccount().getUsername(), shift.getShiftName(),
-                local(shift.getStartsAt()), local(shift.getEndsAt()), shift.getDuty(), shift.getNotes(),
-                !now.isBefore(shift.getStartsAt()) && now.isBefore(shift.getEndsAt())))
-            .toList());
+        model.addAttribute("liveSnapshotAt", local(now).withNano(0));
+        if (!canManageAccounts && !canManageShifts) return;
+        if (canManageAccounts) {
+            model.addAttribute("activeDesktopSessions", desktopSessions.findTop100ByOrderByCreatedAtDesc().stream()
+                .filter(session -> session.isActiveAt(now))
+                .map(session -> {
+                    var currentShift = shifts
+                        .findByAccount_IdAndStartsAtLessThanEqualAndEndsAtGreaterThanOrderByStartsAtDesc(
+                            session.getAccount().getId(), now, now).stream().findFirst().orElse(null);
+                    return new ActiveSessionView(session.getSessionId(), session.getAccount().getUsername(),
+                        session.getDeviceLabel(), local(session.getCreatedAt()), local(session.getLastSeenAt()),
+                        currentShift == null ? null : currentShift.getShiftName(),
+                        currentShift == null ? null : currentShift.getDuty());
+                }).toList());
+            model.addAttribute("activeWebSessions", webSessions.getAllPrincipals().stream()
+                .filter(AccountPrincipal.class::isInstance)
+                .map(AccountPrincipal.class::cast)
+                .flatMap(principal -> webSessions.getAllSessions(principal, false).stream()
+                    .map(info -> new WebSessionView(info.getSessionId(), principal.getUsername(),
+                        local(info.getLastRequest().toInstant()))))
+                .toList());
+        }
+        if (canManageShifts) {
+            model.addAttribute("shiftAssignments", shifts.findTop50ByOrderByStartsAtDesc().stream()
+                .map(shift -> {
+                    boolean upcoming = now.isBefore(shift.getStartsAt());
+                    boolean active = !upcoming && now.isBefore(shift.getEndsAt());
+                    String state = upcoming ? "Sắp diễn ra" : active ? "Đang diễn ra" : "Đã kết thúc";
+                    return new ShiftView(shift.getId(), shift.getAccount().getUsername(), shift.getShiftName(),
+                        local(shift.getStartsAt()), local(shift.getEndsAt()), shift.getDuty(), shift.getNotes(),
+                        active, upcoming, state);
+                })
+                .toList());
+        }
+    }
+
+    private static boolean hasAuthority(Authentication authentication, String authority) {
+        return authentication != null && authentication.getAuthorities().stream()
+            .anyMatch(granted -> authority.equals(granted.getAuthority()));
+    }
+
+    private static AccountManagementView accountView(SystemAccount account) {
+        var role = account.getSecurityRole();
+        return new AccountManagementView(account.getUsername(), account.getEmployeeCode(), account.getFullName(),
+            account.getPhone(), account.getEmail(), account.getCitizenId(), account.getDateOfBirth(),
+            account.getAddress(), role == null ? null : role.getId(),
+            role == null ? account.getRole().name() : role.getDisplayName(),
+            account.isEnabled(), account.isMustChangePassword());
     }
 
     @PostMapping("/account-management/shifts")
@@ -174,7 +224,11 @@ public class AccountManagementPageController {
             LocalDateTime lastSeenAt, String shiftName, String duty) { }
     public record WebSessionView(String sessionId, String username, LocalDateTime lastSeenAt) { }
     public record ShiftView(Long id, String username, String shiftName, LocalDateTime startsAt,
-            LocalDateTime endsAt, String duty, String notes, boolean active) { }
+            LocalDateTime endsAt, String duty, String notes, boolean active, boolean upcoming, String state) { }
+    public record AccountManagementView(String username, String employeeCode, String fullName, String phone,
+            String email, String citizenId, LocalDate dateOfBirth, String address, Long roleId,
+            String roleDisplayName, boolean enabled, boolean mustChangePassword) { }
+    public record RoleOption(Long id, String displayName) { }
 
     @PostMapping("/account-management/create")
     String create(@RequestParam String username, @RequestParam Long roleId,
@@ -240,10 +294,67 @@ public class AccountManagementPageController {
     }
 
     @GetMapping("/security-audit")
-    String audit(@RequestParam(defaultValue = "0") int page, Model model) {
-        int safePage = Math.max(0, page);
-        var events = audit.findAllByOrderByOccurredAtDesc(PageRequest.of(safePage, 25));
+    String audit(@RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "") String from, @RequestParam(defaultValue = "") String to,
+            @RequestParam(defaultValue = "") String actor, @RequestParam(defaultValue = "") String action,
+            @RequestParam(defaultValue = "") String outcome, Model model) {
+        actor = actor.trim(); action = action.trim(); outcome = outcome.trim();
+        String error = null;
+        LocalDate start = null, end = null;
+        try {
+            if ((!from.isBlank() && !from.matches("\\d{4}-\\d{2}-\\d{2}"))
+                    || (!to.isBlank() && !to.matches("\\d{4}-\\d{2}-\\d{2}"))) throw new IllegalArgumentException();
+            if (!from.isBlank()) start = LocalDate.parse(from);
+            if (!to.isBlank()) end = LocalDate.parse(to);
+            if ((start != null && end != null && start.isAfter(end)) || actor.length() > 80
+                    || action.length() > 48 || outcome.length() > 16) throw new IllegalArgumentException();
+        } catch (RuntimeException ex) { error = "Bộ lọc không hợp lệ. Hãy kiểm tra khoảng ngày và nội dung tìm kiếm."; }
+        final Instant startInstant = start == null ? null : start.atStartOfDay(VIETNAM).toInstant();
+        final Instant endInstant = end == null || end.equals(LocalDate.MAX) ? null : end.plusDays(1).atStartOfDay(VIETNAM).toInstant();
+        final String actorTerm = actor.toLowerCase(java.util.Locale.ROOT);
+        final String actionTerm = action.toLowerCase(java.util.Locale.ROOT);
+        final String outcomeTerm = outcome.toLowerCase(java.util.Locale.ROOT);
+        final boolean invalid = error != null;
+        org.springframework.data.jpa.domain.Specification<vn.edu.parking.domain.SecurityAuditEvent> filter = (root, query, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            if (invalid) predicates.add(cb.disjunction());
+            if (startInstant != null) predicates.add(cb.greaterThanOrEqualTo(root.get("occurredAt"), startInstant));
+            if (endInstant != null) predicates.add(cb.lessThan(root.get("occurredAt"), endInstant));
+            if (!actorTerm.isBlank()) predicates.add(cb.like(cb.lower(root.get("actorUsername")), "%" + escapeLike(actorTerm) + "%", '\\'));
+            if (!actionTerm.isBlank()) predicates.add(cb.like(cb.lower(root.get("action")), "%" + escapeLike(actionTerm) + "%", '\\'));
+            if (!outcomeTerm.isBlank()) predicates.add(cb.equal(cb.lower(root.get("outcome")), outcomeTerm));
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        var auditSort = org.springframework.data.domain.Sort.by(
+            org.springframework.data.domain.Sort.Order.desc("occurredAt"),
+            org.springframework.data.domain.Sort.Order.desc("id"));
+        int requestedPage = Math.max(0, page);
+        var pageable = PageRequest.of(requestedPage, 25, auditSort);
+        org.springframework.data.domain.Page<vn.edu.parking.domain.SecurityAuditEvent> events =
+                org.springframework.data.domain.Page.empty(PageRequest.of(0, 25, auditSort));
+        boolean auditUnavailable = false;
+        if (error == null) {
+            try {
+                events = audit.findAll(filter, pageable);
+                int availablePage = events.getTotalPages() == 0 ? 0
+                        : Math.min(requestedPage, events.getTotalPages() - 1);
+                if (availablePage != requestedPage) {
+                    events = audit.findAll(filter, PageRequest.of(availablePage, 25, auditSort));
+                }
+            } catch (org.springframework.dao.DataAccessException ex) {
+                auditUnavailable = true;
+                events = org.springframework.data.domain.Page.empty(PageRequest.of(0, 25, auditSort));
+            }
+        }
         model.addAttribute("events", events);
+        model.addAttribute("auditUnavailable", auditUnavailable);
+        model.addAttribute("filterFrom", from); model.addAttribute("filterTo", to);
+        model.addAttribute("filterActor", actor); model.addAttribute("filterAction", action);
+        model.addAttribute("filterOutcome", outcome); model.addAttribute("filterError", error);
         return "security-audit";
+    }
+
+    private static String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }
