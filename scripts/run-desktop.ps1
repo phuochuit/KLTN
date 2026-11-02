@@ -19,6 +19,12 @@ $project = Join-Path $workspace 'desktop-winform\ParkingGateDesktop.csproj'
 $releaseExe = Join-Path $workspace 'desktop-winform\bin\Release\net8.0-windows\ParkingGateDesktop.exe'
 $releaseDll = Join-Path $workspace 'desktop-winform\bin\Release\net8.0-windows\ParkingGateDesktop.dll'
 
+$existing = Get-Process -Name 'ParkingGateDesktop' -ErrorAction SilentlyContinue
+if ($existing) {
+    Stop-Process -InputObject $existing -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+}
+
 Write-Host 'Dang bien dich ban WinForms moi nhat...' -ForegroundColor Cyan
 & $dotnet build $project --configuration Release
 if ($LASTEXITCODE -ne 0) {
