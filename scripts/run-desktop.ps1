@@ -1,5 +1,10 @@
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $PSScriptRoot
+
+if (Test-Path "$env:LOCALAPPDATA\dotnet8\dotnet.exe") {
+    $env:Path = "$env:LOCALAPPDATA\dotnet8;" + $env:Path
+}
+
 $localDotnet = Join-Path $workspace 'tools\dotnet\dotnet.exe'
 $globalDotnet = Get-Command 'dotnet.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
 $dotnet = $globalDotnet
