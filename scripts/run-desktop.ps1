@@ -2,7 +2,8 @@ $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $PSScriptRoot
 
 if (Test-Path "$env:LOCALAPPDATA\dotnet8\dotnet.exe") {
-    $env:Path = "$env:LOCALAPPDATA\dotnet8;" + $env:Path
+    $env:DOTNET_ROOT = "$env:LOCALAPPDATA\dotnet8"
+    $env:Path = "$env:DOTNET_ROOT;" + $env:Path
 }
 
 $localDotnet = Join-Path $workspace 'tools\dotnet\dotnet.exe'
@@ -16,6 +17,7 @@ $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $project = Join-Path $workspace 'desktop-winform\ParkingGateDesktop.csproj'
 $releaseExe = Join-Path $workspace 'desktop-winform\bin\Release\net8.0-windows\ParkingGateDesktop.exe'
+$releaseDll = Join-Path $workspace 'desktop-winform\bin\Release\net8.0-windows\ParkingGateDesktop.dll'
 
 Write-Host 'Dang bien dich ban WinForms moi nhat...' -ForegroundColor Cyan
 & $dotnet build $project --configuration Release
@@ -24,4 +26,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host 'Dang mo ung dung tram gac...' -ForegroundColor Green
-Start-Process -FilePath $releaseExe -Wait
+if (Test-Path $releaseDll) {
+    Start-Process -FilePath $dotnet -ArgumentList "`"$releaseDll`"" -Wait
+} else {
+    Start-Process -FilePath $releaseExe -Wait
+}
