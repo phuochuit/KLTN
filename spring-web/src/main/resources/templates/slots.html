@@ -66,13 +66,234 @@
         .subform-pricing .form-grid {
             margin-bottom: 0;
         }
-        .checkbox-inline {
-            display: inline-flex;
+        /* ==================== Modal Tạo nhanh sơ đồ tầng / khu Hiện Đại & Trực Quan ==================== */
+        #batchModal .modal-dialog,
+        #vehicleTypeModal .modal-dialog,
+        #zoneConvertModal .modal-dialog {
+            max-width: 700px;
+            width: 95%;
+            border-radius: 16px;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+            overflow: hidden;
+            background: #ffffff;
+        }
+        .modal-header-batch {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            padding: 18px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #ffffff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .modal-header-batch h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .modal-header-batch .modal-desc {
+            font-size: 0.82rem;
+            color: #94a3b8;
+            margin-top: 4px;
+            font-weight: 400;
+        }
+        .batch-form-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .form-section-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px 18px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .form-section-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #1e293b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
             align-items: center;
             gap: 6px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #e2e8f0;
+            margin: 0;
+        }
+        .form-grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .form-grid-3col {
+            display: grid;
+            grid-template-columns: 1.1fr 1fr 1fr;
+            gap: 14px;
+        }
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .field-group label {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0;
+        }
+        .field-group label .req {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .field-group input, 
+        .field-group select {
+            width: 100%;
+            height: 42px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.92rem;
+            color: #0f172a;
+            background: #ffffff;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+        .field-group input:focus,
+        .field-group select:focus {
+            border-color: #0284c7;
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+            outline: none;
+        }
+        /* Toggle Tầng Hầm dạng pill trực quan */
+        .basement-toggle-wrapper {
+            display: flex;
+            align-items: center;
+            margin-top: 6px;
+        }
+        .basement-toggle-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8fafc;
+            border: 1.5px solid #cbd5e1;
+            padding: 6px 14px;
+            border-radius: 8px;
             cursor: pointer;
+            font-size: 0.86rem;
+            font-weight: 600;
+            color: #475569;
             user-select: none;
-            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .basement-toggle-pill input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #0284c7;
+            margin: 0;
+        }
+        .basement-toggle-pill:hover {
+            border-color: #94a3b8;
+            background: #f1f5f9;
+        }
+        .basement-toggle-pill:has(input:checked) {
+            background: #e0f2fe;
+            border-color: #0284c7;
+            color: #0369a1;
+            box-shadow: 0 1px 2px rgba(2, 132, 199, 0.1);
+        }
+        /* Nút thêm loại xe inline */
+        .btn-add-type-inline {
+            background: none;
+            border: none;
+            color: #0284c7;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+            transition: color 0.15s;
+        }
+        .btn-add-type-inline:hover {
+            color: #0369a1;
+        }
+        /* Thẻ xem trước trực quan chuẩn Parking Ticket */
+        .preview-ticket-card {
+            background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+            border: 1.5px solid #6ee7b7;
+            border-radius: 12px;
+            padding: 14px 18px;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .preview-ticket-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .preview-ticket-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #065f46;
+        }
+        .preview-range-badge {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: #047857;
+            background: #ffffff;
+            border: 1px solid #a7f3d0;
+            padding: 4px 12px;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            letter-spacing: 0.5px;
+        }
+        .preview-ticket-stats {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.86rem;
+            color: #047857;
+            flex-wrap: wrap;
+        }
+        .preview-stat-pill {
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid #a7f3d0;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            color: #047857;
+        }
+        .preview-ticket-hint {
+            font-size: 0.8rem;
+            color: #059669;
+            margin: 0;
+            font-style: italic;
+        }
+        .section-separator {
+            border: none;
+            border-top: 1px dashed #e2e8f0;
+            margin: 4px 0;
         }
         .conversion-preview-card {
             border: 1px solid #cbd5e1;
@@ -392,63 +613,125 @@
     <!-- Modal Tạo sơ đồ nhanh (Batch Generator) -->
     <div id="batchModal" class="modal-backdrop" style="display: none;" onclick="closeBatchOnBackdrop(event)">
         <div class="modal-dialog">
-            <div class="modal-header">
-                <h2>➕ Tạo nhanh sơ đồ tầng / khu</h2>
-                <button type="button" class="btn-close" onclick="closeBatchModal()">✕</button>
+            <div class="modal-header-batch">
+                <div>
+                    <h2>➕ Tạo nhanh sơ đồ tầng / khu vực</h2>
+                    <div class="modal-desc">Khởi tạo hàng loạt ô đỗ tự động theo tầng, khu vực và đánh số chuẩn hóa</div>
+                </div>
+                <button type="button" class="btn-close" onclick="closeBatchModal()" title="Đóng">✕</button>
             </div>
             <form method="post" th:action="@{/slots/batch-generate}" onsubmit="recordFormOptions(this)">
-                <div class="modal-body">
-                    <div class="form-grid">
-                        <label>Tầng *
-                            <div style="display: flex; gap: 8px; align-items: center;">
-                                <input list="floorDatalist" id="batchFloorInput" name="floor" required placeholder="Ví dụ: Tầng hầm B1, Tầng 1" style="flex: 1;" onchange="onFloorInputChange(this)">
-                                <label class="checkbox-inline">
-                                    <input type="checkbox" id="batchIsBasement" name="isBasement" value="true" onchange="onBasementCheckboxChange(this)"> Tầng hầm
-                                </label>
+                <div class="modal-body" style="padding: 18px 22px; max-height: calc(85vh - 130px); overflow-y: auto;">
+                    <div class="batch-form-container">
+                        
+                        <!-- Khối 1: Vị trí bãi xe -->
+                        <div class="form-section-card">
+                            <div class="form-section-title">
+                                <span>📍 1. Vị trí & Phân khu</span>
                             </div>
-                        </label>
-                        <label>Tên khu vực *
-                            <input list="zoneDatalist" id="batchZoneInput" name="zoneName" required placeholder="Ví dụ: Khu A - Ô tô">
-                        </label>
-                        <label>Tiền tố mã ô *
-                            <input list="prefixDatalist" id="batchPrefixInput" name="prefix" required placeholder="Ví dụ: A, B, C" style="text-transform: uppercase;" oninput="onPrefixChange(this.value)">
-                        </label>
-                        <label>Số thứ tự bắt đầu *
-                            <input type="number" id="batchStartNumber" name="startNumber" required value="1" min="1" oninput="updateBatchLivePreview()">
-                        </label>
-                        <label>Số lượng ô cần tạo *
-                            <input type="number" id="batchCount" name="count" required value="15" min="1" max="100" oninput="updateBatchLivePreview()">
-                        </label>
-                        <label>Phân loại chỗ đỗ
-                            <select name="slotType">
-                                <option value="RESIDENT">Cư dân đăng ký cố định</option>
-                                <option value="VISITOR">Khách vãng lai linh hoạt</option>
-                            </select>
-                        </label>
-                        <label class="span-2">Loại phương tiện cho phép
-                            <div style="display: flex; gap: 8px;">
-                                <select name="vehicleType" id="batchVehicleTypeSelect" class="dynamic-vehicle-type-select" style="flex: 1;" required onchange="updateBatchLivePreview()">
-                                    <option value="CAR">Ô tô</option>
-                                    <option value="MOTORBIKE">Xe máy</option>
-                                </select>
-                                <button type="button" class="btn btn-outline" style="white-space: nowrap;" onclick="openVehicleTypeModal()">➕ Thêm loại mới</button>
+                            <div class="form-grid-2col">
+                                <div class="field-group">
+                                    <label>
+                                        <span>Tầng đỗ xe <span class="req">*</span></span>
+                                    </label>
+                                    <input list="floorDatalist" id="batchFloorInput" name="floor" required 
+                                           placeholder="Ví dụ: B1, B2, Tầng 1, Tầng 2..." 
+                                           onchange="onFloorInputChange(this)" autocomplete="off">
+                                    <div class="basement-toggle-wrapper">
+                                        <label class="basement-toggle-pill" title="Đánh dấu nếu đây là tầng hầm">
+                                            <input type="checkbox" id="batchIsBasement" name="isBasement" value="true" onchange="onBasementCheckboxChange(this)">
+                                            <span>🏢 Đây là Tầng hầm</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="field-group">
+                                    <label>
+                                        <span>Tên phân khu <span class="req">*</span></span>
+                                    </label>
+                                    <input list="zoneDatalist" id="batchZoneInput" name="zoneName" required 
+                                           placeholder="Ví dụ: Khu A - Ô tô con" autocomplete="off">
+                                    <span style="font-size: 0.78rem; color: #64748b; margin-top: 4px;">💡 Gợi ý: Khu A, Khu B, Khu Xe Máy...</span>
+                                </div>
                             </div>
-                        </label>
-                    </div>
-
-                    <!-- Live preview banner -->
-                    <div id="batchLivePreviewBox" class="live-preview-box">
-                        <div>
-                            <strong>Dự kiến:</strong> <span id="batchLivePreviewText">Mã ô: A01 ➔ A15 (15 ô)</span>
                         </div>
-                        <span id="batchCapacityPreviewText" style="font-size: 0.9em; opacity: 0.85;">Quy chuẩn: 15 xe</span>
-                    </div>
 
-                    <p class="tab-hint" style="margin-top: 10px;">💡 <em>Khi bạn gõ chữ cái tiền tố (A, B...), hệ thống tự động tính số thứ tự tiếp theo và cập nhật tên khu tương ứng.</em></p>
+                        <!-- Khối 2: Quy định ô đỗ & phương tiện -->
+                        <div class="form-section-card">
+                            <div class="form-section-title">
+                                <span>🚗 2. Quy chuẩn phương tiện & Mục đích</span>
+                            </div>
+                            <div class="form-grid-2col">
+                                <div class="field-group">
+                                    <label>
+                                        <span>Loại phương tiện <span class="req">*</span></span>
+                                        <button type="button" class="btn-add-type-inline" onclick="openVehicleTypeModal()">+ Thêm loại mới</button>
+                                    </label>
+                                    <select name="vehicleType" id="batchVehicleTypeSelect" class="dynamic-vehicle-type-select" required onchange="updateBatchLivePreview()">
+                                        <option value="CAR">Ô tô (Quy chuẩn: 5 đơn vị)</option>
+                                        <option value="MOTORBIKE">Xe máy (Quy chuẩn: 1 đơn vị)</option>
+                                    </select>
+                                </div>
+                                <div class="field-group">
+                                    <label>
+                                        <span>Phân loại chỗ đỗ <span class="req">*</span></span>
+                                    </label>
+                                    <select name="slotType" required>
+                                        <option value="RESIDENT">⭐ Cư dân đăng ký cố định</option>
+                                        <option value="VISITOR">👥 Khách vãng lai linh hoạt</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Khối 3: Quy tắc đánh số tự động -->
+                        <div class="form-section-card">
+                            <div class="form-section-title">
+                                <span>🔢 3. Quy tắc sinh mã tự động</span>
+                            </div>
+                            <div class="form-grid-3col">
+                                <div class="field-group">
+                                    <label><span>Chữ cái tiền tố <span class="req">*</span></span></label>
+                                    <input list="prefixDatalist" id="batchPrefixInput" name="prefix" required 
+                                           placeholder="A" maxlength="5"
+                                           style="text-transform: uppercase; font-weight: 700; text-align: center; font-size: 1.1rem; letter-spacing: 2px;" 
+                                           oninput="onPrefixChange(this.value)" autocomplete="off">
+                                </div>
+                                <div class="field-group">
+                                    <label><span>STT bắt đầu <span class="req">*</span></span></label>
+                                    <input type="number" id="batchStartNumber" name="startNumber" required value="1" min="1" 
+                                           style="text-align: center; font-weight: 600; font-size: 1.05rem;" 
+                                           oninput="updateBatchLivePreview()">
+                                </div>
+                                <div class="field-group">
+                                    <label><span>Số lượng ô tạo <span class="req">*</span></span></label>
+                                    <input type="number" id="batchCount" name="count" required value="15" min="1" max="100" 
+                                           style="text-align: center; font-weight: 600; font-size: 1.05rem;" 
+                                           oninput="updateBatchLivePreview()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Khối 4: Thẻ Xem trước trực quan sinh động -->
+                        <div id="batchLivePreviewBox" class="preview-ticket-card">
+                            <div class="preview-ticket-header">
+                                <div class="preview-ticket-title">
+                                    <span>🅿️ Sẽ tự động tạo:</span>
+                                    <span id="batchLivePreviewText" class="preview-range-badge">A01 ➔ A15</span>
+                                </div>
+                                <span class="preview-stat-pill" id="batchCountBadge">📦 15 ô đỗ</span>
+                            </div>
+                            <div class="preview-ticket-stats">
+                                <span class="preview-stat-pill" id="batchCapacityPreviewText">⚖️ Tổng sức chứa: 75 đơn vị (15 xe)</span>
+                                <span class="preview-stat-pill">✨ Tự động định dạng số 2 chữ số</span>
+                            </div>
+                            <p class="preview-ticket-hint">💡 Khi gõ chữ cái tiền tố (A, B...), hệ thống tự động dò tìm số thứ tự trống tiếp theo và điền sẵn tên khu vực.</p>
+                        </div>
+
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Tạo sơ đồ ngay</button>
-                    <button type="button" class="btn btn-outline" onclick="closeBatchModal()">Hủy</button>
+                <div class="modal-footer" style="padding: 14px 22px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" class="btn btn-outline" onclick="closeBatchModal()" style="min-width: 90px; border-radius: 8px;">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-primary" style="min-width: 170px; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);">🚀 Khởi tạo sơ đồ ngay</button>
                 </div>
             </form>
         </div>
@@ -687,17 +970,25 @@
             const padStart = String(start).padStart(2, '0');
             const padEnd = String(end).padStart(2, '0');
 
-            document.getElementById('batchLivePreviewText').innerText =
-                `Mã ô: ${prefix}${padStart} ➔ ${prefix}${padEnd} (${count} ô)`;
+            const previewTextEl = document.getElementById('batchLivePreviewText');
+            if (previewTextEl) {
+                previewTextEl.innerText = `${prefix}${padStart} ➔ ${prefix}${padEnd}`;
+            }
+            const countBadge = document.getElementById('batchCountBadge');
+            if (countBadge) {
+                countBadge.innerText = `📦 ${count} ô đỗ`;
+            }
 
             const vtSelect = document.getElementById('batchVehicleTypeSelect');
-            const vtCode = vtSelect.value;
+            const vtCode = vtSelect ? vtSelect.value : 'CAR';
             const vtObj = cachedVehicleTypes.find(t => t.code === vtCode);
             const units = vtObj ? vtObj.capacityUnits : (vtCode === 'MOTORBIKE' ? 1 : 5);
             const totalUnits = count * units;
 
-            document.getElementById('batchCapacityPreviewText').innerText =
-                `Tổng sức chứa: ${totalUnits} đơn vị (${count} xe)`;
+            const capEl = document.getElementById('batchCapacityPreviewText');
+            if (capEl) {
+                capEl.innerText = `⚖️ Tổng sức chứa: ${totalUnits} đơn vị (${count} xe)`;
+            }
         }
 
         // ==================== Quản lý Loại Phương Tiện Động (B03, B07) ====================
