@@ -31,7 +31,7 @@ Report ở `.artifacts/test-runs/<run-id>/`: XML/TRX, combined stdout/stderr, to
 
 Cache/temp tái tạo ở `.cache/`; mỗi lượt có report/temp riêng, không tái sử dụng hoặc tự xóa report cũ. Không đưa local config, credentials, operational media, `.cache/` hoặc `.artifacts/` vào Git. Giữ native `target/`, `bin/`, `obj/` của từng module.
 
-**Ranh giới Spring main:** test resource đặt H2 driver/dialect và JWT off; từng integration class khai báo in-memory URL/create-drop, DesktopJwtIntegrationTest bật JWT bằng synthetic keys. ParkingFlowIntegrationTest còn tắt evidence và dùng fixed `target/test-uploads`/`target/test-private`; các class khác cũng có media defaults/relative paths. Runner tách TEMP/TMP/java.io.tmpdir nhưng không sửa các paths này; per-class/JVM media isolation của feature branch chưa có trên main. Phải xác nhận effective test datasource/media và không dùng operational storage trước khi được phép chạy; đừng copy create-drop tới DB thật. Không có Flyway dependency/migration test suite trên main.
+**Ranh giới Spring trong PR:** test resources đặt H2 driver/dialect và JWT off, nhưng không tự bảo đảm mọi class có URL/media cô lập. `LoginTestIsolation` cấp H2 in-memory/create-drop và media root riêng cho các lớp đã đăng ký, gồm ParkingFlow và DailyPackageValidity; dynamic properties ghi đè cả các annotation path cũ của ParkingFlow. Demo account bootstrap bị tắt trong fixture này; DesktopJwtIntegrationTest có synthetic keys riêng. Các class khác vẫn cần kiểm annotation/config hiệu lực trước khi chạy. Runner chỉ tách TEMP/TMP/java.io.tmpdir, không biến môi trường thật thành test DB. Không copy create-drop sang DB thật hoặc coi source isolation là bằng chứng live E2E. Không có Flyway dependency/migration suite trên main đã tích hợp.
 
 ## GitHub Actions
 
@@ -78,44 +78,17 @@ try {
 
 Chỉ kết luận PASS sau khi kiểm exit code và XML mới trong `$reports`: có test thực thi, không failures/errors, không toàn skipped. Giữ logs/report kể cả khi lỗi; đây vẫn là kiểm thử nội bộ, không live E2E.
 
-## API/E2E và browser harness
-
-### LumiPark Login focused/browser harness
-
-Spring tests/build cần Node22+ và frontend dependencies: từ `spring-web` chạy `npm ci --cache ../.cache/npm` trước Maven. `npm test` chạy3 JS tests bằng Node test doubles; không thay browser QA. Maven process-classes build Tailwind CSS/Lucide subset, không tự cài dependencies. Workflow Verify job Spring chuẩn bị Node24.21.0/npm11.19.0 và npm ci; triggers/permissions không đổi.
-
-Focused `LoginPageIntegrationTest` kiểm native bindings/CSRF/assets, feedback, authentication/forced-change/logout/throttle bằng real Spring security + H2, mock ANPR; kết hợp `SecurityAuthorizationIntegrationTest` để kiểm hồi quy trang cũ. Dùng report/temp mới như focused example phía trên. Không bật MockMvc request printing vì có credentials và token trong request.
-
-`LoginBrowserHarnessTest` là opt-in, mặc định skipped để không treo runner. Khi được duyệt, chạy một mình bằng `-Dtest=LoginBrowserHarnessTest -Dparking.test.login-browser.enabled=true -Dparking.test.login-browser.run-directory=<absolute-fresh-run-directory>` cùng report/temp riêng. Directory phải tồn tại dưới `.artifacts/test-runs/` hoặc `.cache/test-temp/`, không có server.port/stop. Harness bind loopback/random port, H2 in-memory riêng, media/cache riêng, không bootstrap account thật; tắt JWT chỉ trong test context và mock ANPR. Đây không phải production config hay gate E2E.
-
-Khi sẵn sàng, file `server.port` chỉ chứa port; truy cập `http://127.0.0.1:<port>/login`. Synthetic fixture identity/credential định nghĩa trong test source, không dùng tài khoản thật; không ghi password, cookies, CSRF hoặc request body vào screenshots/logs. Tạo marker `stop` trong chính run-directory để kết thúc; tự dừng sau15 phút. Không chạy Maven clean/suite khác song song. Xác minh server/build và hash static response trước QA; health không đủ chứng minh nguồn mới.
-
-Browser checks opt-in: từ root chạy `node tests/e2e/web/login.mjs <absolute-or-relative-run-directory>`. Dùng Playwright devDependency đã lock trong spring-web và Microsoft Edge cài sẵn (channel msedge); không tự tải browser. Runner chỉ đọc port từ run-directory dưới .artifacts/test-runs và fixture credential từ test source, không nhận URL tùy ý. Tắt trace/credential screenshots, errors chỉ lưu type/path đã bỏ query, screenshots chỉ lấy form trống/feedback. Lưu browser-checks.json và browser-errors-sanitized.json; legacy destination tự request /favicon.ico được báo riêng, không che lỗi assets mới.
-
-Group 4A focused browser review dùng cùng harness cô lập: `node tests/e2e/web/management-core.mjs <fresh-run-directory> [stage]`. Stage tạo thư mục con mới, không ghi đè; kiểm năm trang ở desktop/mobile/320px, hồ sơ/editor, quota, draft, synthetic save và các nhánh lỗi được script khai báo, audit/settings/password. QR response và camera là mock synthetic; ảnh fixture H2 không chứng minh camera/QR thật, MySQL hoặc quyền runtime production. `checks.json` chỉ xuất hiện khi script hoàn tất; đối chiếu browser exit, harness exit và XML mới, không suy visual approval từ assertion PASS.
-
-Login layout checks đo scroll dimensions và CTA bounds ở1920×1080,1536×864,1440×900,1366×768,1280×720,1024×768 cho default/error/throttled/passwordChanged; output `viewport-measurements.json` và screenshot đúng viewport, không chỉ full-page. Resize cùng page qua17 desktop widths960→1600/bước40px, đo form/padding và lưu `fluid-resize.json`: không width plateau toàn khoảng, không width jump bất thường trong desktop mode; cap đọc544px và chuyển một cột dưới960px là chủ đích. Mobile320/375/390/430px kiểm header→panel24–40px và input/CTA≥48px, lưu `mobile-positions.json`. Không dùng body overflow hidden để giả không cuộn. Mobile320px/landscape812×375 vẫn được cuộn và phải focus tới CTA được; có forced-colors/opaque/reduced-motion QA, không phải WCAG certification hoặc bàn phím ảo thật. Chất lượng thị giác cần xem ảnh trước/sau cùng viewport, không suy từ test PASS. Khi đổi template trong vòng lặp render cần restart harness (Thymeleaf cache mặc định); có thể dùng `-Dspring.thymeleaf.cache=false` **chỉ trên lệnh test harness**, rồi copy đúng template/assets mới vào build output, không đổi runtime config hoặc chạy Maven clean song song.
-
-Chỉ ghi Playwright PASS cho scenarios thực chạy. H2/MockMvc không thay live browser; browser trên H2/mock ANPR cũng không chứng minh target DB hoặc AI integrations. Chưa có suite browser automation tổng quát cho toàn Web.
-
-### Dashboard & Overview browser checks
-
-Dashboard dùng cùng opt-in `LoginBrowserHarnessTest` ở trên (Spring loopback/H2, tài khoản synthetic, ANPR mock), không dùng DB runtime. Chạy từ root:
-
-```powershell
-node tests/e2e/web/dashboard.mjs <fresh-run-directory-with-server.port> final
-```
-
-Script tạo thư mục `final/` mới và từ chối ghi đè. Có thể dùng stage `baseline`, `shell`, `charts` hoặc `refined` để **render/quan sát trong quá trình dựng UI**; chỉ stage `final` chạy đầy đủ assertion tương tác. Nếu cần lượt final mới với cùng harness, tạo thư mục con mới dưới run, copy duy nhất `server.port` rồi truyền thư mục đó; report phải ghi rõ harness gốc. Không lấy kết quả từ stage preview làm PASS.
-
-Đầu tiên suite đăng nhập thật, gọi API đọc mới và lưu `real-api-empty.png` từ H2. Sau đó route mock31 giao dịch **chỉ trong browser** để kiểm populated/paging/error states; không seed DB thật. Ảnh `viewport-*.png` là visual fixture, không dữ liệu vận hành. Các nhóm kiểm hiện hành sở hữu tại `dashboard-ux.mjs`: phân trang/tìm kiếm/source, URL/reload/Back/Forward, tổng toàn kỳ độc lập trang, không scroll-jump khi đổi trang, drill-down có CTA, range/reset, lỗi/thử lại, summary pending/failed và request supersession, sidebar/dropdown/drawer, forced colors/reduced motion, logout và no-JS. Output `checks.json` và screenshots; counts/source khác với suite Dashboard cũ được giữ trong report lịch sử. Không tự suy từ test count ra visual acceptance hoặc full WCAG.
-
-Dashboard UX/data hiện hành: `node tests/e2e/web/dashboard-ux.mjs <run-directory-with-server.port> final`; `dashboard.mjs` là entry tương thích chuyển tới suite này. Stage preview phục vụ quan sát trước khi chạy final. Suite gọi real isolated overview/summary/transactions trước, sau đó dùng browser-only fixture31 giao dịch để kiểm trang/tìm kiếm/source/URL/history/error/race và layout; không claim fixture là data vận hành. Report mới trong stage riêng, không ghi đè. Có ảnh dropdown thực đang mở, popup ở đáy mobile và sidebar ngắn, không chỉ ảnh trạng thái đóng. Pagination phải giữ tổng toàn kỳ và không làm trang nhảy do bảng bị collapse.
-
-`DashboardQueryIntegrationTest` kiểm DB-side pagination/totals/order/literal search/validation/permissions và midnight-boundary consistency giữa trend/summary/transactions. `DashboardPageIntegrationTest` kiểm render/CSRF/local assets/navigation, H2 totals, gate-staff policy và KPI OPEN dẫn tới danh sách thực sự lọc. Chạy focused cùng `LoginPageIntegrationTest,SecurityAuthorizationIntegrationTest` theo lệnh focused ở trên. Login browser regression kiểm Dashboard dùng CSS riêng, rồi mở `/vehicles` để kiểm legacy `app.css` và confirmation dialog vẫn cô lập.
-
-Nhánh dữ liệu demo được chủ dự án cấp: `node tests/e2e/web/dashboard-live.mjs <fresh-report-directory> baseline` hoặc stage `connected-final`. Đọc credential local theo [hướng dẫn](../docs/operations/setup-and-troubleshooting.md#phiên-demo-được-chủ-dự-án-cấp-cho-dashboard-uiux), chỉ dùng đúng origin đã duyệt. Không trace/log credential hay row identifiers; ảnh mask tên tài khoản và bodies bảng. Baseline dùng API legacy hiện có; connected-final yêu cầu API đọc mới, đối chiếu trend/summary với toàn bộ trang DTO, kiểm trùng và tổng. Nếu Web chưa restart để nạp backend mới thì báo BLOCKED, không dùng baseline/mock/H2 để thay cho connected PASS. Không tự kill/restart owner's process hoặc seed/reset DB.
+## API/E2E chưa triển khai
 
 Vị trí được duyệt: `tests/api/`, `tests/e2e/web/`, `tests/e2e/desktop/`, fixtures synthetic ở `tests/fixtures/`; chỉ tạo suite/helper khi có implementation thật.
 
 Trước live run phải xác nhận URL, DB/schema/media test độc lập, tài khoản synthetic/quyền, credential channel và seed/cleanup. Không tự dùng datasource hiện tại, reset DB, mở camera hoặc gọi mutation route. Spring thật + ANPR giả cần ghi nhãn như vậy, không full E2E. Web harness và Windows UI Automation chưa chọn; Playwright không test WinForms. Desktop outbox tests hiện có không thay cho client↔Spring network test; HTTP doubles của feature branch chỉ là lịch sử và cũng không live network proof.
+
+## Package-policy integration regression coverage
+
+The approved Web integration adds/extends Spring coverage in `DailyPackageValidityIntegrationTest` and `ParkingFlowIntegrationTest` for inclusive DAILY validity, fixed 30-day MONTHLY validity, ACTIVE-only activation, legacy `PER_VISIT` rejection for new purchases, and optional package activation in the combined registration POST. Root owns execution; these tests are **not yet reported as run** by this handoff. Focused execution should include both classes plus `CsvExportIntegrationTest` (upstream CSV preservation) and frontend model/asset checks for cards, pricing, and registration. Use the existing isolated test runner and fresh report directory; do not infer PASS from test source.
+
+
+## Final review LumiPark Web
+
+[Kết quả và giới hạn](../docs/review/web-final-review-integration.md) ghi số liệu mới nhất theo từng lớp, không gộp các lượt trùng thành test mới. Không lấy report H2/mock thành live E2E. Legacy `login.mjs`/`management-core.mjs` hiện bắt buộc ownership của listener đúng process tree LoginBrowserHarnessTest; thiếu/stop/sai marker thì từ chối trước browser. Chạy regression guard độc lập từ root: `node --test tests/e2e/web/isolated-harness.test.mjs` (không khởi động ứng dụng hoặc mutation nghiệp vụ). Các helper opt-in không thuộc default frontend test glob; những API browser ngoài quyền hiện hành không được sử dụng chỉ vì có trong source lịch sử.

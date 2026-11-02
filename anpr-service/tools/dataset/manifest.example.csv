@@ -1,0 +1,22 @@
+sample_id,kind,image_path,expected_plate,expected_vehicle,expected_liveness,expected_decision,condition
+V-0001,vehicle,samples/day/car-front-001.jpg,51H88888,CAR,,,day_front
+V-0002,vehicle,samples/day/car-rear-002.jpg,51H88888,CAR,,,day_rear
+V-0003,vehicle,samples/night/motorbike-001.jpg,59A112345,MOTORBIKE,,,night_front
+V-0004,vehicle,samples/night/motorbike-002.jpg,59A112345,MOTORBIKE,,,night_backlit
+V-0005,vehicle,samples/near/car-close-001.jpg,51H88888,CAR,,,near
+V-0006,vehicle,samples/far/car-far-001.jpg,51H88888,CAR,,,far
+V-0007,vehicle,samples/blur/motorbike-blur-001.jpg,59A19999,MOTORBIKE,,,motion_blur
+V-0008,vehicle,samples/tilt/car-tilt-001.jpg,51H88888,CAR,,,plate_tilted
+V-0009,vehicle,samples/dirty/car-dirty-001.jpg,51H88888,CAR,,,plate_dirty
+V-0010,vehicle,samples/occluded/motorbike-occluded-001.jpg,59A18888,MOTORBIKE,,,plate_occluded
+L-0001,liveness,samples/liveness/live-001.mp4,,,LIVE,,live_person
+L-0002,liveness,samples/liveness/live-002.mp4,,,LIVE,,live_person_backlit
+L-0003,liveness,samples/liveness/print-001.mp4,,,SPOOF,,printed_photo
+L-0004,liveness,samples/liveness/phone-001.mp4,,,SPOOF,,phone_replay
+L-0005,liveness,samples/liveness/video-001.mp4,,,SPOOF,,video_replay
+L-0006,liveness,samples/liveness/dark-001.mp4,,,REVIEW,,too_dark
+F-0001,face,samples/face/registered-pass-001.jpg,,, ,PASS,registered_member
+F-0002,face,samples/face/registered-pass-002.jpg,,, ,PASS,registered_member_backlit
+F-0003,face,samples/face/unknown-001.jpg,,, ,REJECT,unknown_person
+F-0004,face,samples/face/partial-001.jpg,,, ,REVIEW,partially_occluded
+F-0005,face,samples/face/printed-pass-001.jpg,,, ,REJECT,printed_face

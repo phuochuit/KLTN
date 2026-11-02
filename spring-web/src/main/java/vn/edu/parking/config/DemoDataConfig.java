@@ -192,6 +192,8 @@ public class DemoDataConfig {
         }
         if (!existed || rule.getNightPrice() == null || legacyMotorbike || legacyCar)
             rule.setNightPrice(BigDecimal.valueOf(night));
+        if (!existed || rule.getDailyPassPrice().signum() == 0 || legacyMotorbike || legacyCar)
+            rule.setDailyPassPrice(BigDecimal.valueOf(overnight));
         if (!existed || (type.isCar() && rule.getBaseHours() == 0) || legacyCar) rule.setBaseHours(baseHours);
         if (!existed || (type.isCar() && rule.getExtraBlockHours() == 0) || legacyCar) rule.setExtraBlockHours(extraHours);
         if (!existed || (type.isCar() && rule.getExtraBlockPrice().signum() == 0) || legacyCar)

@@ -77,8 +77,6 @@ Chi tiết [authentication](authentication.md). DesktopAuthController chỉ tạ
 | POST | `/roles/create` |
 | POST | `/roles/update` |
 
-`GET /security-audit` accepts optional `page`, `from`, `to`, `actor`, `action`, and `outcome` query parameters. Dates are inclusive Vietnam calendar dates; actor/action are literal case-insensitive substring searches, outcome is case-insensitive exact matching. The server returns 25 records per page. Invalid dates/ranges or overlong search terms display an error and no unfiltered results. This is an HTML page, not a new JSON API.
-
 ## Spring — Web pages/forms/JSON
 
 Nguồn [AdminController](../../spring-web/src/main/java/vn/edu/parking/web/AdminController.java), [CccdQrController](../../spring-web/src/main/java/vn/edu/parking/web/CccdQrController.java), [GateEvidenceAdminController](../../spring-web/src/main/java/vn/edu/parking/web/GateEvidenceAdminController.java), [PaymentController](../../spring-web/src/main/java/vn/edu/parking/web/PaymentController.java). Web session/permissions; CSRF cho forms/QR/payment (main bỏ qua `/api/parking/**`). Contracts/forms ở [contracts](contracts.md), thao tác ở [user guide](../operations/user-guide.md); không REST CRUD mọi entity.
@@ -91,7 +89,6 @@ Nguồn [AdminController](../../spring-web/src/main/java/vn/edu/parking/web/Admi
 | POST | `/registrations` |
 | POST | `/vehicles` |
 | GET | `/admin-data/vehicles/{id}` |
-| GET | `/admin-data/vehicles/households/{householdId}/quota-preview` |
 | GET | `/households` |
 | POST | `/households` |
 | POST | `/members` |
@@ -115,10 +112,6 @@ Nguồn [AdminController](../../spring-web/src/main/java/vn/edu/parking/web/Admi
 | GET | `/pricing` |
 | POST | `/pricing` |
 | GET | `/sessions` |
-| GET | `/api/dashboard/overview` |
-| GET | `/api/parking/revenue/trend` |
-| GET | `/api/parking/revenue/summary` |
-| GET | `/api/parking/revenue/transactions` |
 | GET | `/api/parking/revenue/monthly` |
 | GET | `/api/parking/revenue/filter` |
 | GET | `/api/parking/revenue/monthly/{year}/{month}` |
@@ -128,10 +121,6 @@ Nguồn [AdminController](../../spring-web/src/main/java/vn/edu/parking/web/Admi
 | POST | `/payments/{id}/reconcile` |
 | GET | `/payments/receipts/{id}` |
 | GET | `/payments/reports/reconciliation` |
-
-**Group 4A worktree (khác snapshot main ở đầu trang):** `GET /vehicles` nhận `q`, `page`, `vehicleId`; tìm literal và phân trang 10 kết quả. `GET /admin-data/vehicles/{id}` trả `registrationImageAvailable` thay vì đường dẫn ảnh giấy xe. `GET /admin-data/vehicles/households/{householdId}/quota-preview` nhận `vehicleType` bắt buộc và `vehicleId` tùy chọn, trả JSON `activeCount`, `limit`, `householdSpecific`; số lượng là tham khảo theo nhóm xe, chỉ xe active và loại trừ ID được truyền, không thay kiểm tra khi lưu. Cả hai JSON route yêu cầu Web session có `VEHICLE_MANAGE` hoặc `ROLE_MANAGEMENT`. Đây là mô tả source/worktree, không chứng nhận live deployment.
-
-Dashboard read-model routes bổ sung bởi `DashboardQueryController`; query/DTO/permission và half-open boundary tại [contracts](contracts.md#dashboard-read-model-và-giao-dịch-phân-trang). `/sessions` nhận optional `q`, `status`, `from`, `to`, `sort`, `page`, `size`; `status` cho KPI OPEN lọc thật, còn `from`/`to` là ngày vào xe inclusive và truy vấn theo half-open local `LocalDateTime`. Các route legacy giữ nguyên contract.
 
 ## ANPR và demo riêng
 

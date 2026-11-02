@@ -110,30 +110,19 @@ class CardWriteTransactionIntegrationTest {
         String receiptNumber = transactions.findDetailedById(linkedTransactionId).orElseThrow().getReceiptNumber();
         assertThat(receiptNumber).isNotBlank();
         assertThat(result.getFlashMap().get("message")).isEqualTo(
-            "Đã kích hoạt gói 30 ngày đến 2026-11-30. Biên nhận: " + receiptNumber);
+            "Đã kích hoạt Gói 30 ngày đến 2026-11-30. Đã thu 150000 đ. Biên nhận: " + receiptNumber);
     }
 
     @Test
-    void perVisitPassPersistsCardWithoutSubscriptionOrPayment() throws Exception {
+    void rejectsNewLegacyPerVisitWithoutCardSubscriptionOrPaymentWrites() throws Exception {
         WriteCounts before = writeCounts();
         Vehicle vehicle = vehicle();
-
-        MvcResult result = mvc.perform(post("/cards").with(csrf())
+        mvc.perform(post("/cards").with(csrf())
                 .param("vehicleId", vehicle.getId().toString())
                 .param("status", CardStatus.ACTIVE.name())
                 .param("passType", PassType.PER_VISIT.name()))
-            .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/cards")).andReturn();
-
-        ParkingCard card = cards.findByVehicleId(vehicle.getId()).orElseThrow();
-        assertThat(card.getPassType()).isEqualTo(PassType.PER_VISIT);
-        assertThat(card.getValidFrom()).isNull();
-        assertThat(card.getValidUntil()).isNull();
-        assertThat(card.getSubscriptionFee()).isZero();
-        assertThat(cards.count()).isEqualTo(before.cards() + 1);
-        assertThat(subscriptions.count()).isEqualTo(before.subscriptions());
-        assertThat(transactions.count()).isEqualTo(before.transactions());
-        assertThat(result.getFlashMap().get("message")).isEqualTo("Đã lưu thẻ vé lượt");
+            .andExpect(status().isBadRequest());
+        assertNoCardOperationWrites(before, vehicle.getId());
     }
 
     @Test

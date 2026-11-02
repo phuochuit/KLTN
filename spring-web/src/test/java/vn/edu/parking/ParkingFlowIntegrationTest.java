@@ -65,11 +65,14 @@ class ParkingFlowIntegrationTest {
     @Autowired PaymentTransactionRepository paymentTransactions;
     @Autowired ParkingSessionRepository parkingSessions;
     @Autowired SystemAccountRepository systemAccounts;
+    @Autowired org.springframework.core.env.Environment environment;
 
     @Test
     @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void completesEntryPreviewAndExitFlow() throws Exception {
         seedCollectorAccount();
+        long paymentsBefore = paymentTransactions.count();
+        int openBefore = parkingSessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN).size();
         String body = """
             {"plateNumber":"59A1-123.45","cardCode":"59A112345","vehicleType":"MOTORBIKE","manualOverride":false}
             """;
@@ -78,7 +81,7 @@ class ParkingFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.plateNumber", is("59A112345")))
             .andExpect(jsonPath("$.status", is("OPEN")))
-            .andExpect(jsonPath("$.warning", is(false)));
+            .andExpect(jsonPath("$.warning", is(true)));
 
         mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
             .andExpect(status().isOk())
@@ -87,8 +90,8 @@ class ParkingFlowIntegrationTest {
 
         mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(body))
             .andExpect(status().isBadRequest());
-        assertThat(parkingSessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN)).hasSize(1);
-        assertThat(paymentTransactions.count()).isZero();
+        assertThat(parkingSessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN)).hasSize(openBefore + 1);
+        assertThat(paymentTransactions.count()).isEqualTo(paymentsBefore);
 
         String paidBody = """
             {"plateNumber":"59A1-123.45","cardCode":"59A112345","vehicleType":"MOTORBIKE","manualOverride":false,"paymentMethod":"CASH"}
@@ -98,7 +101,7 @@ class ParkingFlowIntegrationTest {
             .andExpect(jsonPath("$.status", is("COMPLETED")))
             .andExpect(jsonPath("$.fee", anyOf(is(5000), is(8000))))
             .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("biên nhận")));
-        assertThat(paymentTransactions.count()).isEqualTo(1);
+        assertThat(paymentTransactions.count()).isEqualTo(paymentsBefore + 1);
     }
 
     @Test
@@ -139,7 +142,7 @@ class ParkingFlowIntegrationTest {
             .andExpect(jsonPath("$.status", is("COMPLETED")))
             .andExpect(jsonPath("$.fee", is(0)))
             .andExpect(jsonPath("$.message",
-                org.hamcrest.Matchers.containsString("gói tháng còn hiệu lực")))
+                org.hamcrest.Matchers.containsString("gói trả trước còn hiệu lực")))
             .andExpect(jsonPath("$.receiptNumber").doesNotExist())
             .andExpect(jsonPath("$.paymentMethod").doesNotExist());
         assertThat(paymentTransactions.count()).isEqualTo(paymentCountBefore);
@@ -199,8 +202,9 @@ class ParkingFlowIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "admin", roles = "MANAGEMENT")
-    void combinedRegistrationCreatesHouseholdMemberVehicleThenOpensPackageStep() throws Exception {
+    @WithMockUser(username = "admin", authorities = "VEHICLE_MANAGE")
+    void vehicleManagerCanActivateOptionalDailyPackageWithoutChangingUpstreamPermission() throws Exception {
+        seedCollectorAccount();
         byte[] image = java.util.Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
         MockMultipartFile face = new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image);
@@ -210,6 +214,8 @@ class ParkingFlowIntegrationTest {
         existingOpenSession.setEntryTime(java.time.LocalDateTime.now().minusMinutes(2));
         existingOpenSession.setDetectedVehicleType(VehicleType.CAR);
         existingOpenSession = parkingSessions.saveAndFlush(existingOpenSession);
+        long transactionsBefore = paymentTransactions.count();
+        LocalDate packageStartDate = LocalDate.now();
         mvc.perform(multipart("/registrations").file(face).file(registration).with(csrf())
                 .param("householdCode", "HH-COMBINED-01").param("apartmentNumber", "C1-0101")
                 .param("buildingName", "C1").param("contactPhone", "0901000001")
@@ -218,9 +224,11 @@ class ParkingFlowIntegrationTest {
                 .param("plateNumber", "61A1-234.56").param("vehicleType", "MOTORBIKE")
                 .param("fuelType", "GASOLINE").param("registrationNumber", "DKX-COMBINED")
                 .param("brand", "Honda").param("modelName", "Vision").param("color", "Đen")
-                .param("chassisNumber", "FRAME-COMBINED").param("engineNumber", "ENGINE-COMBINED"))
+                .param("chassisNumber", "FRAME-COMBINED").param("engineNumber", "ENGINE-COMBINED")
+                .param("passType", "DAILY").param("packageStartDate", packageStartDate.toString())
+                .param("packageDurationDays", "3").param("paymentMethod", "CASH"))
             .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrlPattern("/cards?vehicleId=*"));
+            .andExpect(redirectedUrlPattern("/vehicles?vehicleId=*"));
 
         Vehicle vehicle = vehicles.findByPlateNumberIgnoreCase("61A123456").orElseThrow();
         assertEquals("HH-COMBINED-01", vehicle.getHousehold().getHouseholdCode());
@@ -229,6 +237,32 @@ class ParkingFlowIntegrationTest {
         ParkingSession updatedOpenSession = parkingSessions.findById(existingOpenSession.getId()).orElseThrow();
         assertEquals(vehicle.getId(), updatedOpenSession.getVehicle().getId());
         assertEquals(VehicleType.MOTORBIKE, updatedOpenSession.getDetectedVehicleType());
+        ParkingCard activated = cards.findByVehicleId(vehicle.getId()).orElseThrow();
+        assertEquals(PassType.DAILY, activated.getPassType());
+        assertEquals(packageStartDate.plusDays(2), activated.getValidUntil());
+        assertThat(activated.getSubscriptionFee()).isEqualByComparingTo(
+            prices.findByVehicleType(VehicleType.MOTORBIKE).orElseThrow().getDailyPassPrice().multiply(BigDecimal.valueOf(3)));
+        assertThat(paymentTransactions.count()).isEqualTo(transactionsBefore + 1);
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
+    void combinedRegistrationWithoutPackageLeavesCardUnpurchased() throws Exception {
+        byte[] image = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        MockMultipartFile face = new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image);
+        MockMultipartFile registration = new MockMultipartFile("registrationImage", "registration.png", "image/png", image);
+        mvc.perform(multipart("/registrations").file(face).file(registration).with(csrf())
+                .param("householdCode", "HH-COMBINED-NOPACK").param("apartmentNumber", "C1-0102")
+                .param("fullName", "Cư dân chưa mua gói").param("citizenId", "079205019298")
+                .param("plateNumber", "61A1-234.57").param("vehicleType", "MOTORBIKE")
+                .param("fuelType", "GASOLINE").param("registrationNumber", "DKX-NOPACK")
+                .param("brand", "Honda").param("modelName", "Vision").param("color", "Đen")
+                .param("chassisNumber", "FRAME-NOPACK").param("engineNumber", "ENGINE-NOPACK"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrlPattern("/cards?vehicleId=*"));
+        Vehicle vehicle = vehicles.findByPlateNumberIgnoreCase("61A123457").orElseThrow();
+        assertThat(cards.findByVehicleId(vehicle.getId())).isEmpty();
     }
 
     @Test
@@ -344,6 +378,43 @@ class ParkingFlowIntegrationTest {
         assertEquals(2, vehicle.getAuthorizedMembers().size());
         assertTrue(vehicle.getAuthorizedMemberNames().contains("Người chồng kiểm thử"));
         assertTrue(vehicle.getAuthorizedMemberNames().contains("Người vợ kiểm thử"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = "VEHICLE_MANAGE")
+    void failedInlinePackagePaymentRollsBackRegistrationAndNewPrivateImages() throws Exception {
+        seedCollectorAccount();
+        long householdCount = households.count(), memberCount = members.count(), vehicleCount = vehicles.count();
+        long cardCount = cards.count(), paymentCount = paymentTransactions.count(), imageCount = privateImageCount();
+        byte[] image = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        mvc.perform(multipart("/registrations")
+                .file(new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image))
+                .file(new MockMultipartFile("registrationImage", "registration.png", "image/png", image)).with(csrf())
+                .param("householdCode", "HH-ROLLBACK-PKG").param("apartmentNumber", "SYNTHETIC-PKG")
+                .param("fullName", "Synthetic package rollback").param("citizenId", "079205019288")
+                .param("plateNumber", "61B1-234.56").param("vehicleType", "MOTORBIKE")
+                .param("fuelType", "GASOLINE").param("registrationNumber", "SYNTHETIC-PKG")
+                .param("brand", "Test").param("modelName", "Test").param("color", "Test")
+                .param("chassisNumber", "SYNTHETIC-PKG").param("engineNumber", "SYNTHETIC-PKG")
+                .param("passType", "DAILY").param("packageDurationDays", "3")
+                .param("paymentMethod", "BANK_TRANSFER"))
+            .andExpect(status().isBadRequest()); // Missing bank reference fails after staging profile/card work.
+        assertThat(households.count()).isEqualTo(householdCount);
+        assertThat(members.count()).isEqualTo(memberCount);
+        assertThat(vehicles.count()).isEqualTo(vehicleCount);
+        assertThat(cards.count()).isEqualTo(cardCount);
+        assertThat(paymentTransactions.count()).isEqualTo(paymentCount);
+        assertThat(vehicles.findByPlateNumberIgnoreCase("61B123456")).isEmpty();
+        assertThat(privateImageCount()).isEqualTo(imageCount);
+    }
+
+    private long privateImageCount() throws Exception {
+        java.nio.file.Path storage = java.nio.file.Path.of(environment.getRequiredProperty("parking.private-storage-path"));
+        if (!java.nio.file.Files.exists(storage)) return 0;
+        try (var files = java.nio.file.Files.walk(storage)) {
+            return files.filter(java.nio.file.Files::isRegularFile).count();
+        }
     }
 
     private void seedCollectorAccount() {

@@ -12,7 +12,6 @@ const dateText = value => { const date = new Date(value); return value && !Numbe
 const navigation = $('#navigationDialog');
 $('#openNavigation').addEventListener('click', () => navigation.showModal());
 $('#closeNavigation').addEventListener('click', () => navigation.close());
-matchMedia('(min-width: 64rem)').addEventListener('change', event => { if (event.matches && navigation.open) navigation.close(); });
 document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', event => { if (!window.confirm('Bạn muốn đăng xuất khỏi hệ thống?')) event.preventDefault(); }));
 
 const now = new Date();
@@ -28,6 +27,12 @@ function controls() {
   for (const name of ['type','year','month','from','to']) $({type:'#filterType',year:'#filterYear',month:'#filterMonth',from:'#filterFrom',to:'#filterTo'}[name]).value = state[name];
   $('#transactionSearch').value = state.q; $('#transactionSource').value = state.source; $('#transactionSort').value = state.sort;
   $('#trendWindow').value = String(state.months); changeType();
+  const exportParams = new URLSearchParams({type:state.type});
+  if (state.type === 'month') { exportParams.set('year',state.year); exportParams.set('month',state.month); }
+  else if (state.type === 'year') exportParams.set('year',state.year);
+  else { exportParams.set('from',state.from); exportParams.set('to',state.to); }
+  const exportLink = $('#exportRevenueCsv');
+  if (exportLink) exportLink.href = '/revenue/export-csv?' + exportParams;
 }
 function changeType() {
   const type = $('#filterType').value;

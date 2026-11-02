@@ -4,7 +4,7 @@
 
 ## Cách đọc trạng thái
 
-Đây là tổng hợp evidence đã thu thập, không full repository audit hay application readiness certificate. Acceptance tài liệu không xác nhận code đã đáp ứng nghiệp vụ. Verification lịch sử ngày 2026-10-09/10 ghi nhận Spring 108/108, Desktop 12/12 và Release build sạch; ANPR 10/10 là lượt chạy trước. Lượt Spring mới nhất ngày 2026-10-24 trên nhánh RBAC đạt 128/128, gồm permission/role regressions và H2 V1–V6 rehearsal (`20261024T020410Z-spring-04215e1a`); Desktop/ANPR không chạy lại trong lượt này. Các kết quả H2/fake không xác nhận MySQL thật, TLS, Spring–FastAPI/camera thực hoặc backup/restore; các mục này vẫn PENDING. Mức inspection trong tài liệu cũ là snapshot; [testing](testing/strategy.md) ghi test IDs/assertions và executions, còn [architecture](architecture/system.md) và [operations](operations/setup-and-troubleshooting.md) ghi actual boundaries. Focused Group 4B worktree evidence ngày 2026-10-29 đến 2026-11-01 được ghi riêng bên dưới và không chuyển thành current-main result.
+Đây là tổng hợp evidence đã thu thập, không full repository audit hay application readiness certificate. Acceptance tài liệu không xác nhận code đã đáp ứng nghiệp vụ. Verification lịch sử ngày 2026-10-09/10 ghi nhận Spring 108/108, Desktop 12/12 và Release build sạch; ANPR 10/10 là lượt chạy trước. Lượt Spring mới nhất ngày 2026-10-24 trên nhánh RBAC đạt 128/128, gồm permission/role regressions và H2 V1–V6 rehearsal (`20261024T020410Z-spring-04215e1a`); Desktop/ANPR không chạy lại trong lượt này. Các kết quả H2/fake không xác nhận MySQL thật, TLS, Spring–FastAPI/camera thực hoặc backup/restore; các mục này vẫn PENDING. Mức inspection trong tài liệu cũ là snapshot; [testing](testing/strategy.md) ghi test IDs/assertions và executions, còn [architecture](architecture/system.md) và [operations](operations/setup-and-troubleshooting.md) ghi actual boundaries.
 
 | Nhãn | Ý nghĩa |
 | --- | --- |
@@ -13,6 +13,27 @@
 | **Partially implemented** | Có code cho một subset cụ thể, không completion toàn NV |
 | **Not verified** | Chưa đủ assertions/runtime/source authority; không tự kết luận không có implementation |
 | **Known discrepancy** | Nguồn/claim khác actual observation hoặc variants xung đột; cần quyết định/kiểm chứng |
+
+## Cập nhật 2026-10-26 — main `eb471d7`
+
+Mục này bổ sung cho bảng `abd6183` bên dưới, không thay thế bản ghi lịch sử. Đo lại trên `main` ngày 2026-10-26:
+
+| Hạng mục | Kết quả đo | Ghi chú |
+| --- | --- | --- |
+| Spring test | 152 tests, 0 failures, 0 errors (BUILD SUCCESS) | thay cho 108/128 của các nhánh trước |
+| ANPR test | 38 passed | |
+| OCR `plate-960.jpg` | 2,4s → 1,19s | `denoised → enlarged → straightened → equalized`, early-stop `conf ≥ 0,80` |
+| OCR ảnh camera | 4,4s → 0,73s | |
+| Song song biển + khuôn mặt | 1,224s / 1,193s / 1,200s (3 lượt) | mỗi tác vụ và tổng ≤5s |
+
+Các thay đổi so với `abd6183` làm thay đổi nội dung NV03/NV07 bên dưới:
+
+- **Liveness tách khỏi face-match**: `LivenessStatus` (`SPOOF`/`REVIEW`/`NOT_EVALUATED`); `SPOOF` không mở barrier; `REVIEW` cần xác nhận qua `ManualOverrideDialog`; ảnh tĩnh trả `NOT_EVALUATED`. Luồng có UI: `MainForm`, `ManualOverrideDialog`, `EvidenceComparisonDialog`, `exceptions.html`.
+- **Presence Desktop**: heartbeat 2s, polling 2s, timeout 6s — Desktop chết tự rời danh sách trạm.
+- **OCR**: bỏ `clahe`, thêm early-stop, bỏ log profiling `AI_PROFILE`.
+- **Bàn giao máy mới**: `setup-new-machine.ps1` kiểm tra 13 mục, tự sinh token nội bộ và khoá JWT, tự tải 2 model ONNX.
+
+Giới hạn vẫn giữ nguyên: chưa có anti-replay video/deepfake, chưa cân ngưỡng trên camera thật, chưa nghiệm thu TLS/KMS/thiết bị thật. Flyway vẫn **không có** trong `main`: schema do `ddl-auto=update` cộng 11 script SQL thủ công trong `scripts/database/`; các dòng "additive Flyway V1–V6" bên dưới thuộc snapshot nhánh cũ, không áp cho `main`.
 
 ## NV01–NV08
 
@@ -35,18 +56,6 @@
 
 Chi tiết field/constraints tại [dictionary](architecture/data-dictionary.md), controls tại [security](security/overview.md), API tại [contracts](api/contracts.md), các nhánh và failure boundaries tại [system](architecture/system.md).
 
-### Local Group 4A worktree — WIP, not main (2026-10-27)
-
-The uncommitted local worktree adds a shared transactional write boundary for household/member/vehicle/combined-registration/settings forms, transfer/quota/authorization synchronization, rollback cleanup for newly saved resident images, scoped POST error states, audit-query failure distinction, and broader override-event matching. It retains existing RBAC, upsert identities, redirects and password rules. The approved `registrationImagePath` contract change requires a server upload for a vehicle without an existing image, and only allows a client path echo matching that vehicle's DB reference. Existing stored references are preserved without proving files exist. This is an implementation observation, not a release claim. Focused H2 evidence is in [testing strategy](testing/strategy.md); MySQL races, process-crash media recovery and browser recovery remain unverified.
-
-### Local Group 4B worktree — G4B-ACC-SEC-BE (2026-10-29)
-
-The `/account-management` and `/account-management/live` page models now select account/profile DTOs and sessions for `ACCOUNT_MANAGE`/`ROLE_MANAGEMENT`, username-only gate-staff options and shift assignments for `SHIFT_MANAGE`/`ROLE_MANAGEMENT`, and no account/shift/session payload for audit-only reads. Existing route grants, role-assignment behavior, mutations, auth, schema and session/shift services remain unchanged. Focused MockMvc/H2 evidence is **17/17** in [testing strategy](testing/strategy.md). This is a scoped working-tree observation, not a full authorization review, ACC-V, live/deployment proof or user acceptance; DB-backed grant mapping and broader runtime behavior remain unverified.
-
-### Local Group 4B worktree — G4B-REG-FE / G4B-CARD-BE (2026-10-31–2026-11-01)
-
-`G4B-REG-FE` Build and final synthetic visual review were completed and the user accepted its UI/UX; `REG-V` remains pending, so this is not functional acceptance. `G4B-CARD-BE` adds the scoped transaction boundary for card/subscription/payment/receipt writes and a current server `monthlyPrices` view-model value. Focused isolated H2 evidence is **7/7** in [testing strategy](testing/strategy.md); the Build awaits user acceptance and is not `CARD-V`. No schema or business pricing/period/renewal policy changed. The shared management-write error handler does not cover `/cards`, and failure-page/status mapping remains unverified for the CARD-FE contract checkpoint. Full Spring regression, MySQL behavior, live E2E, settlement, response-loss/concurrent duplicate behavior, and aggregate TEST/VERIFY remain unverified; `CARD-FE` and `CARD-V` have not started.
-
 ## Snapshot NV và supporting components lịch sử — Security + WIP
 
 Các bảng kế tiếp bảo toàn quan sát và kết quả của nhánh trước, không phải characterization main. Nhận xét cũ về ba override, absence payment/outbox, V1–V6, storage và launcher mismatch không thay thế bảng hiện hành phía trên. Test lịch sử không được dùng như coverage/execution của main.
@@ -56,7 +65,7 @@ Các location viết tắt bên dưới: [ParkingService](../spring-web/src/main
 | Documented / owner | Code observed / subset partially implemented | Actual verification level | Gaps / known discrepancy |
 | --- | --- | --- | --- |
 | [NV01](requirements/nv01-registration.md): household/person/vehicle, consent, ba ảnh, approval, quyền theo xe | P:lookup, entry face evidence; S:active authorized-member checks; Web registration/QR/face upload | Static call paths/templates; Spring full suite 108/108 PASS on 2026-10-10, including resident face evidence, registration/QR parsing, content-free QR scan audit, generic internal scan errors and resident-entry member rejection | Full approval/consent/dedup/privacy chưa verified; same household không mọi xe; three approved gate override exceptions do not replace registration/identity controls; QR route still returns parsed CCCD data; no three-way CCCD/registration/realtime comparison |
-| [NV02](requirements/nv02-cards-passes-pricing.md): card/pass/30-day/payment/debt/giá/history | A:saveCard monthly/payment record; S:calculateFee/hasValidMonthlyPass; cards/pricing forms | Static bodies; T monthly zero preview/default prices và fee subset | Record không paid/settled proof; renewal/replacement/refund/debt/price snapshot chưa verified; entry-date eligibility vs source validity-at-exit; payment-only activation vs debt approval unresolved |
+| [NV02](requirements/nv02-cards-passes-pricing.md): gói ngày/gói tháng/payment/giá/history | Đăng ký cư dân có tùy chọn không mua, DAILY hoặc MONTHLY và thu tiền ngay; calculateFee/hasValidPrepaidPackage; cards/pricing forms | Integration test gói ngày 10 ngày, PaymentTransaction, lookup packageValid và phí ra 0; gói tháng vẫn được phủ | Renewal overlap/refund/debt/price snapshot chưa verified; eligibility hiện dùng ngày entry |
 | [NV03](requirements/nv03-resident-entry.md): rights/evidence/one OPEN/barrier | S:entry/precheck/member validation; P:authenticated image/video OCR and server-bound recognition/face evidence; D gate flow | Static bodies; Spring full suite 108/108 PASS on 2026-10-10, including resident/guest evidence binding, all three approved reasoned override classes and missing/inactive/unrelated member rejection | **Warning thiếu/sai card/hết pass vẫn có thể tạo OPEN**; UI barrier không mở không là rollback. Quality/liveness/type mismatch, MySQL race/idempotency chưa verified; source Bước9 variants khác |
 | [NV04](requirements/nv04-resident-exit.md): OPEN/evidence/authorized collector/fee/closure | S:preview/confirm and OPEN lookup; P:server-bound exit recognition and optional face proof; D preview/confirm | Static bodies; Spring H2 test covers resident face proof binding through confirm | **Resident confirm không bắt buộc face verification**; alternate authorized collector policy not established; payment/waiver/replay/MySQL races chưa verified. **Source CLOSED vs code COMPLETED** |
 | [NV05](requirements/nv05-visitor-parking.md): khách evidence/ownership/payment-before-close | Optional Spring camera capture at entry; private guest evidence; same-session exit face verification when entry capture exists | Static body; Spring H2 test covers capture→entry bind→exit verification/consume; client-supplied flags rejected | Capture remains optional; guest sessions without stored entry-face image do not trigger this exit check. Payment/lost-card/ownership/receipt/audit and liveness efficacy remain unverified |

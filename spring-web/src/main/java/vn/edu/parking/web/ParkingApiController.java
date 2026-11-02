@@ -90,15 +90,16 @@ public class ParkingApiController {
         boolean cardMatched = card == null || (card.getVehicle() != null
             && card.getVehicle().getId().equals(vehicle.getId())
             && (normalizedPlate.isBlank() || vehicle.getPlateNumber().equalsIgnoreCase(normalizedPlate)));
-        boolean monthlyValid = cardMatched && card != null && card.isMonthlyValid(LocalDate.now());
+        boolean packageValid = cardMatched && card != null
+            && card.isPrepaidPackageValid(LocalDate.now());
         String message;
         if (!cardMatched) message = "Thẻ không thuộc biển số đang nhận diện";
         else if (card == null) message = "Xe cư dân đã đăng ký; chưa nhập thẻ nên sẽ tính giá lượt";
-        else if (card.getPassType() == PassType.MONTHLY && monthlyValid)
-            message = "Gói tháng còn hiệu lực đến " + card.getValidUntil();
-        else if (card.getPassType() == PassType.MONTHLY)
-            message = "Gói tháng đã hết hạn hoặc chưa đến ngày hiệu lực";
-        else message = "Thẻ vé lượt đang hoạt động";
+        else if (packageValid)
+            message = card.getPassType().getDisplayName() + " còn hiệu lực đến " + card.getValidUntil();
+        else if (card.getPassType() == PassType.DAILY || card.getPassType() == PassType.MONTHLY)
+            message = "Gói gửi xe đã hết hạn hoặc chưa đến ngày hiệu lực; tính giá khách vãng lai";
+        else message = "Cư dân chưa mua gói; tính giá khách vãng lai";
         if (!vehicle.getAuthorizedMemberNames().isBlank()) {
             message += "; người được phép sử dụng: " + vehicle.getAuthorizedMemberNames();
         }
@@ -111,7 +112,7 @@ public class ParkingApiController {
             vehicle.getEffectiveOwnerName(), vehicle.getOwnerPhone(), vehicle.getEffectiveApartmentNumber(),
             vehicle.getVehicleType().name(), card == null ? "" : card.getCardCode(),
             card == null ? "" : card.getPassType().name(), card == null ? null : card.getValidUntil(),
-            monthlyValid, message, authorized, false);
+            packageValid, message, authorized, false);
     }
 
     @GetMapping("/slots")

@@ -83,7 +83,7 @@ ANPR camera routes require internal Bearer and receive registration bytes from S
 ## Pricing, payment và gaps
 
 - Canonical formula tại [NV02](nv02-cards-passes-pricing.md), source code `calculateFee`: PricingRule theo session type; minimum 1 phút; car base/extra rounded blocks/max overnight, non-car overnight cycles hoặc day/night. Không suy ra bảng giá phân cư dân/khách hay lost-card surcharge đã implemented chỉ từ lời mô tả nguồn.
-- `hasValidMonthlyPass` cần session.vehicle/card.vehicle khớp nên guest vehicle null không có monthly exemption. Không tự biến manualOverride thành miễn phí; helper fee không có discount/reason logic trong body đã đọc.
+- `hasValidPrepaidPackage` cần session.vehicle/card.vehicle khớp nên khách và cư dân không có gói không được miễn phí. Manual override không tự biến thành miễn phí.
 - Khách thiếu entry-face, request cờ faceVerified, payment-before-close, fee breakdown lưu bền, lịch sử giá/Payment/receipt/reconciliation/manual reasons và protected media là discrepancies/gaps cần kiểm tra/resolve, không claim toàn hệ thống hoàn toàn thiếu.
 - Sequential confirm lặp thường không tìm OPEN; không replay idempotent success. New OPEN/concurrent confirm/duplicate payment chưa được chứng minh bằng precheck/annotation.
 - Quy trình khách không dùng quyền hộ cư dân để thay ownership. Mức phí tham khảo và ví dụ nằm tại [pricing-reference](pricing-reference.md), không phải biểu phí được duyệt hoặc chứng cứ đã thu tiền.

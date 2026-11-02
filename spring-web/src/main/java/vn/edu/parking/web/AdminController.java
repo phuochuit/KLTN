@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -26,6 +27,8 @@ import java.math.BigDecimal;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.LinkedHashSet;
@@ -177,11 +180,19 @@ public class AdminController {
     String registrations(Model model) {
         model.addAttribute("types", VehicleType.values());
         model.addAttribute("fuelTypes", FuelType.values());
+        model.addAttribute("packageTypes", List.of(PassType.DAILY, PassType.MONTHLY));
+        model.addAttribute("paymentMethods", PaymentMethod.values());
+        model.addAttribute("today", LocalDate.now());
+        model.addAttribute("dailyPrices", prices.findAll().stream()
+            .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getDailyPassPrice)));
+        model.addAttribute("monthlyPrices", prices.findAll().stream()
+            .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getMonthlyPrice)));
         model.addAttribute("policy", getPolicy());
         return "registrations";
     }
 
     @PostMapping("/registrations")
+    @Transactional
     String saveRegistration(@RequestParam String householdCode, @RequestParam String apartmentNumber,
             @RequestParam(required = false, defaultValue = "") String buildingName,
             @RequestParam(required = false, defaultValue = "") String contactPhone,
@@ -206,8 +217,17 @@ public class AdminController {
             @RequestParam String chassisNumber, @RequestParam String engineNumber,
             @RequestParam(required = false) Integer seatCount,
             @RequestParam(required = false) Integer cylinderCapacityCc,
-            @RequestParam(required = false) MultipartFile registrationImage, RedirectAttributes redirect,
+            @RequestParam(required = false) MultipartFile registrationImage,
+            @RequestParam(required = false) PassType passType,
+            @RequestParam(required = false) LocalDate packageStartDate,
+            @RequestParam(defaultValue = "1") int packageDurationDays,
+            @RequestParam(required = false) PaymentMethod paymentMethod,
+            @RequestParam(required = false) String paymentReference,
+            RedirectAttributes redirect,
             Authentication authentication) {
+        boolean canManageCards = authentication.getAuthorities().stream()
+                .anyMatch(authority -> Set.of("CARD_MANAGE", "ROLE_MANAGEMENT")
+                        .contains(authority.getAuthority()));
         Vehicle vehicle = managementWrites.saveRegistration(
                 new ManagementCoreWriteService.HouseholdInput(householdCode, apartmentNumber, buildingName,
                         contactPhone, maxTwoWheelers, maxCars),
@@ -219,11 +239,16 @@ public class AdminController {
                         fuelType, registrationNumber, brand, modelName, color, manufactureYear, chassisNumber,
                         engineNumber, seatCount, cylinderCapacityCc, registrationImage, null));
 
-        redirect.addFlashAttribute("message",
-                "Đã lưu hồ sơ hộ, cư dân và xe " + vehicle.getPlateNumber() + ".");
-        boolean canManageCards = authentication.getAuthorities().stream()
-                .anyMatch(authority -> Set.of("CARD_MANAGE", "ROLE_MANAGEMENT")
-                        .contains(authority.getAuthority()));
+        if (passType != null) {
+            CardManagementWriteService.SaveResult activation = cardWrites.saveCard(vehicle.getId(), CardStatus.ACTIVE,
+                    passType, packageStartDate, packageDurationDays, paymentMethod, paymentReference);
+            redirect.addFlashAttribute("message", "Đã lưu hồ sơ và kích hoạt " + passType.getDisplayName()
+                    + " đến " + activation.validUntil() + ". Đã thu " + activation.amount()
+                    + " đ. Biên nhận: " + activation.receiptNumber());
+        } else {
+            redirect.addFlashAttribute("message",
+                    "Đã lưu hồ sơ hộ, cư dân và xe " + vehicle.getPlateNumber() + ".");
+        }
         String destination = canManageCards ? "/cards" : "/vehicles";
         return "redirect:" + destination + "?vehicleId=" + vehicle.getId();
     }
@@ -693,12 +718,15 @@ public class AdminController {
 
     @GetMapping("/cards")
     String cards(@RequestParam(required = false) Long vehicleId, Model model) {
-        model.addAttribute("cards", cards.findAll());
+        model.addAttribute("cards", cards.findAll().stream()
+            .filter(card -> card.getPassType() != PassType.PER_VISIT).toList());
         model.addAttribute("vehicles", vehicles.findAll());
+        model.addAttribute("dailyPrices", prices.findAll().stream()
+            .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getDailyPassPrice)));
         model.addAttribute("monthlyPrices", prices.findAll().stream()
             .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getMonthlyPrice)));
-        model.addAttribute("statuses", CardStatus.values());
-        model.addAttribute("passTypes", PassType.values());
+        model.addAttribute("statuses", List.of(CardStatus.ACTIVE));
+        model.addAttribute("passTypes", List.of(PassType.DAILY, PassType.MONTHLY));
         model.addAttribute("paymentMethods", PaymentMethod.values());
         model.addAttribute("today", LocalDate.now());
         model.addAttribute("payments", payments.findAllByOrderByPaidAtDesc().stream().limit(20).toList());
@@ -715,17 +743,14 @@ public class AdminController {
             @RequestParam(required = false) PaymentMethod paymentMethod,
             @RequestParam(required = false) String paymentReference,
             RedirectAttributes redirect) {
-        if (durationDays < 1 || durationDays > 366) {
-            throw new IllegalArgumentException("Số ngày của gói phải từ 1 đến 366");
-        }
+        if (status != CardStatus.ACTIVE) throw new IllegalArgumentException("Chỉ được kích hoạt gói ở trạng thái hoạt động");
+        if (passType == PassType.MONTHLY) durationDays = 30;
+        if (durationDays < 1 || durationDays > 366) throw new IllegalArgumentException("Số ngày của gói phải từ 1 đến 366");
         CardManagementWriteService.SaveResult result = cardWrites.saveCard(
             vehicleId, status, passType, startDate, durationDays, paymentMethod, paymentReference);
-        if (passType == PassType.MONTHLY) {
-            redirect.addFlashAttribute("message", "Đã kích hoạt gói " + durationDays
-                + " ngày đến " + result.validUntil() + ". Biên nhận: " + result.receiptNumber());
-        } else {
-            redirect.addFlashAttribute("message", "Đã lưu thẻ vé lượt");
-        }
+        redirect.addFlashAttribute("message", "Đã kích hoạt " + passType.getDisplayName()
+            + " đến " + result.validUntil() + ". Đã thu " + result.amount()
+            + " đ. Biên nhận: " + result.receiptNumber());
         return "redirect:/cards";
     }
 
@@ -741,12 +766,13 @@ public class AdminController {
             @RequestParam BigDecimal basePrice,
             @RequestParam BigDecimal nightPrice,
             @RequestParam BigDecimal overnightFee,
+            @RequestParam BigDecimal dailyPassPrice,
             @RequestParam BigDecimal monthlyPrice,
             @RequestParam(defaultValue = "0") int baseHours,
             @RequestParam(defaultValue = "0") int extraBlockHours,
             @RequestParam(defaultValue = "0") BigDecimal extraBlockPrice,
             RedirectAttributes redirect) {
-        if (List.of(basePrice, nightPrice, overnightFee, monthlyPrice, extraBlockPrice)
+        if (List.of(basePrice, nightPrice, overnightFee, dailyPassPrice, monthlyPrice, extraBlockPrice)
                 .stream().anyMatch(value -> value.signum() < 0)) {
             throw new IllegalArgumentException("Giá không được âm");
         }
@@ -758,6 +784,7 @@ public class AdminController {
         rule.setBasePrice(basePrice);
         rule.setNightPrice(nightPrice);
         rule.setOvernightFee(overnightFee);
+        rule.setDailyPassPrice(dailyPassPrice);
         rule.setMonthlyPrice(monthlyPrice);
         rule.setBaseHours(vehicleType.isCar() ? baseHours : 0);
         rule.setExtraBlockHours(vehicleType.isCar() ? extraBlockHours : 0);
@@ -940,6 +967,84 @@ public class AdminController {
         data.put("sessions", sessionList);
         data.put("payments", paymentList);
         return data;
+    }
+
+    @GetMapping(value = {"/api/parking/revenue/export-csv", "/revenue/export-csv"}, produces = "text/csv; charset=UTF-8")
+    @ResponseBody
+    public ResponseEntity<byte[]> exportRevenueCsv(@RequestParam(defaultValue = "month") String type,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
+        LocalDateTime fromTime;
+        LocalDateTime toTime;
+        String periodLabel;
+        if ("month".equals(type) && year != null && month != null) {
+            fromTime = LocalDate.of(year, month, 1).atStartOfDay();
+            toTime = fromTime.plusMonths(1);
+            periodLabel = "thang_" + month + "_" + year;
+        } else if ("year".equals(type) && year != null) {
+            fromTime = LocalDate.of(year, 1, 1).atStartOfDay();
+            toTime = fromTime.plusYears(1);
+            periodLabel = "nam_" + year;
+        } else if ("range".equals(type) && from != null && to != null) {
+            fromTime = from.atStartOfDay();
+            toTime = to.plusDays(1).atStartOfDay();
+            periodLabel = "tu_" + from + "_den_" + to;
+        } else {
+            fromTime = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            toTime = fromTime.plusMonths(1);
+            periodLabel = "thang_" + LocalDate.now().getMonthValue() + "_" + LocalDate.now().getYear();
+        }
+        var sessionList = sessions.findByStatusAndExitTimeBetween(SessionStatus.COMPLETED, fromTime, toTime).stream()
+                .sorted((a, b) -> b.getExitTime().compareTo(a.getExitTime())).toList();
+        var paymentList = payments.findByPaidAtBetween(fromTime, toTime).stream()
+                .sorted((a, b) -> b.getPaidAt().compareTo(a.getPaidAt())).toList();
+        StringBuilder csv = new StringBuilder(CsvUtils.UTF_8_BOM)
+                .append("Mã giao dịch / Phiên,Phân loại doanh thu,Biển số xe,Thời gian bắt đầu / Vào,Thời gian kết thúc / Ra / Thu,Thời lượng / Kỳ hạn,Số tiền (VNĐ),Trạng thái,Phương thức / Loại xe\r\n");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        BigDecimal visitTotal = BigDecimal.ZERO;
+        for (ParkingSession session : sessionList) {
+            BigDecimal amount = session.getFee() == null ? BigDecimal.ZERO : session.getFee();
+            visitTotal = visitTotal.add(amount);
+            String duration = "";
+            if (session.getEntryTime() != null && session.getExitTime() != null) {
+                long minutes = java.time.Duration.between(session.getEntryTime(), session.getExitTime()).toMinutes();
+                duration = minutes / 60 + "h " + minutes % 60 + "m";
+            }
+            csv.append(CsvUtils.escape(session.getId())).append(",Vé lượt,")
+                .append(CsvUtils.escape(session.getEntryPlate())).append(",")
+                .append(CsvUtils.escape(session.getEntryTime() == null ? "" : session.getEntryTime().format(formatter))).append(",")
+                .append(CsvUtils.escape(session.getExitTime() == null ? "" : session.getExitTime().format(formatter))).append(",")
+                .append(CsvUtils.escape(duration)).append(",").append(amount.toPlainString()).append(",")
+                .append(CsvUtils.escape(session.getStatus().getDisplayName())).append(",")
+                .append(CsvUtils.escape(session.getDetectedVehicleType() == null
+                        ? "" : session.getDetectedVehicleType().name())).append("\r\n");
+        }
+        BigDecimal packageTotal = BigDecimal.ZERO;
+        for (SubscriptionPayment payment : paymentList) {
+            BigDecimal amount = payment.getAmount() == null ? BigDecimal.ZERO : payment.getAmount();
+            packageTotal = packageTotal.add(amount);
+            String plate = payment.getParkingCard() != null && payment.getParkingCard().getVehicle() != null
+                    ? payment.getParkingCard().getVehicle().getPlateNumber()
+                    : payment.getParkingCard() == null ? "" : payment.getParkingCard().getCardCode();
+            String period = (payment.getPeriodStart() == null ? "" : payment.getPeriodStart().toString()) + " -> "
+                    + (payment.getPeriodEnd() == null ? "" : payment.getPeriodEnd().toString());
+            csv.append(CsvUtils.escape(payment.getId())).append(",Gói cư dân,")
+                .append(CsvUtils.escape(plate)).append(",")
+                .append(CsvUtils.escape(payment.getPaidAt() == null ? "" : payment.getPaidAt().format(formatter))).append(",")
+                .append(CsvUtils.escape(payment.getPeriodEnd() == null ? "" : payment.getPeriodEnd().toString())).append(",")
+                .append(CsvUtils.escape(period)).append(",").append(amount.toPlainString()).append(",Đã ghi nhận,")
+                .append(CsvUtils.escape("Gói thẻ " + (payment.getParkingCard() == null ? "" : payment.getParkingCard().getCardCode())))
+                .append("\r\n");
+        }
+        BigDecimal grandTotal = visitTotal.add(packageTotal);
+        csv.append("TỔNG CỘNG,Tất cả nguồn,,,,,").append(grandTotal.toPlainString()).append(",,Vé lượt: ")
+            .append(visitTotal.toPlainString()).append(" | Gói: ").append(packageTotal.toPlainString()).append("\r\n");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"doanh_thu_" + periodLabel + ".csv\"")
+                .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                .body(csv.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     @GetMapping("/api/parking/revenue/monthly/{year}/{month}")

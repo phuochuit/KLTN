@@ -38,3 +38,12 @@
 
 - Bảng từng rộng tối thiểu 69rem trong vùng desktop hẹp hơn, còn gợi ý cuộn bị ẩn ở desktop. Giảm minimum về 64rem, cho phép nội dung kỳ/giá xuống dòng, giữ cột thao tác sticky bên phải và gợi ý cuộn ở mọi kích thước. Ở 1440×1000 các cột trạng thái và thao tác đều thấy trọn; 390×844 có thể cuộn vùng bảng bằng bàn phím, nút chọn xe vẫn nhìn thấy và GET chọn xe hoạt động. Quan sát screenshot desktop/mobile tại `.artifacts/test-runs/20261101T131313Z-cards-targeted-harness-cc45c221/`.
 - Review mới thay thế giới hạn browser của đoạn trên: proxy loopback trả response giả lập, chặn toàn bộ POST `/cards` trước Spring. Quan sát success có flash, 400, 409, 503, redirect thiếu flash và cancel. Đây là tương tác giả lập, không chứng minh commit thực tế hay provider settlement; không có human acceptance hoặc `CARD-V`.
+
+## Approved upstream integration — current contract (2026-11-03)
+
+The user approved the final GitHub integration contract; this is a current implementation target, not a retroactive UI acceptance or test result.
+
+- New resident packages are `DAILY` and fixed-30-day `MONTHLY`; `PER_VISIT` remains legacy data and is not offered for new purchase. Package activation is `ACTIVE` only, with inclusive validity dates and server-calculated amount (`dailyPassPrice × days` or `monthlyPrice`).
+- Keep the approved cards directory/review flow, payment-method/reference requirements, CSRF, server flash as the only success evidence, and no automatic retry after an unknown POST outcome. On `/cards`, both new package types show their actual inclusive validity and recorded amount; legacy `PER_VISIT` cards are omitted from this package-management listing.
+- Registration may optionally include package and payment details for authorized card managers. The same multipart POST remains the single submission; the outer registration transaction joins the existing transactional management/card write services so a failed package activation does not leave a partial registration. The client summary is indicative; the server owns amount and validity.
+- These changes are not browser-reviewed in this integration. `CARD-V`, visual acceptance for `/cards`, and Root's focused Spring/frontend checks remain pending; historical synthetic browser evidence above retains its original limits.

@@ -2,6 +2,7 @@ spring-web/target/
 spring-web/data/
 spring-web/uploads/
 spring-web/private-data/
+anpr-service/app/__pycache__/
 desktop-winform/bin/
 desktop-winform/obj/
 desktop-winform.Tests/bin/
@@ -11,6 +12,8 @@ tools/apache-maven-*/
 tools/apache-maven-*.zip
 tools/dotnet/
 tools/dotnet-install.ps1
+anpr-service/.venv/
+anpr-service/.venv.incompatible.*/
 anpr-service/*.pt
 anpr-service/.EasyOCR/
 anpr-service/.ultralytics/
@@ -21,39 +24,32 @@ tmp/
 qa_*
 scripts/security/keys/
 *.pem
+.env.local
 
-# Reproducible local state and retained outputs (not backups)
-/.cache/
-/.artifacts/
-/.test-tmp/
-/.test-tmp-*/
-/spring-web/.test-tmp/
-/spring-web/.idea/
-/desktop-winform.Tests/TestResults/
-**/.venv/
-**/.venv.*/
-node_modules/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
+e2e_screenshots/
+test_e2e_full.py
+scripts/operations/Benchmark/bin/
+scripts/operations/Benchmark/obj/
 
-# Local agent instructions, tooling and task tracking
-/AGENTS.md
-/.opencode/
-/.codegraph/
-/tasks/
+.cache/
+.artifacts/
 
-# Local secrets; examples contain placeholders only
-.env
-.env.*
-!.env.example
-!.env.local.example
-*.key
-*.pfx
-*.p12
+# Local engineering context and reproducible frontend dependencies/output.
+.opencode/
+.codegraph/
+tasks/
+backups/
+spring-web/node_modules/
+spring-web/src/main/resources/static/css/web-ui.css
+spring-web/src/main/resources/static/css/dashboard-ui.css
+spring-web/src/main/resources/static/css/security-roles.css
+spring-web/src/main/resources/static/css/account-management.css
+spring-web/src/main/resources/static/css/registration.css
+spring-web/src/main/resources/static/css/cards.css
+spring-web/src/main/resources/static/css/pricing.css
+spring-web/src/main/resources/static/css/payments.css
+spring-web/src/main/resources/static/images/lucide/
 
-# Runtime storage when a supported command is launched from the workspace root
-/private-data/
-/uploads/
-/spring-web/var/
+# Local Python environments are never publication inputs.
+.venv/
+.venv.incompatible.*/

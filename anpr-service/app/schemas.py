@@ -25,6 +25,7 @@ class RecognitionResponse(BaseModel):
     bounding_box: BoundingBox | None = Field(alias="boundingBox")
     frame_index: int = Field(alias="frameIndex")
     annotated_image_base64: str = Field(alias="annotatedImageBase64")
+    quality: dict | None = Field(default=None, alias="quality")
     message: str
 
     model_config = {"populate_by_name": True}

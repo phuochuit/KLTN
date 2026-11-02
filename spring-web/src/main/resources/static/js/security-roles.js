@@ -21,6 +21,12 @@
   let pendingAction = null;
   let focusAfterPrompt = null;
   let submitting = false;
+  const draftStorageKey = 'kltn.roleDraft.v1';
+  const draftScope = document.body.dataset.roleDraftScope;
+
+  function clearStoredDraft() {
+    try { sessionStorage.removeItem(draftStorageKey); } catch { }
+  }
 
   const text = (selector, value) => { document.querySelector(selector).textContent = value; };
   const state = () => JSON.stringify({
@@ -53,6 +59,52 @@
 
   function markBaseline() {
     baseline = state();
+    updateDraftState();
+  }
+
+  function saveDraft() {
+    if (submitting || !draftScope) return;
+    const role = selectedRole ? readRole(selectedRole) : null;
+    try {
+      sessionStorage.setItem(draftStorageKey, JSON.stringify({
+        scope: draftScope, mode, roleCode: role?.code ?? null,
+        displayName: displayName.value, code: code.value, prefix: prefix.value,
+        description: description.value, enabled: enabledInput.checked,
+        permissions: permissionInputs.filter(input => input.checked).map(input => input.value),
+      }));
+    } catch { }
+  }
+
+  function restoreDraft() {
+    let draft;
+    try { draft = JSON.parse(sessionStorage.getItem(draftStorageKey) || 'null'); }
+    catch { clearStoredDraft(); return; }
+    if (!draft) return;
+    if (draft.scope !== draftScope || document.querySelector('.roles-flash.is-success')) {
+      clearStoredDraft();
+      return;
+    }
+    if (draft.mode === 'edit' && typeof draft.roleCode === 'string') {
+      const role = choices.find(choice => choice.dataset.code === draft.roleCode);
+      if (!role) { clearStoredDraft(); return; }
+      loadRole(role);
+    } else if (draft.mode === 'create') {
+      selectedRole = null;
+      loadCreate();
+    } else return;
+
+    if (typeof draft.displayName === 'string') displayName.value = draft.displayName;
+    if (mode === 'create') {
+      if (typeof draft.code === 'string') code.value = draft.code;
+      if (typeof draft.prefix === 'string') prefix.value = draft.prefix;
+    }
+    if (typeof draft.description === 'string') description.value = draft.description;
+    if (mode === 'edit' && !enabledInput.disabled && typeof draft.enabled === 'boolean') enabledInput.checked = draft.enabled;
+    const allowed = new Set(permissionInputs.filter(input => !input.disabled).map(input => input.value));
+    if (Array.isArray(draft.permissions)) {
+      permissionInputs.forEach(input => { if (allowed.has(input.value)) input.checked = draft.permissions.includes(input.value); });
+      configureManagementPermissions(mode === 'edit' && code.value === 'MANAGEMENT');
+    }
     updateDraftState();
   }
 
@@ -173,22 +225,13 @@
     else action();
   }
 
-  function revealActiveNavigation(container) {
-    container?.querySelector('.nav-item[aria-current="page"]')?.scrollIntoView({ block: 'center' });
-  }
-
-  requestAnimationFrame(() => revealActiveNavigation(document.querySelector('.sidebar')));
-  document.querySelector('#openNavigation')?.addEventListener('click', () => {
-    requestAnimationFrame(() => revealActiveNavigation(document.querySelector('#navigationDialog')));
-  });
-
   choices.forEach(button => button.addEventListener('click', () => {
     if (button === selectedRole && mode === 'edit') return;
-    requestAction(() => loadRole(button), button);
+    requestAction(() => { clearStoredDraft(); loadRole(button); }, button);
   }));
 
   document.querySelector('#newRoleButton').addEventListener('click', event => {
-    requestAction(() => { selectedRole = null; loadCreate(); displayName.focus(); }, event.currentTarget);
+    requestAction(() => { clearStoredDraft(); selectedRole = null; loadCreate(); displayName.focus(); }, event.currentTarget);
   });
 
   document.querySelector('#keepRoleDraft').addEventListener('click', () => {
@@ -201,11 +244,12 @@
     const action = pendingAction;
     discardPrompt.hidden = true;
     pendingAction = null;
+    clearStoredDraft();
     if (action) action();
   });
 
   document.querySelector('#cancelRoleChanges').addEventListener('click', event => {
-    requestAction(() => selectedRole ? loadRole(selectedRole) : loadCreate(), event.currentTarget);
+    requestAction(() => { clearStoredDraft(); selectedRole ? loadRole(selectedRole) : loadCreate(); }, event.currentTarget);
   });
 
   document.querySelector('#clearRolePermissions').addEventListener('click', () => {
@@ -215,11 +259,14 @@
 
   form.addEventListener('input', updateDraftState);
   form.addEventListener('change', updateDraftState);
+  form.addEventListener('input', saveDraft);
+  form.addEventListener('change', saveDraft);
   form.addEventListener('submit', event => {
     if (mode === 'edit' && !dirty()) {
       event.preventDefault();
       return;
     }
+    saveDraft();
     submitting = true;
     form.setAttribute('aria-busy', 'true');
     document.querySelector('#roleSavingState').hidden = false;
@@ -242,4 +289,12 @@
     loadCreate();
     text('#roleDirectoryTitle', 'Danh sách vai trò');
   }
+  window.addEventListener('pageshow', () => {
+    submitting = false;
+    form.removeAttribute('aria-busy');
+    document.querySelector('#roleSavingState').hidden = true;
+    restoreDraft();
+    saveButton.textContent = mode === 'edit' ? 'Lưu thay đổi' : 'Tạo vai trò';
+    updateDraftState();
+  });
 })();

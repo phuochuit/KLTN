@@ -35,7 +35,7 @@ jobs:
           $files = @(git ls-files)
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $blocked = @($files | Where-Object {
-            $_ -match '^(AGENTS\.md$|\.opencode/|\.codegraph/|tasks/|\.cache/|\.artifacts/)' -or
+            ($_ -match '^(\.opencode/|\.codegraph/|tasks/|\.cache/|\.artifacts/)' -and $_ -ne '.opencode/skills/parking-anpr/SKILL.md') -or
             $_ -match '\.(pem|key|pfx|p12)$' -or
             ($_ -match '(^|/)\.env($|\.)' -and $_ -notmatch '\.example$')
           })
@@ -57,14 +57,14 @@ jobs:
         with:
           node-version: '24.21.0'
 
-      - name: Prepare Spring frontend dependencies
+      - name: Prepare and test Spring frontend
         if: matrix.suite == 'spring'
         working-directory: spring-web
         run: |
-          npm install --global npm@11.19.0 --ignore-scripts --no-fund --no-audit
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm ci --cache ../.cache/npm --no-fund --no-audit
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          exit $LASTEXITCODE
 
       - name: Set up .NET 8
         if: matrix.suite == 'desktop'

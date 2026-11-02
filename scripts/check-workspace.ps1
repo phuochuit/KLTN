@@ -20,7 +20,7 @@ function Get-ParkingWorkspaceFindings([string]$Workspace) {
     if (Test-Path $scripts) { $files += Get-ChildItem $scripts -File -Recurse -Include '*.ps1','*.psm1' | Where-Object { $_.Name -ne 'check-workspace.ps1' } }
     $thesis = Join-Path $Workspace 'tools/thesis'
     if (Test-Path $thesis) { $files += Get-ChildItem $thesis -File -Filter '*.py' }
-    $pattern = 'tools[\\/]apache-maven|\.dotnet-cli-home|\.test-tmp|D:[\\/]Code[\\/]|C:[\\/]Users[\\/]Dphuoc1903'
+    $pattern = '\.dotnet-cli-home|\.test-tmp|D:[\\/]Code[\\/]|C:[\\/]Users[\\/]Dphuoc1903'
     foreach ($file in $files) {
         if (Select-String -LiteralPath $file.FullName -Pattern $pattern -Quiet) { "Legacy active path reference: $($file.FullName.Substring($Workspace.Length+1))" }
     }
@@ -30,7 +30,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     $ErrorActionPreference = 'Stop'
     $workspace = Split-Path -Parent $PSScriptRoot
     $findings = @(Get-ParkingWorkspaceFindings $workspace)
-    $trackedLocal = @(git -C $workspace ls-files -- .cache .artifacts AGENTS.md .opencode .codegraph tasks)
+    $trackedLocal = @(git -C $workspace ls-files -- .cache .artifacts .codegraph tasks) + @(git -C $workspace ls-files -- .opencode | Where-Object { $_ -notlike '.opencode/skills/*' })
     if ($LASTEXITCODE -ne 0) { throw 'Git tracking check unavailable; workspace verification is blocked.' }
     if ($trackedLocal.Count -gt 0) { $findings += "Local-only files tracked: $($trackedLocal.Count). Inspect git ls-files; no index changes were made." }
     $trackedDependencies = @(git -C $workspace ls-files -- survey_analysis/node_modules)

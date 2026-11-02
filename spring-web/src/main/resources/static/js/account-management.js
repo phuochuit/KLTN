@@ -3,9 +3,6 @@ import { filterAccounts } from './account-management-model.mjs';
 const navigation = document.getElementById('navigationDialog');
 document.getElementById('openNavigation')?.addEventListener('click', () => navigation?.showModal());
 document.getElementById('closeNavigation')?.addEventListener('click', () => navigation?.close());
-window.matchMedia?.('(min-width: 64rem)').addEventListener('change', event => {
-  if (event.matches && navigation?.open) navigation.close();
-});
 
 const createPanel = document.getElementById('createAccountPanel');
 document.getElementById('openCreateAccount')?.addEventListener('click', () => {
@@ -88,6 +85,68 @@ accountActionPopovers.forEach(popover => {
     }, 0);
   });
   popover.addEventListener('submit', () => closeAccountActionPopovers({ restoreFocus: true }));
+});
+
+const adminSubmitStatus = document.getElementById('admin-submit-status');
+let adminSubmissionPending = false;
+let pendingControlState = null;
+const adminActionPaths = ['/account-management/state', '/account-management/reset-password',
+  '/account-management/sessions/desktop/revoke', '/account-management/sessions/web/revoke',
+  '/account-management/shifts', '/account-management/shifts/delete'];
+document.addEventListener('submit', event => {
+  if (!adminSubmissionPending || !(event.target instanceof HTMLFormElement)) return;
+  const path = new URL(event.target.action, window.location.href).pathname;
+  if (!adminActionPaths.includes(path)) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}, true);
+document.addEventListener('submit', event => {
+  const form = event.target.closest('form');
+  if (!form || event.defaultPrevented || !adminSubmitStatus) return;
+  const path = new URL(form.action, window.location.href).pathname;
+  if (!adminActionPaths.includes(path)) return;
+
+  if (adminSubmissionPending) {
+    event.preventDefault();
+    return;
+  }
+
+  adminSubmissionPending = true;
+  pendingControlState = {
+    form,
+    formBusy: form.getAttribute('aria-busy'),
+    submitter: event.submitter,
+    submitterDisabled: event.submitter?.getAttribute('disabled') ?? null,
+    submitterBusy: event.submitter?.getAttribute('aria-busy') ?? null,
+  };
+  form.setAttribute('aria-busy', 'true');
+  if (event.submitter) {
+    event.submitter.disabled = true;
+    event.submitter.setAttribute('aria-busy', 'true');
+  }
+  adminSubmitStatus.hidden = false;
+  adminSubmitStatus.textContent = 'Đang gửi thao tác quản trị. Không gửi lại; hãy chờ phản hồi.';
+});
+
+window.addEventListener('pageshow', () => {
+  if (!adminSubmissionPending) return;
+  const state = pendingControlState;
+  adminSubmissionPending = false;
+  pendingControlState = null;
+  if (state?.form?.isConnected) {
+    if (state.formBusy === null) state.form.removeAttribute('aria-busy');
+    else state.form.setAttribute('aria-busy', state.formBusy);
+  }
+  if (state?.submitter?.isConnected) {
+    if (state.submitterDisabled === null) state.submitter.removeAttribute('disabled');
+    else state.submitter.setAttribute('disabled', state.submitterDisabled);
+    if (state.submitterBusy === null) state.submitter.removeAttribute('aria-busy');
+    else state.submitter.setAttribute('aria-busy', state.submitterBusy);
+  }
+  if (adminSubmitStatus) {
+    adminSubmitStatus.hidden = true;
+    adminSubmitStatus.textContent = '';
+  }
 });
 
 function repositionAccountActionPopovers() {

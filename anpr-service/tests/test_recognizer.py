@@ -1,8 +1,22 @@
-from app.recognizer import AnprRecognizer, normalize_plate, plate_format_score, vehicle_type_from_detections
+from app.recognizer import (
+    AnprRecognizer,
+    canonicalize_plate,
+    normalize_plate,
+    plate_format_score,
+    vehicle_type_from_detections,
+)
 
 
 def test_normalize_plate():
     assert normalize_plate("59-A1 123.45") == "59A112345"
+
+
+def test_canonicalize_plate_removes_inserted_series_prefix_letter():
+    assert canonicalize_plate("59HF241578") == "59F241578"
+
+
+def test_canonicalize_plate_keeps_standard_plate_unchanged():
+    assert canonicalize_plate("59F241578") == "59F241578"
 
 
 def test_vehicle_type_prefers_highest_confidence():

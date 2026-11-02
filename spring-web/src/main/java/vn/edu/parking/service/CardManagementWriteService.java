@@ -38,52 +38,56 @@ public class CardManagementWriteService {
     @Transactional
     public SaveResult saveCard(Long vehicleId, CardStatus status, PassType passType, LocalDate startDate,
             int durationDays, PaymentMethod paymentMethod, String paymentReference) {
+        if (status != CardStatus.ACTIVE) {
+            throw new IllegalArgumentException("Gói mới hoặc gia hạn phải ở trạng thái hoạt động");
+        }
+        if (passType == null || passType == PassType.PER_VISIT) {
+            throw new IllegalArgumentException("Chỉ hỗ trợ gói theo ngày hoặc gói 30 ngày");
+        }
+        int days = passType == PassType.MONTHLY ? 30 : durationDays;
+        if (days < 1 || days > 366) {
+            throw new IllegalArgumentException("Số ngày của gói phải từ 1 đến 366");
+        }
         Vehicle vehicle = vehicles.findById(vehicleId).orElseThrow();
         String plateIdentifier = PlateNormalizer.normalize(vehicle.getPlateNumber());
         ParkingCard card = cards.findByVehicleId(vehicleId).orElseGet(ParkingCard::new);
         card.setCardCode(plateIdentifier);
         card.setVehicle(vehicle);
-        card.setStatus(status);
+        card.setStatus(CardStatus.ACTIVE);
         card.setPassType(passType);
 
-        if (passType == PassType.MONTHLY) {
-            LocalDate from = startDate == null ? LocalDate.now() : startDate;
-            LocalDate until = from.plusDays(durationDays - 1L);
-            BigDecimal amount = prices.findByVehicleType(vehicle.getVehicleType())
-                    .orElseThrow(
-                            () -> new IllegalStateException("Chưa cấu hình bảng giá cho " + vehicle.getVehicleType()))
-                    .getMonthlyPrice();
-            if (amount.signum() <= 0) {
-                throw new IllegalStateException(
-                        "Chưa cấu hình giá gói tháng cho " + vehicle.getVehicleType().getDisplayName());
-            }
-            card.setValidFrom(from);
-            card.setValidUntil(until);
-            card.setSubscriptionFee(amount);
-            card = cards.save(card);
-
-            SubscriptionPayment payment = new SubscriptionPayment();
-            payment.setParkingCard(card);
-            payment.setPeriodStart(from);
-            payment.setPeriodEnd(until);
-            payment.setAmount(amount);
-            payment.setPaidAt(LocalDateTime.now());
-            payment.setPendingPayment(true);
-            payment = payments.save(payment);
-            PaymentTransaction transaction = paymentTransactions.recordSubscription(
-                payment, paymentMethod, paymentReference);
-            payment.setPendingPayment(false);
-            payment.setPaymentTransaction(transaction);
-            payments.save(payment);
-            return new SaveResult(until, transaction.getReceiptNumber());
+        LocalDate from = startDate == null ? LocalDate.now() : startDate;
+        LocalDate until = from.plusDays(days - 1L);
+        var price = prices.findByVehicleType(vehicle.getVehicleType())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Chưa cấu hình bảng giá cho " + vehicle.getVehicleType().getDisplayName()));
+        BigDecimal amount = passType == PassType.MONTHLY
+                ? price.getMonthlyPrice()
+                : price.getDailyPassPrice().multiply(BigDecimal.valueOf(days));
+        if (amount.signum() <= 0) {
+            throw new IllegalStateException("Chưa cấu hình giá cho " + passType.getDisplayName()
+                    + " của " + vehicle.getVehicleType().getDisplayName());
         }
+        card.setValidFrom(from);
+        card.setValidUntil(until);
+        card.setSubscriptionFee(amount);
+        card = cards.save(card);
 
-        card.setValidFrom(null);
-        card.setValidUntil(null);
-        card.setSubscriptionFee(BigDecimal.ZERO);
-        cards.save(card);
-        return new SaveResult(null, null);
+        SubscriptionPayment payment = new SubscriptionPayment();
+        payment.setParkingCard(card);
+        payment.setPeriodStart(from);
+        payment.setPeriodEnd(until);
+        payment.setAmount(amount);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setPendingPayment(true);
+        payment = payments.save(payment);
+        PaymentTransaction transaction = paymentTransactions.recordSubscription(
+            payment, paymentMethod, paymentReference);
+        payment.setPendingPayment(false);
+        payment.setPaymentTransaction(transaction);
+        payments.save(payment);
+        return new SaveResult(until, transaction.getReceiptNumber(), amount);
     }
 
-    public record SaveResult(LocalDate validUntil, String receiptNumber) { }
+    public record SaveResult(LocalDate validUntil, String receiptNumber, BigDecimal amount) { }
 }

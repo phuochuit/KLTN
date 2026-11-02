@@ -1,3 +1,4 @@
+import { assertIsolatedHarness } from './isolated-harness.mjs';
 // Opt-in browser check against the isolated LoginBrowserHarnessTest only.
 import { createRequire } from 'node:module';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
@@ -8,10 +9,7 @@ import assert from 'node:assert/strict';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const require = createRequire(path.join(root, 'spring-web/package.json'));
 const { chromium } = require('@playwright/test');
-const run = path.resolve(process.argv[2] ?? '');
-assert.ok(run.startsWith(path.join(root, '.artifacts/test-runs') + path.sep));
-const port = (await readFile(path.join(run, 'server.port'), 'utf8')).trim();
-assert.match(port, /^\d{1,5}$/);
+const { run, port } = await assertIsolatedHarness(root, process.argv[2]);
 const fixture = await readFile(path.join(root, 'spring-web/src/test/java/vn/edu/parking/LoginTestIsolation.java'), 'utf8');
 const password = fixture.match(/PASSWORD = "([^"]+)"/)[1];
 const harness = await readFile(path.join(root, 'spring-web/src/test/java/vn/edu/parking/LoginBrowserHarnessTest.java'), 'utf8');

@@ -248,7 +248,7 @@
                 <span class="registration-field-label">Loại xe <span class="registration-required">Bắt buộc</span></span>
                 <select id="vehicleType" name="vehicleType" required>
                   <option value="">Chọn loại xe</option>
-                  <option th:each="type:${types}" th:value="${type}" th:text="${type.displayName}"></option>
+                   <option th:each="type:${types}" th:value="${type}" th:attr="data-daily-price=${dailyPrices[type.name()]},data-monthly-price=${monthlyPrices[type.name()]}" th:text="${type.displayName}"></option>
                 </select>
               </label>
               <label class="registration-field" for="fuelType">
@@ -307,15 +307,47 @@
             </div>
           </section>
 
+          <section class="registration-section glass-card" aria-labelledby="packageHeading">
+            <header class="registration-section-heading">
+              <span class="registration-step-number">04</span>
+              <div><p class="eyebrow">GÓI CƯ DÂN (TÙY CHỌN)</p><h2 id="packageHeading">Mua gói cho phương tiện</h2>
+                <p>Để trống nếu chỉ lưu hồ sơ. Gói chỉ được ghi nhận khi chọn hình thức, phương thức thu và xác nhận gửi.</p></div>
+            </header>
+            <div class="registration-field-grid">
+              <label class="registration-field registration-field-wide" for="packageType">
+                <span class="registration-field-label">Gói gửi xe</span>
+                <select id="packageType" name="passType">
+                  <option value="">Chưa mua gói</option>
+                  <option th:each="package:${packageTypes}" th:value="${package}" th:text="${package.displayName}"></option>
+                </select>
+              </label>
+              <label class="registration-field" for="packageStartDate"><span class="registration-field-label">Ngày bắt đầu</span>
+                <input id="packageStartDate" name="packageStartDate" type="date" th:value="${today}">
+              </label>
+              <label class="registration-field" for="packageDurationDays"><span class="registration-field-label">Số ngày (gói ngày)</span>
+                <input id="packageDurationDays" name="packageDurationDays" type="number" value="1" min="1" max="366">
+              </label>
+              <label class="registration-field" for="packagePaymentMethod"><span class="registration-field-label">Phương thức ghi nhận thu</span>
+                <select id="packagePaymentMethod" name="paymentMethod">
+                  <option value="">Chọn phương thức</option>
+                  <option th:each="method:${paymentMethods}" th:value="${method}" th:attr="data-requires-reference=${method.externalReferenceRequired}" th:text="${method.displayName}"></option>
+                </select>
+              </label>
+              <label class="registration-field" for="packagePaymentReference"><span class="registration-field-label">Mã giao dịch chuyển khoản / POS</span>
+                <input id="packagePaymentReference" name="paymentReference" maxlength="120" autocomplete="off">
+              </label>
+              <p id="packageSummary" class="registration-field registration-field-wide" role="status" aria-live="polite">Chưa chọn gói. Nếu tiếp tục, hồ sơ được lưu mà chưa mua gói.</p>
+            </div>
+          </section>
+
           <footer class="registration-submit-panel glass-card">
             <div>
               <strong>Một lần gửi để lưu hồ sơ</strong>
-              <p>Hãy kiểm tra các mục bắt buộc và ảnh đã chọn trước khi tiếp tục.</p>
+              <p>Kiểm tra hồ sơ, ảnh và gói tùy chọn. Nếu chọn gói, lần gửi này đồng thời ghi nhận khoản thu đã hiển thị.</p>
             </div>
             <button id="saveRegistrationButton" class="registration-button registration-button-primary" type="submit">
               <img th:src="@{/images/lucide/check.svg}" alt="">
-              <span th:if="${#sets.contains(currentAuthorities, 'CARD_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Lưu hồ sơ và tiếp tục tạo gói</span>
-              <span th:unless="${#sets.contains(currentAuthorities, 'CARD_MANAGE') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Lưu hồ sơ</span>
+              <span>Lưu hồ sơ</span>
             </button>
           </footer>
         </form>

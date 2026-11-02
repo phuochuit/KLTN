@@ -11,7 +11,7 @@
   <script defer th:src="@{/js/management-core.js}"></script>
   <script defer th:src="@{/js/security-roles.js}"></script>
 </head>
-<body class="dashboard-page management-page security-roles-page" th:with="activePage='roles'">
+<body class="dashboard-page management-page security-roles-page" th:with="activePage='roles'" th:attr="data-role-draft-scope=${roleDraftScope}">
   <a href="#coreMain" class="skip-link">Đến nội dung chính</a>
   <div class="dashboard-shell">
     <aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside>

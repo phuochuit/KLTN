@@ -223,6 +223,19 @@ public sealed class ParkingApiClient : IDisposable
             "Spring Web", "tra cứu cư dân/phương tiện");
     }
 
+    public async Task<EvidenceComparisonResponse> GetEvidenceComparisonAsync(
+        string plate, string exitVehicleType, string exitVehicleEvidenceId, string exitFaceEvidenceId, long? sessionId = null)
+    {
+        string query = $"?plate={Uri.EscapeDataString(plate ?? "")}"
+            + $"&exitVehicleType={Uri.EscapeDataString(exitVehicleType ?? "")}"
+            + $"&exitVehicleEvidenceId={Uri.EscapeDataString(exitVehicleEvidenceId ?? "")}"
+            + $"&exitFaceEvidenceId={Uri.EscapeDataString(exitFaceEvidenceId ?? "")}"
+            + (sessionId.HasValue ? $"&sessionId={sessionId.Value}" : "");
+        using var response = await SendProtectedAsync("/api/parking/evidence-comparison" + query, HttpMethod.Get, retrySafeRead: true);
+        return await ApiResponseReader.ReadAsync<EvidenceComparisonResponse>(response, _json,
+            "Spring Web", "đối chiếu bằng chứng ảnh vào/ra");
+    }
+
     public async Task<List<ParkingSlotResponse>> GetSlotsAsync()
     {
         using var response = await SendProtectedAsync("/api/parking/slots", HttpMethod.Get, retrySafeRead: true);
@@ -309,8 +322,10 @@ public sealed class ParkingApiClient : IDisposable
         }
     }
 
+    // Lỗi 5xx từ Spring (mất database, AI chưa sẵn sàng) cũng phải vào outbox: request có
+    // operationId nên Spring chống trùng bằng UUID + SHA-256 khi gửi lại.
     private static bool IsConnectivityFailure(Exception ex) =>
-        ex is HttpRequestException or IOException or OperationCanceledException;
+        ex is HttpRequestException or IOException or OperationCanceledException or TransientServerException;
 
     private async Task<AnprResponse> UploadAiAsync(string endpoint, string path, string operation)
     {
@@ -400,7 +415,10 @@ public sealed class ParkingApiClient : IDisposable
     private static (byte[], string, string) PrepareImageUpload(string path)
     {
         using var source = Image.FromFile(path);
-        const int maxDimension = 2240;
+        // YOLO evaluates at 640px. Keeping a 960px source preserves enough
+        // detail for small plates while avoiding multi-megabyte image, Base64
+        // response and evidence-storage overhead on CPU-only gate machines.
+        const int maxDimension = 960;
         double scale = Math.Min(1.0, (double)maxDimension / Math.Max(source.Width, source.Height));
         int width = Math.Max(1, (int)Math.Round(source.Width * scale));
         int height = Math.Max(1, (int)Math.Round(source.Height * scale));

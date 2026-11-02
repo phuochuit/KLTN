@@ -1,17 +1,27 @@
-# Quyết định và chính sách còn mở
+# Architecture Decision Records
+
+Thư mục này lưu các quyết định kiến trúc quan trọng của hệ thống quản lý bãi đỗ xe ANPR. ADR giải thích bối cảnh, lý do lựa chọn và hệ quả; tài liệu không thay thế mã nguồn hoặc kết quả kiểm thử.
 
 [Mục lục](../README.md) · [Nghiệp vụ](../requirements/README.md) · [Trạng thái](../implementation-status.md)
 
-## Cách sử dụng
+## Quy ước
 
-Chỉ ghi **đã duyệt** khi có xác nhận rõ của chủ dự án/người có thẩm quyền. Code hiện tại, tên file “final”, hình render hoặc test pass không thay cho phê duyệt nghiệp vụ. Khi thay quyết định kiến trúc quan trọng, thêm ADR mới và tham chiếu bản bị thay thế; không xóa lịch sử quyết định.
+- Tên file: `NNNN-ten-quyet-dinh.md`.
+- Không xóa ADR cũ. Khi quyết định thay đổi, tạo ADR mới và đánh dấu ADR cũ là `Superseded`.
+- Trạng thái sử dụng: `Proposed`, `Accepted`, `Superseded`, `Deprecated`.
+- `Proposed` không được xem là bằng chứng tính năng đã triển khai.
 
-## Quyết định đã được duyệt trong đợt tài liệu
+## Danh sách quyết định
 
-| Quyết định | Phạm vi / căn cứ | Giới hạn |
-| --- | --- | --- |
-| [ADR-001 — Docs là tài liệu tham khảo chính](0001-docs-as-project-reference.md) | Chủ dự án duyệt kế hoạch trong hội thoại ngày 2026-10-23: tổng hợp nghiệp vụ, quyết định, ERD/database và API thành Markdown tự đủ nghĩa | Xóa kho tư liệu gốc cần xác nhận cuối riêng; không đồng nghĩa duyệt các chính sách còn mở dưới đây |
-| [ADR-002 — Workspace và test artifacts](0002-workspace-and-test-artifacts.md) | Chủ dự án duyệt tách `.cache/`, `.artifacts/`, chuẩn hóa tools/test runner và luật agent ngày 2026-10-23 | Không thay nghiệp vụ; live API/E2E cần môi trường/harness được xác nhận |
+| ADR | Trạng thái | Nội dung |
+|---|---|---|
+| [ADR-0001](0001-spring-backend-trung-tam-va-tich-hop-ai.md) | Accepted | Spring Boot là backend nghiệp vụ trung tâm; FastAPI là dịch vụ AI độc lập |
+| [ADR-0002](0002-rbac-database-va-jwt-cho-desktop.md) | Proposed | Tài khoản database, RBAC và JWT cho Desktop |
+| [ADR-0003](0003-bang-chung-ai-dang-tin-cay.md) | Proposed | Gate Evidence làm nguồn tin cậy cho kết quả AI |
+| [ADR-0004](0004-tich-hop-bao-mat-tung-giai-doan.md) | Accepted | Port bảo mật theo giai đoạn thay vì merge nguyên branch |
+| [ADR-0005](0005-docs-as-project-reference.md) | Accepted | Docs là tài liệu tham khảo chính của dự án |
+| [ADR-0006](0006-workspace-and-test-artifacts.md) | Accepted | Tách `.cache/`, `.artifacts/` và chuẩn hóa tools/test runner |
+| [ADR-0007](0007-schema-migration-khong-dung-flyway.md) | Accepted | Không dùng Flyway; schema do `ddl-auto=update` và script SQL thủ công |
 
 ## Ràng buộc kỹ thuật đang áp dụng
 

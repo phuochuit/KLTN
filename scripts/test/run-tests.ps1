@@ -48,7 +48,7 @@ function Invoke-Suite([string]$Name) {
         switch ($Name) {
             spring {
                 $exe = Resolve-ParkingMaven $workspace
-                if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME/bin/java.exe")) { throw 'Set JAVA_HOME to a JDK 21 installation before running Spring tests.' }
+                if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME/bin/java.exe")) { throw 'Set JAVA_HOME to a JDK 21 or newer installation before running Spring tests.' }
                 $cwd = Join-Path $workspace 'spring-web'
                 $args = @('test', "-Dparking.test.reports-directory=$reports", "-Djava.io.tmpdir=$temp", '-DfailIfNoTests=true')
                 $versionArgs = @('--version')
@@ -81,7 +81,7 @@ function Invoke-Suite([string]$Name) {
         $summary.commands += @{executable=$exe; arguments=$versionArgs; working_directory=$cwd; log='logs/version.log'}
         $versionCode = Invoke-ParkingTestCommand $exe $versionArgs $cwd (Join-Path $logs 'version.log')
         if ($versionCode -ne 0) { throw 'Tool version probe failed; inspect logs/version.log.' }
-        if ($Name -eq 'spring' -and (Get-Content (Join-Path $logs 'version.log') -Raw) -notmatch 'Java version: 21[\.,]') { throw 'Spring tests require JDK 21. Check JAVA_HOME and Maven version output.' }
+        if ($Name -eq 'spring' -and (Get-Content (Join-Path $logs 'version.log') -Raw) -notmatch 'Java version: (2[1-9]|[3-9]\d)[\.,]') { throw 'Spring tests require JDK 21. Check JAVA_HOME and Maven version output.' }
         $summary.commands += @{executable=$exe; arguments=$args; working_directory=$cwd; log='logs/test.log'}
         $executing = $true
         $code = Invoke-ParkingTestCommand $exe $args $cwd (Join-Path $logs 'test.log')

@@ -16,10 +16,20 @@ Snapshot tĩnh 2026-10-25, revision `fe182fc9839de07d56bb0b3c54fefc5cdf034aed`, 
 | `/slots`, `/sessions` | Group 3 đã Build/refine, focused synthetic review; không suy human acceptance từ test. |
 | `/account-management` | FE1 chờ UI/UX acceptance; FE2 được chấp thuận UI/UX; ACC-V pending. |
 | `/roles` | FE đã Build; UI/UX acceptance và ROLE-V pending. |
-| `/pricing` | Build và desktop/mobile review một phần; browser response ghi chưa kiểm; chờ UI/UX acceptance. |
-| `/payments` | Build và desktop/mobile empty review; populated ledger/response ghi chưa browser review; chờ UI/UX acceptance. |
+| `/pricing` | Build Review hoàn tất theo Codex final review 2026-11-01; desktop/mobile, response states, keyboard dialog, không-forward mutation và asset hash evidence tại `.artifacts/test-runs/20261101T155314Z-pricing-payments-codex-final-91ad694d/`; người dùng vẫn sở hữu UI/UX acceptance. Xem [pricing override](pages/pricing.md). |
+| `/payments` | Build Review hoàn tất theo Codex final review 2026-11-01; empty/populated ledger fixture, response states, keyboard dialog, không-forward mutation và asset hash evidence tại `.artifacts/test-runs/20261101T155314Z-pricing-payments-codex-final-91ad694d/`; người dùng vẫn sở hữu UI/UX acceptance. Xem [payments override](pages/payments.md). |
+
+Ghi chú hiện trạng được cập nhật 2026-11-02 dựa trên final review và canonical page overrides; snapshot inventory 2026-10-25 bên dưới không bị sửa. Đây là evidence lịch sử cho hai route, không phải baseline mới hoặc acceptance cho goal toàn Web.
 
 Trạng thái này không chứng nhận nghiệp vụ, live E2E hoặc nghiệm thu chức năng; chi tiết evidence trong override và Plan/TODO tương ứng.
+
+## Final engineering evidence checkpoint — 2026-11-03
+
+Root's supplied final evidence (bằng chứng local, không nằm trong PR) closes the bounded important-P2 findings (zero open confirmed P0/P1 and zero open important P2), including the actual 413 error view and keyboard Back, valid shift submit 2→1 at 390px, and mobile card-review fit. Account-management details and evidence limits are in the [canonical override](pages/account-management.md). This completes the bounded engineering review of all 15 screens; it is not live E2E or human UI/UX acceptance; keep the existing per-route human acceptance decisions above. H2/mock/proxy observations are not live E2E, and the 36 paired affected-source performance samples are descriptive/confounded, not causal speedup evidence. Root completed final independent documentation review on 2026-11-03: Engineering Complete — Awaiting Human Acceptance, within the stated evidence limits.
+
+## Approved final integration scope — 2026-11-03
+
+The user approved the upstream-main GitHub integration. `/cards`, `/pricing`, and `/registrations` retain their accepted LumiPark presentation while implementing the current DAILY/MONTHLY-only new-package contract, optional authorized package purchase during registration, and server-authoritative pricing/payment behavior. This is an implementation handoff, not a new visual review: existing acceptance provenance above is unchanged; Root's functional checks and any fresh visual review remain pending. See the [publishable integration handoff](../../docs/review/web-final-review-integration.md) and [cards override](pages/cards.md).
 
 ## Source map
 
@@ -122,3 +132,8 @@ CSRF Web enabled trừ `/api/parking/**`, `/h2-console/**`; QR **không exempt**
 Shared nav conditions dựa currentAuthorities, nhưng page body account chưa chia grant từng action. `/account-management`/live read broad, shifts POST narrower SHIFT_MANAGE, còn actions ACCOUNT_MANAGE; không coi visible button là quyền server. Registration entry VEHICLE_MANAGE, QR RESIDENT_MANAGE, redirect cards CARD_MANAGE: test limited grants, không mở rộng quyền để làm luồng đẹp.
 
 Docs security có phần snapshot cũ; **source matcher hiện tại** dùng DASHBOARD_VIEW/HISTORY_VIEW cho revenue, không REVENUE_VIEW như một số bảng lịch sử. Redesign giữ source authorization hiện tại, mọi thay đổi policy phải được duyệt riêng. Error fetch không uniform JSON: có login redirect, HTML413 và generic error. Chưa có live auth/media/financial E2E evidence trong audit này.
+
+
+## Bàn giao GitHub — 2026-11-03
+
+Người dùng đã duyệt chuyển phạm vi 15 màn hình sang bàn giao GitHub và tích hợp main `0bed157`, giữ checkpoint `d824918`. [Tổng duyệt PR](../../docs/review/web-final-review-integration.md) là nguồn kết quả final review và giới hạn mới nhất; các snapshot/human acceptance lịch sử bên trên vẫn giữ provenance riêng. Không mở lại redesign hoặc coi chấp thuận bàn giao là chứng nhận production.

@@ -21,6 +21,7 @@ function initializeRegistration(form) {
   const saveIcon = saveButton.querySelector('img');
   const saveLabel = saveButton.querySelector('span');
   const originalSaveLabel = saveLabel.textContent;
+  const idleSaveLabel = () => packageType?.value ? 'Lưu hồ sơ và ghi nhận thu gói' : originalSaveLabel;
   const qrInput = byId('cccdQrFile');
   const qrStatus = byId('qrStatus');
   const qrPreview = byId('qrPreview');
@@ -44,6 +45,13 @@ function initializeRegistration(form) {
   const registrationImagePreview = byId('registrationImagePreview');
   const registrationImagePreviewFrame = byId('registrationImagePreviewFrame');
   const registrationImagePreviewFallback = byId('registrationImagePreviewFallback');
+  const packageType = byId('packageType');
+  const packageStartDate = byId('packageStartDate');
+  const packageDurationDays = byId('packageDurationDays');
+  const packagePaymentMethod = byId('packagePaymentMethod');
+  const packagePaymentReference = byId('packagePaymentReference');
+  const packageSummary = byId('packageSummary');
+  const packageControls = [packageStartDate, packageDurationDays, packagePaymentMethod, packagePaymentReference];
   const state = {
     previewUrls: { qr: null, face: null, vehicle: null },
     pendingQr: null,
@@ -741,7 +749,7 @@ function initializeRegistration(form) {
         saveButton.removeAttribute('aria-busy');
         saveButton.disabled = false;
         saveIcon.hidden = false;
-        saveLabel.textContent = originalSaveLabel;
+        saveLabel.textContent = idleSaveLabel();
         setFeedback(`${serverText ? `${serverText} ` : ''}${guidance} Thông tin và tệp đã chọn vẫn còn trên trang này.`, 'error', { focus: true });
         return;
       }
@@ -761,7 +769,7 @@ function initializeRegistration(form) {
     } finally {
       form.removeAttribute('aria-busy');
       saveButton.removeAttribute('aria-busy');
-      if (!state.writeLocked && !saveButton.disabled) saveLabel.textContent = originalSaveLabel;
+      if (!state.writeLocked && !saveButton.disabled) saveLabel.textContent = idleSaveLabel();
     }
   }
 
@@ -770,7 +778,35 @@ function initializeRegistration(form) {
     dateFields.forEach(control => {
       data.set(control.name, control.value ? parseVietnameseDate(control.value) : '');
     });
+    if (packageType?.value) {
+      data.set('packageStartDate', packageStartDate.value);
+      data.set('packageDurationDays', packageType.value === 'MONTHLY' ? '30' : packageDurationDays.value);
+    }
     return data;
+  }
+
+  function updatePackageSummary() {
+    if (!packageType) return;
+    const enabled = Boolean(packageType.value);
+    if (!saveButton.disabled && !state.writeLocked) saveLabel.textContent = idleSaveLabel();
+    packageControls.forEach(control => { control.disabled = !enabled; });
+    const monthly = packageType.value === 'MONTHLY';
+    packageDurationDays.readOnly = monthly;
+    if (monthly) packageDurationDays.value = '30';
+    packageStartDate.required = enabled;
+    packageDurationDays.required = enabled && !monthly;
+    packagePaymentMethod.required = enabled;
+    packagePaymentReference.required = enabled
+      && packagePaymentMethod.selectedOptions[0]?.dataset.requiresReference === 'true';
+    const vehicleOption = byId('vehicleType').selectedOptions[0];
+    const days = monthly ? 30 : Number(packageDurationDays.value);
+    const rate = Number(vehicleOption?.dataset[monthly ? 'monthlyPrice' : 'dailyPrice']);
+    const amount = monthly ? rate : rate * days;
+    packageSummary.textContent = !enabled
+      ? 'Chưa chọn gói. Nếu tiếp tục, hồ sơ được lưu mà chưa mua gói.'
+      : !Number.isFinite(amount) || amount <= 0 || !Number.isInteger(days) || days < 1 || days > 366
+        ? 'Kiểm tra loại xe, số ngày và cấu hình giá gói trước khi gửi.'
+        : `${packageType.selectedOptions[0].textContent.trim()} · ${days} ngày tính cả ngày cuối · ${new Intl.NumberFormat('vi-VN').format(amount)} đ. Số tiền cuối cùng do máy chủ tính.`;
   }
 
   form.noValidate = true;
@@ -780,6 +816,7 @@ function initializeRegistration(form) {
     if (dateFields.includes(control)) formatDateEntry(control);
     syncAppliedQrWithManualEdits(control);
     if (control === faceInput) refreshFaceRequirement();
+    if ([packageType, packageStartDate, packageDurationDays, packagePaymentMethod, packagePaymentReference, byId('vehicleType')].includes(control)) updatePackageSummary();
     syncDateValidity(control);
     if (control.checkValidity()) clearFieldError(control);
     else if (state.validationAttempted) setFieldError(control, validationMessage(control));
@@ -791,6 +828,7 @@ function initializeRegistration(form) {
     if (dateFields.includes(control)) formatDateEntry(control);
     syncAppliedQrWithManualEdits(control);
     if (control === faceInput) refreshFaceRequirement();
+    if ([packageType, packageStartDate, packageDurationDays, packagePaymentMethod, packagePaymentReference, byId('vehicleType')].includes(control)) updatePackageSummary();
     syncDateValidity(control);
     if (control.checkValidity()) clearFieldError(control);
     else if (state.validationAttempted) setFieldError(control, validationMessage(control));
@@ -814,10 +852,12 @@ function initializeRegistration(form) {
        setMediaStatus(byId('faceStatus'), 'Chưa có ảnh. Camera chỉ bật khi bạn chọn mở; nếu không cấp quyền, hãy tải ảnh lên.');
        registrationImageStatus.textContent = 'Chưa chọn ảnh.';
        feedback.hidden = true;
-       refreshFaceRequirement();
+        refreshFaceRequirement();
+        updatePackageSummary();
        dateFields.forEach(syncDateValidity);
     });
   });
+  updatePackageSummary();
 
   window.addEventListener('beforeunload', event => {
     if (!state.writeLocked) return;

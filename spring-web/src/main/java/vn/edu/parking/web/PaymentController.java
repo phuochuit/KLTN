@@ -1,6 +1,10 @@
 package vn.edu.parking.web;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -112,4 +116,57 @@ public class PaymentController {
         }).toList());
         return result;
     }
+
+    @GetMapping(value = "/reports/reconciliation.csv", produces = "text/csv; charset=UTF-8")
+    @ResponseBody
+    public ResponseEntity<byte[]> reconciliationCsv(@RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to) {
+        LocalDateTime start = from == null ? LocalDateTime.now().minusDays(30)
+            : LocalDateTime.ofInstant(from, ZoneId.systemDefault());
+        LocalDateTime end = to == null ? LocalDateTime.now()
+            : LocalDateTime.ofInstant(to, ZoneId.systemDefault());
+        List<PaymentTransaction> list = transactions
+            .findByStatusAndPaidAtBetweenOrderByPaidAtDesc(PaymentStatus.RECONCILED,
+                start.atZone(ZoneId.systemDefault()).toInstant(),
+                end.atZone(ZoneId.systemDefault()).toInstant());
+
+        StringBuilder csv = new StringBuilder(CsvUtils.UTF_8_BOM);
+        csv.append("Số biên nhận,Loại phí,Phương thức thanh toán,Số tiền (VNĐ),Trạng thái,Mã tham chiếu,Thời gian thanh toán,Mã phiên gửi xe,Mã gói tháng,Thu ngân,Người đối soát,Thời gian đối soát,Ghi chú đối soát\r\n");
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(ZoneId.systemDefault());
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        for (PaymentTransaction tx : list) {
+            BigDecimal amt = tx.getAmount() != null ? tx.getAmount() : BigDecimal.ZERO;
+            totalAmount = totalAmount.add(amt);
+            String collector = tx.getCollectedBy() != null ? (tx.getCollectedBy().getFullName() != null && !tx.getCollectedBy().getFullName().isBlank() ? tx.getCollectedBy().getFullName() : tx.getCollectedBy().getUsername()) : "";
+            String reconciler = tx.getReconciledBy() != null ? (tx.getReconciledBy().getFullName() != null && !tx.getReconciledBy().getFullName().isBlank() ? tx.getReconciledBy().getFullName() : tx.getReconciledBy().getUsername()) : "";
+
+            csv.append(CsvUtils.escape(tx.getReceiptNumber())).append(",")
+               .append(CsvUtils.escape(tx.getPaymentType() != null ? tx.getPaymentType().getDisplayName() : "")).append(",")
+               .append(CsvUtils.escape(tx.getPaymentMethod() != null ? tx.getPaymentMethod().getDisplayName() : "")).append(",")
+               .append(amt.toPlainString()).append(",")
+               .append(CsvUtils.escape(tx.getStatus() != null ? tx.getStatus().getDisplayName() : "")).append(",")
+               .append(CsvUtils.escape(tx.getExternalReference())).append(",")
+               .append(CsvUtils.escape(tx.getPaidAt() != null ? dtf.format(tx.getPaidAt()) : "")).append(",")
+               .append(CsvUtils.escape(tx.getParkingSession() != null ? tx.getParkingSession().getId() : "")).append(",")
+               .append(CsvUtils.escape(tx.getSubscriptionPayment() != null ? tx.getSubscriptionPayment().getId() : "")).append(",")
+               .append(CsvUtils.escape(collector)).append(",")
+               .append(CsvUtils.escape(reconciler)).append(",")
+               .append(CsvUtils.escape(tx.getReconciledAt() != null ? dtf.format(tx.getReconciledAt()) : "")).append(",")
+               .append(CsvUtils.escape(tx.getReconciliationNote())).append("\r\n");
+        }
+
+        csv.append("TỔNG CỘNG,,,")
+           .append(totalAmount.toPlainString())
+           .append(",,,,,,,,Tổng số giao dịch: ").append(list.size())
+           .append("\r\n");
+
+        byte[] bytes = csv.toString().getBytes(StandardCharsets.UTF_8);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"doi_soat_thanh_toan.csv\"")
+                .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                .body(bytes);
+    }
+
 }

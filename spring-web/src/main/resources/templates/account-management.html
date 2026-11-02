@@ -47,6 +47,7 @@
             </nav>
             <p class="account-flash" role="status" th:if="${message}" th:text="${message}"></p>
             <p class="account-flash is-error" role="alert" tabindex="-1" th:if="${error}" th:text="${error}"></p>
+            <p id="admin-submit-status" class="account-flash" role="status" aria-live="polite" aria-atomic="true" hidden></p>
 
             <section class="temporary-secret" th:if="${canManageAccounts && temporaryPassword != null}">
                 <strong>Mật khẩu tạm — chỉ hiển thị trong lần này</strong>

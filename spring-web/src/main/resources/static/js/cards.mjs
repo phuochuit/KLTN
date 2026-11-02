@@ -49,6 +49,10 @@ function initializeCardsPage(form) {
     return passType.value === 'MONTHLY';
   }
 
+  function isPackage() {
+    return passType.value === 'DAILY' || isMonthly();
+  }
+
   function selectedVehicle() {
     return vehicle.selectedOptions[0];
   }
@@ -57,8 +61,13 @@ function initializeCardsPage(form) {
     return paymentMethod.selectedOptions[0];
   }
 
-  function monthlyPrice() {
-    const amount = Number(selectedVehicle()?.dataset.monthlyPrice);
+  function packagePrice() {
+    const option = selectedVehicle();
+    const days = isMonthly() ? 30 : (duration.value.trim() === '' ? 1 : Number(duration.value));
+    if (!Number.isInteger(days) || days < 1 || days > 366) return null;
+    const dailyPrice = Number(option?.dataset.dailyPrice);
+    const monthlyPrice = Number(option?.dataset.monthlyPrice);
+    const amount = isMonthly() ? monthlyPrice : dailyPrice * days;
     return Number.isFinite(amount) && amount > 0 ? amount : null;
   }
 
@@ -87,31 +96,35 @@ function initializeCardsPage(form) {
 
   function updateMode() {
     const monthly = isMonthly();
-    monthlyFields.hidden = !monthly;
+    const packageSelected = isPackage();
+    monthlyFields.hidden = !packageSelected;
     monthlyFields.querySelectorAll('input, select').forEach(control => {
-      control.disabled = !monthly;
+      control.disabled = !packageSelected;
     });
-    startDate.required = monthly;
-    paymentMethod.required = monthly;
-    paymentReference.required = monthly && selectedPaymentMethod()?.dataset.requiresReference === 'true';
-    setShown('startDateRequired', monthly);
-    setShown('paymentMethodRequired', monthly);
+    startDate.required = packageSelected;
+    duration.required = packageSelected;
+    duration.readOnly = monthly;
+    if (monthly) duration.value = '30';
+    paymentMethod.required = packageSelected;
+    paymentReference.required = packageSelected && selectedPaymentMethod()?.dataset.requiresReference === 'true';
+    setShown('startDateRequired', packageSelected);
+    setShown('paymentMethodRequired', packageSelected);
     setShown('paymentReferenceRequired', paymentReference.required);
-    setShown('previewPeriodRow', monthly);
-    setShown('previewPaymentRow', monthly);
-    setShown('previewReferenceRow', monthly);
-    setShown('reviewPeriodRow', monthly);
-    setShown('reviewPaymentRow', monthly);
-    setShown('reviewReferenceRow', monthly);
-    byId('previewDisclosure').textContent = monthly
+    setShown('previewPeriodRow', packageSelected);
+    setShown('previewPaymentRow', packageSelected);
+    setShown('previewReferenceRow', packageSelected);
+    setShown('reviewPeriodRow', packageSelected);
+    setShown('reviewPaymentRow', packageSelected);
+    setShown('reviewReferenceRow', packageSelected);
+    byId('previewDisclosure').textContent = packageSelected
       ? 'Khoản thu được ghi nhận trong hệ thống; thông tin này không xác nhận đối soát hoặc thanh toán thành công từ nhà cung cấp bên ngoài.'
-      : 'Vé lượt không tạo bản ghi thu gói tháng; phí mỗi lượt tiếp tục theo quy tắc nghiệp vụ hiện hành.';
+      : 'Chưa chọn gói; các lượt gửi xe áp dụng chính sách nghiệp vụ hiện hành.';
     byId('reviewDisclosure').textContent = byId('previewDisclosure').textContent;
     updatePreview();
   }
 
   function periodSummary() {
-    const durationValue = duration.value.trim() === '' ? 30 : Number(duration.value);
+    const durationValue = isMonthly() ? 30 : (duration.value.trim() === '' ? 1 : Number(duration.value));
     const start = parseVietnameseDate(startDate.value);
     const end = start ? inclusiveEndDate(start, durationValue) : null;
     if (!start) return 'Chọn ngày bắt đầu';
@@ -120,20 +133,20 @@ function initializeCardsPage(form) {
   }
 
   function updatePreview() {
-    const monthly = isMonthly();
+    const packageSelected = isPackage();
     const parsedStartDate = parseVietnameseDate(startDate.value);
-    startDate.setCustomValidity(monthly && startDate.value && !parsedStartDate
+    startDate.setCustomValidity(packageSelected && startDate.value && !parsedStartDate
       ? 'Nhập ngày có thật theo định dạng dd/mm/yyyy.'
       : '');
     const option = selectedVehicle();
-    const price = monthlyPrice();
+    const price = packagePrice();
     const period = periodSummary();
     const method = selectedPaymentMethod();
     const needsReference = method?.dataset.requiresReference === 'true';
     const vehicleText = option?.dataset.plate
       ? `${option.dataset.plate} · ${option.dataset.owner || 'Chưa có tên chủ xe'} · ${option.dataset.type || ''}`
       : 'Chưa có xe phù hợp';
-    const amountText = monthly ? (price === null ? 'Chưa có giá gói' : money(price)) : 'Không thu gói tháng';
+    const amountText = packageSelected ? (price === null ? 'Chưa có giá gói hợp lệ' : money(price)) : 'Chưa mua gói';
     const methodText = method?.textContent.trim() || 'Chưa chọn phương thức';
     const referenceText = needsReference
       ? (paymentReference.value.trim() || 'Cần nhập mã giao dịch')
@@ -142,12 +155,12 @@ function initializeCardsPage(form) {
     setText('previewVehicle', vehicleText);
     setText('previewPassType', passType.selectedOptions[0]?.textContent.trim() || '—');
     setText('previewStatus', status.selectedOptions[0]?.textContent.trim() || '—');
-    setText('previewPeriod', monthly ? period : 'Không áp dụng gói tháng');
+    setText('previewPeriod', packageSelected ? period : 'Chưa chọn gói');
     setText('previewAmount', amountText);
     setText('previewPayment', methodText);
     setText('previewReference', referenceText);
-    setShown('previewUnavailable', monthly && price === null);
-    submitButton.disabled = state.writeLocked || !vehicle.value || (monthly && price === null);
+    setShown('previewUnavailable', packageSelected && price === null);
+    submitButton.disabled = state.writeLocked || !vehicle.value || (packageSelected && price === null);
   }
 
   function copyPreviewToReview() {
@@ -199,8 +212,9 @@ function initializeCardsPage(form) {
 
     try {
       const parameters = new URLSearchParams(new FormData(form));
-      if (isMonthly()) {
+      if (isPackage()) {
         parameters.set('startDate', parseVietnameseDate(startDate.value) || '');
+        if (isMonthly()) parameters.set('durationDays', '30');
       } else {
         for (const name of ['startDate', 'durationDays', 'paymentMethod', 'paymentReference']) parameters.delete(name);
       }

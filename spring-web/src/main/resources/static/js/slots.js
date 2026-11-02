@@ -14,9 +14,6 @@ $('#openNavigation')?.addEventListener('click', () => {
   navigation.querySelector('.close-navigation').focus();
 });
 $('#closeNavigation')?.addEventListener('click', () => navigation.close());
-matchMedia('(min-width: 64rem)').addEventListener('change', event => {
-  if (event.matches && navigation?.open) navigation.close();
-});
 document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', event => {
   if (!window.confirm('Bạn muốn đăng xuất khỏi hệ thống?')) event.preventDefault();
 }));
@@ -76,6 +73,47 @@ $('#showReleaseConfirm').addEventListener('click', () => {
   $('#cancelRelease').focus();
 });
 $('#cancelRelease').addEventListener('click', closeReleaseConfirmation);
+
+const pendingSlotForms = [];
+document.querySelectorAll('form[method="post"]').forEach(form => {
+  if (!/(^|\/)slots(?:\/|$)/.test(new URL(form.action, window.location.href).pathname)) return;
+
+  const pending = { form, active: false };
+  pendingSlotForms.push(pending);
+  form.addEventListener('submit', event => {
+    if (pending.active) {
+      event.preventDefault();
+      return;
+    }
+
+    const submitter = event.submitter || form.querySelector('button[type="submit"]');
+    if (!submitter) return;
+
+    pending.active = true;
+    pending.submitter = submitter;
+    pending.originalText = submitter.textContent;
+    pending.originalMinWidth = submitter.style.minWidth;
+    pending.originalAriaDisabled = submitter.getAttribute('aria-disabled');
+    pending.originalAriaBusy = form.getAttribute('aria-busy');
+    submitter.style.minWidth = `${submitter.getBoundingClientRect().width}px`;
+    form.setAttribute('aria-busy', 'true');
+    submitter.setAttribute('aria-disabled', 'true');
+    submitter.textContent = 'Đang gửi…';
+  });
+});
+
+window.addEventListener('pageshow', () => {
+  pendingSlotForms.forEach(pending => {
+    if (!pending.active) return;
+    pending.active = false;
+    if (pending.originalAriaBusy === null) pending.form.removeAttribute('aria-busy');
+    else pending.form.setAttribute('aria-busy', pending.originalAriaBusy);
+    pending.submitter.style.minWidth = pending.originalMinWidth;
+    if (pending.originalAriaDisabled === null) pending.submitter.removeAttribute('aria-disabled');
+    else pending.submitter.setAttribute('aria-disabled', pending.originalAriaDisabled);
+    pending.submitter.textContent = pending.originalText;
+  });
+});
 
 function openSlot(tile) {
   const data = tile.dataset;

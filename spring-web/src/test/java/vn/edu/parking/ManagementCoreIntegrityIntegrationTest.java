@@ -379,8 +379,8 @@ class ManagementCoreIntegrityIntegrationTest {
         doThrow(new DataAccessResourceFailureException("synthetic internal detail"))
             .when(audit).findAll(any(Specification.class), any(Pageable.class));
         mvc.perform(get("/security-audit")).andExpect(status().isOk())
-            .andExpect(content().string(containsString("Không thể truy vấn nhật ký")))
-            .andExpect(content().string(not(containsString("Chưa có sự kiện bảo mật."))))
+            .andExpect(content().string(containsString("Nhật ký tạm thời không khả dụng")))
+            .andExpect(content().string(not(containsString("audit-table-area"))))
             .andExpect(content().string(not(containsString("synthetic internal detail"))));
     }
 }

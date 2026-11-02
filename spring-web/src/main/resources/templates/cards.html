@@ -87,16 +87,14 @@
                   <td><strong class="card-code" th:text="${c.cardCode}">59A112345</strong><small class="card-code-note">Từ biển số chuẩn hóa</small></td>
                   <td class="card-plate" th:text="${c.vehicle?.plateNumber}">59A1-123.45</td>
                   <td class="card-owner" th:text="${c.vehicle?.effectiveOwnerName}">Nguyễn Văn An</td>
-                  <td><span class="card-pass-badge" th:classappend="${c.passType.name() == 'MONTHLY' ? 'is-monthly' : 'is-per-visit'}" th:text="${c.passType.displayName}">Gói 30 ngày</span></td>
+                  <td><span class="card-pass-badge" th:classappend="${c.passType.name() == 'MONTHLY' ? 'is-monthly' : 'is-daily'}" th:text="${c.passType.displayName}">Gói 30 ngày</span></td>
                   <td class="card-validity">
-                    <span th:if="${c.passType.name() == 'MONTHLY' && c.validFrom != null && c.validUntil != null}" th:text="${#temporals.format(c.validFrom,'dd/MM/yyyy') + ' – ' + #temporals.format(c.validUntil,'dd/MM/yyyy')}">01/11/2026 – 30/11/2026</span>
-                    <span th:if="${c.passType.name() == 'MONTHLY' && (c.validFrom == null || c.validUntil == null)}">Chưa ghi nhận kỳ</span>
-                    <span th:if="${c.passType.name() == 'PER_VISIT'}">Không áp dụng gói tháng</span>
-                    <small th:if="${c.passType.name() == 'MONTHLY'}">Tính cả ngày cuối</small>
+                    <span th:if="${c.validFrom != null && c.validUntil != null}" th:text="${#temporals.format(c.validFrom,'dd/MM/yyyy') + ' – ' + #temporals.format(c.validUntil,'dd/MM/yyyy')}">01/11/2026 – 30/11/2026</span>
+                    <span th:if="${c.validFrom == null || c.validUntil == null}">Chưa ghi nhận kỳ</span>
+                    <small>Tính cả ngày cuối</small>
                   </td>
                   <td class="card-price">
-                    <strong th:if="${c.passType.name() == 'MONTHLY'}" th:text="${#numbers.formatDecimal(c.subscriptionFee,0,'COMMA',0,'POINT') + ' đ'}">150.000 đ</strong>
-                    <span th:if="${c.passType.name() == 'PER_VISIT'}">Không thu gói tháng</span>
+                    <strong th:text="${#numbers.formatDecimal(c.subscriptionFee,0,'COMMA',0,'POINT') + ' đ'}">150.000 đ</strong>
                   </td>
                   <td><span class="card-status-badge" th:classappend="${c.status.name() == 'ACTIVE' ? 'is-active' : (c.status.name() == 'BLOCKED' ? 'is-blocked' : 'is-expired')}" th:text="${c.status.displayName}">Hoạt động</span></td>
                   <td><a class="card-row-action" th:href="@{/cards(vehicleId=${c.vehicle.id})}">Chọn xe</a></td>
@@ -124,8 +122,8 @@
               <label class="cards-field cards-field-wide" for="cardVehicleId">
                 <span class="cards-field-label">Xe đã đăng ký <span class="cards-required">Bắt buộc</span></span>
                 <select id="cardVehicleId" name="vehicleId" required>
-                  <option th:each="v:${vehicles}" th:value="${v.id}" th:selected="${selectedVehicleId != null && selectedVehicleId == v.id}"
-                    th:attr="data-plate=${v.plateNumber},data-owner=${v.effectiveOwnerName},data-type=${v.vehicleType.displayName},data-monthly-price=${monthlyPrices[v.vehicleType.name()]}"
+                    <option th:each="v:${vehicles}" th:value="${v.id}" th:selected="${selectedVehicleId != null && selectedVehicleId == v.id}"
+                    th:attr="data-plate=${v.plateNumber},data-owner=${v.effectiveOwnerName},data-type=${v.vehicleType.displayName},data-daily-price=${dailyPrices[v.vehicleType.name()]},data-monthly-price=${monthlyPrices[v.vehicleType.name()]}"
                     th:text="${v.plateNumber + ' · ' + v.effectiveOwnerName + ' · ' + v.vehicleType.displayName}">59A1-123.45 · Nguyễn Văn An · Xe máy</option>
                   <option th:if="${#lists.isEmpty(vehicles)}" value="" disabled>Chưa có phương tiện đăng ký</option>
                 </select>
@@ -135,7 +133,7 @@
               <label class="cards-field" for="cardPassType">
                 <span class="cards-field-label">Hình thức <span class="cards-required">Bắt buộc</span></span>
                 <select id="cardPassType" name="passType" required>
-                  <option th:each="p:${passTypes}" th:value="${p}" th:text="${p.displayName}">Vé lượt</option>
+                    <option th:each="p:${passTypes}" th:value="${p}" th:text="${p.displayName}">Gói theo ngày</option>
                 </select>
               </label>
 
@@ -148,17 +146,17 @@
 
               <div id="monthlyFields" class="cards-monthly-fields cards-field-wide">
                 <label class="cards-field" for="cardStartDate">
-                  <span class="cards-field-label">Ngày bắt đầu <span id="startDateRequired" class="cards-required" hidden>Bắt buộc với gói tháng</span></span>
+                  <span class="cards-field-label">Ngày bắt đầu <span id="startDateRequired" class="cards-required" hidden>Bắt buộc với gói</span></span>
                   <input id="cardStartDate" name="startDate" type="date" th:value="${today}" aria-describedby="cardDateHint">
                   <small id="cardDateHint" class="cards-field-hint">Kỳ kết thúc sau số ngày đã chọn, tính cả ngày cuối.</small>
                 </label>
                 <label class="cards-field" for="cardDurationDays">
                   <span class="cards-field-label">Số ngày</span>
-                  <input id="cardDurationDays" name="durationDays" type="number" value="30" min="1" max="366" inputmode="numeric" aria-describedby="cardDurationHint">
-                  <small id="cardDurationHint" class="cards-field-hint">Mặc định 30 ngày; phạm vi 1–366 ngày.</small>
+                  <input id="cardDurationDays" name="durationDays" type="number" value="1" min="1" max="366" inputmode="numeric" aria-describedby="cardDurationHint">
+                  <small id="cardDurationHint" class="cards-field-hint">Gói ngày: 1–366 ngày. Gói tháng: cố định 30 ngày.</small>
                 </label>
                 <label class="cards-field" for="cardPaymentMethod">
-                  <span class="cards-field-label">Phương thức ghi nhận thu <span id="paymentMethodRequired" class="cards-required" hidden>Bắt buộc với gói tháng</span></span>
+                  <span class="cards-field-label">Phương thức ghi nhận thu <span id="paymentMethodRequired" class="cards-required" hidden>Bắt buộc với gói</span></span>
                   <select id="cardPaymentMethod" name="paymentMethod">
                     <option th:each="m:${paymentMethods}" th:value="${m}" th:attr="data-requires-reference=${m.externalReferenceRequired}" th:text="${m.displayName}">Tiền mặt</option>
                   </select>
@@ -206,13 +204,13 @@
           <header class="cards-section-heading">
             <div>
               <p class="eyebrow">BẢN GHI THU GÓI</p>
-              <h2 id="cardHistoryHeading">Lịch sử khoản thu gói tháng</h2>
+              <h2 id="cardHistoryHeading">Lịch sử khoản thu gói</h2>
               <p class="muted">Tối đa 20 bản ghi mới nhất được tải từ máy chủ; không phải màn hình đối soát bên ngoài.</p>
             </div>
             <img class="cards-history-icon" th:src="@{/images/lucide/history.svg}" alt="">
           </header>
           <p id="paymentsTableHint" class="table-hint">Bảng có thể cuộn ngang để xem đủ cột.</p>
-          <div class="table-scroll cards-table-scroll" role="region" aria-label="Lịch sử khoản thu gói tháng, cuộn ngang để xem đủ cột" aria-describedby="paymentsTableHint" tabindex="0">
+          <div class="table-scroll cards-table-scroll" role="region" aria-label="Lịch sử khoản thu gói, cuộn ngang để xem đủ cột" aria-describedby="paymentsTableHint" tabindex="0">
             <table class="cards-table cards-payment-table">
               <caption class="sr-only">Các bản ghi thu gói tháng mới nhất theo thời điểm, thẻ, kỳ và số tiền</caption>
               <thead><tr><th scope="col">Thời điểm ghi nhận</th><th scope="col">Mã nhận diện</th><th scope="col">Biển số</th><th scope="col">Kỳ hạn tính cả ngày cuối</th><th scope="col">Số tiền</th></tr></thead>

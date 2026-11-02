@@ -30,7 +30,6 @@
   const navigation = document.querySelector('#navigationDialog');
   document.querySelector('#openNavigation')?.addEventListener('click', () => navigation?.showModal());
   document.querySelector('#closeNavigation')?.addEventListener('click', () => navigation?.close());
-  matchMedia('(min-width: 64rem)').addEventListener('change', event => { if (event.matches && navigation?.open) navigation.close(); });
   document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', event => {
     if (!window.confirm('Bạn muốn đăng xuất khỏi hệ thống?')) event.preventDefault();
   }));
@@ -62,7 +61,7 @@
   const form = document.querySelector('#limitForm');
   if (form) {
     const inputs = [...form.querySelectorAll('input[type=number]')];
-    const original = inputs.map(input => input.value);
+    const original = inputs.map(input => input.defaultValue);
     const status = document.querySelector('#limitDraft');
     const draftState = document.querySelector('#limitDraftState');
     const draftValues = document.querySelector('#limitDraftValues');
@@ -74,6 +73,19 @@
     reset.hidden = false;
     function updateDraft(reverted = false) {
       const changed = inputs.some((input, index) => input.value !== original[index]);
+      if (submitting) {
+        status.dataset.state = 'saving';
+        status.textContent = 'Đang lưu hạn mức…';
+        draftValues.hidden = !changed;
+        draftValues.textContent = changed
+          ? `Bản nháp đang gửi: ${inputs[0].value || 'chưa nhập'} xe hai bánh / hộ · ${inputs[1].value || 'chưa nhập'} ô tô / hộ`
+          : '';
+        actionHint.hidden = false;
+        actionHint.textContent = 'Đang gửi hạn mức; không chỉnh sửa hoặc khôi phục trong khi chờ kết quả.';
+        save.disabled = true;
+        reset.disabled = true;
+        return changed;
+      }
       status.dataset.state = changed ? 'draft' : reverted ? 'reverted' : 'saved';
       status.textContent = changed ? 'Có thay đổi chưa lưu' : reverted ? 'Đã khôi phục giá trị đã tải' : 'Đang dùng giá trị đã lưu';
       draftValues.hidden = !changed;
@@ -96,8 +108,22 @@
       inputs[0]?.focus();
     });
     form.addEventListener('submit', event => {
+      if (submitting) { event.preventDefault(); return; }
       if (!updateDraft()) event.preventDefault();
-      else submitting = true;
+      else {
+        submitting = true;
+        form.setAttribute('aria-busy', 'true');
+        inputs.forEach(input => { input.readOnly = true; });
+        updateDraft();
+      }
+    });
+    window.addEventListener('pageshow', event => {
+      if (event.persisted && submitting) {
+        submitting = false;
+        form.removeAttribute('aria-busy');
+        inputs.forEach(input => { input.readOnly = false; });
+      }
+      if (!submitting) updateDraft();
     });
     window.addEventListener('beforeunload', event => {
       if (updateDraft() && !submitting) { event.preventDefault(); event.returnValue = ''; }

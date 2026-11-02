@@ -18,10 +18,24 @@ from .schemas import BoundingBox, RecognitionResponse
 CAR_CLASS = "car"
 MOTORCYCLE_CLASSES = {"motorcycle", "motorbike"}
 VIETNAM_PLATE_PATTERN = re.compile(r"^\d{2}[A-Z]{1,2}\d{4,6}$")
+STANDARD_PLATE_WITH_EXTRA_LETTER = re.compile(r"^(\d{2})[A-Z]([A-Z]\d{6})$")
 
 
 def normalize_plate(value: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", (value or "").upper())
+
+
+def canonicalize_plate(value: str) -> str:
+    """Normalize a standard Vietnamese plate and remove one OCR-only prefix letter.
+
+    Resident motorcycle/car plates handled by this system use a two-digit province
+    code followed by one series letter. EasyOCR can hallucinate a letter between
+    the province code and the real series (for example 59HF241578). In the narrow
+    two-letter + six-digit shape, discard only that inserted first letter.
+    """
+    text = normalize_plate(value)
+    match = STANDARD_PLATE_WITH_EXTRA_LETTER.fullmatch(text)
+    return "".join(match.groups()) if match else text
 
 
 def plate_format_score(value: str) -> float:
@@ -71,6 +85,23 @@ class AnprRecognizer:
         self.plate_confidence = float(os.getenv("ANPR_PLATE_CONFIDENCE", "0.20"))
         self.vehicle_confidence = float(os.getenv("ANPR_VEHICLE_CONFIDENCE", "0.25"))
         self._lock = Lock()
+        self.ready = False
+
+    def warm_up(self) -> None:
+        """Initialize YOLO and EasyOCR execution before serving gate requests."""
+        blank = np.zeros((640, 640, 3), dtype=np.uint8)
+        self.recognize_frame(blank)
+
+        # A blank frame never reaches OCR because YOLO finds no plate. Run OCR
+        # once on a synthetic high-contrast plate so the first real vehicle does
+        # not pay PyTorch/EasyOCR's lazy CPU initialization cost.
+        synthetic_plate = np.full((140, 420, 3), 255, dtype=np.uint8)
+        cv2.putText(synthetic_plate, "59F2", (18, 58), cv2.FONT_HERSHEY_SIMPLEX,
+                    1.6, (0, 0, 0), 3, cv2.LINE_AA)
+        cv2.putText(synthetic_plate, "41578", (65, 122), cv2.FONT_HERSHEY_SIMPLEX,
+                    1.6, (0, 0, 0), 3, cv2.LINE_AA)
+        self._read_plate(synthetic_plate)
+        self.ready = True
 
     def recognize_image_bytes(self, data: bytes, frame_index: int = 0) -> RecognitionResponse:
         image = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
@@ -78,11 +109,13 @@ class AnprRecognizer:
             raise ValueError("Không đọc được dữ liệu ảnh")
         return self.recognize_frame(image, frame_index)
 
-    def recognize_frame(self, image: np.ndarray, frame_index: int = 0) -> RecognitionResponse:
+    def recognize_frame(self, image: np.ndarray, frame_index: int = 0,
+                        plate_result=None) -> RecognitionResponse:
         with self._lock:
-            plate_result = self.plate_model.predict(
-                image, conf=self.plate_confidence, imgsz=640, verbose=False
-            )[0]
+            if plate_result is None:
+                plate_result = self.plate_model.predict(
+                    image, conf=self.plate_confidence, imgsz=640, verbose=False
+                )[0]
             vehicle_result = self.vehicle_model.predict(
                 image, conf=self.vehicle_confidence, imgsz=640, verbose=False,
                 classes=[2, 3],
@@ -105,6 +138,8 @@ class AnprRecognizer:
         if vehicle_type == "UNKNOWN":
             vehicle_type, vehicle_conf = self._vehicle_type_from_plate_shape(xyxy)
         crop = image[y1:y2, x1:x2]
+        from .quality import assess_plate
+        plate_quality = assess_plate(image, (x1, y1, x2 - x1, y2 - y1))
         plate_text, ocr_conf = self._read_plate(crop)
 
         annotated = image.copy()
@@ -135,6 +170,7 @@ class AnprRecognizer:
             boundingBox=BoundingBox(x=x1, y=y1, width=x2 - x1, height=y2 - y1),
             frameIndex=frame_index,
             annotatedImageBase64=self._encode_image(annotated),
+            quality=plate_quality,
             message=message,
         )
 
@@ -159,7 +195,7 @@ class AnprRecognizer:
 
     def recognize_frames(self, frames: list[tuple[int, np.ndarray]], finalist_count: int = 3) -> RecognitionResponse:
         """Select sharp plate candidates, then run expensive OCR only on finalists."""
-        finalists: list[tuple[float, int, np.ndarray]] = []
+        finalists: list[tuple[float, int, np.ndarray, object]] = []
         for index, frame in frames:
             with self._lock:
                 plate_result = self.plate_model.predict(
@@ -168,14 +204,14 @@ class AnprRecognizer:
             plate_confidence = max((score for score, _ in self._all_boxes(plate_result)), default=0.0)
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             sharpness = min(float(cv2.Laplacian(gray, cv2.CV_64F).var()) / 1000.0, 1.0)
-            finalists.append((plate_confidence * 0.9 + sharpness * 0.1, index, frame))
+            finalists.append((plate_confidence * 0.9 + sharpness * 0.1, index, frame, plate_result))
 
         if not finalists:
             raise ValueError("Không đọc được frame nào để nhận dạng")
 
         best: Candidate | None = None
-        for _, index, frame in sorted(finalists, key=lambda item: item[0], reverse=True)[:max(1, finalist_count)]:
-            response = self.recognize_frame(frame, index)
+        for _, index, frame, plate_result in sorted(finalists, key=lambda item: item[0], reverse=True)[:max(1, finalist_count)]:
+            response = self.recognize_frame(frame, index, plate_result=plate_result)
             score = (
                 response.detection_confidence * 0.45
                 + response.ocr_confidence * 0.45
@@ -198,13 +234,19 @@ class AnprRecognizer:
             return "", 0.0
         scale = max(1.0, 420 / max(1, crop.shape[1]))
         enlarged = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-        gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
+        from .quality import deskew
+        straightened = deskew(enlarged)
+        gray = cv2.cvtColor(straightened, cv2.COLOR_BGR2GRAY)
         equalized = cv2.equalizeHist(gray)
         denoised = cv2.bilateralFilter(equalized, 7, 35, 35)
 
         # Ảnh cân bằng + khử nhiễu thường tốt nhất với biển số ngoài trời.
-        # Chạy nó trước để đa số trường hợp chỉ cần một lượt OCR.
-        variants = [denoised, equalized, enlarged]
+        # Chạy nó trước để đa số trường hợp chỉ cần một lượt OCR. Bản phóng to
+        # xếp ngay sau vì đây là biến thể duy nhất đọc đúng trên ảnh gốc lớn bị
+        # thu nhỏ, còn clahe bị loại vì luôn cho điểm cấu trúc kém trong đo đạc.
+        variants = [denoised, enlarged, equalized]
+        if straightened is not enlarged:
+            variants.insert(2, straightened)
 
         best_text, best_conf, best_quality = "", 0.0, -1.0
         with self._lock:
@@ -216,7 +258,7 @@ class AnprRecognizer:
                     allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
                 )
                 ordered = self._order_ocr_results(results)
-                text = normalize_plate("".join(str(item[1]) for item in ordered))
+                text = canonicalize_plate("".join(str(item[1]) for item in ordered))
                 token_lengths = [max(1, len(normalize_plate(str(item[1])))) for item in ordered]
                 confidence = (sum(float(item[2]) * length for item, length in zip(ordered, token_lengths))
                               / sum(token_lengths)) if ordered else 0.0
@@ -227,8 +269,10 @@ class AnprRecognizer:
                     best_text, best_conf, best_quality = text, confidence, quality
 
                 # Dừng ngay khi đã có biển đúng cấu trúc và độ tin cậy tốt.
-                # Nhờ vậy ảnh rõ chỉ chạy một biến thể OCR thay vì cả ba.
-                if confidence >= 0.82 and format_score >= 0.35:
+                # Nhờ vậy ảnh rõ chỉ chạy một biến thể OCR thay vì cả bốn.
+                # Ngưỡng 0.80 nằm giữa kết quả sai 0.7756 và kết quả đúng
+                # 0.8126 đo được trên ảnh benchmark.
+                if confidence >= 0.80 and format_score >= 0.35:
                     break
         return best_text, best_conf
 

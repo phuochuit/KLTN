@@ -11,7 +11,8 @@
     <a class="nav-item" th:classappend="${activePage == 'cards' ? 'is-selected' : ''}" th:attr="aria-current=${activePage == 'cards' ? 'page' : null}" th:href="@{/cards}" th:if="${#sets.contains(currentAuthorities,'CARD_MANAGE') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}"><img th:src="@{/images/lucide/credit-card.svg}" alt="">Thẻ &amp; gói</a>
     <p class="nav-section" th:if="${#sets.contains(currentAuthorities,'SLOT_MANAGE') or #sets.contains(currentAuthorities,'HISTORY_VIEW') or #sets.contains(currentAuthorities,'PAYMENT_RECONCILE') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}">VẬN HÀNH</p>
     <a class="nav-item" th:classappend="${activePage == 'slots' ? 'is-selected' : ''}" th:attr="aria-current=${activePage == 'slots' ? 'page' : null}" th:href="@{/slots}" th:if="${#sets.contains(currentAuthorities,'SLOT_MANAGE') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}"><img th:src="@{/images/lucide/map.svg}" alt="">Sơ đồ bãi</a>
-    <a class="nav-item" th:classappend="${activePage == 'sessions' ? 'is-selected' : ''}" th:attr="aria-current=${activePage == 'sessions' ? 'page' : null}" th:href="@{/sessions}" th:if="${#sets.contains(currentAuthorities,'HISTORY_VIEW') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}"><img th:src="@{/images/lucide/history.svg}" alt="">Lịch sử xe</a>
+     <a class="nav-item" th:classappend="${activePage == 'sessions' ? 'is-selected' : ''}" th:attr="aria-current=${activePage == 'sessions' ? 'page' : null}" th:href="@{/sessions}" th:if="${#sets.contains(currentAuthorities,'HISTORY_VIEW') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}"><img th:src="@{/images/lucide/history.svg}" alt="">Lịch sử xe</a>
+     <a class="nav-item" th:classappend="${activePage == 'exceptions' ? 'is-selected' : ''}" th:attr="aria-current=${activePage == 'exceptions' ? 'page' : null}" th:href="@{/exceptions}" th:if="${#sets.contains(currentAuthorities,'HISTORY_VIEW') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}"><img th:src="@{/images/lucide/circle-alert.svg}" alt="">Ngoại lệ</a>
     <a class="nav-item" th:classappend="${activePage == 'payments' ? 'is-selected' : ''}" th:attr="aria-current=${activePage == 'payments' ? 'page' : null}" th:href="@{/payments}" th:if="${#sets.contains(currentAuthorities,'PAYMENT_RECONCILE') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}"><img th:src="@{/images/lucide/receipt.svg}" alt="">Giao dịch &amp; đối soát</a>
     <details class="nav-extra" th:open="${activePage == 'pricing' or activePage == 'settings' or activePage == 'audit' or activePage == 'roles' or activePage == 'accounts'}" th:if="${#sets.contains(currentAuthorities,'PRICING_MANAGE') or #sets.contains(currentAuthorities,'SLOT_MANAGE') or #sets.contains(currentAuthorities,'ACCOUNT_MANAGE') or #sets.contains(currentAuthorities,'SHIFT_MANAGE') or #sets.contains(currentAuthorities,'ROLE_MANAGE') or #sets.contains(currentAuthorities,'SECURITY_AUDIT_VIEW') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}"><summary>Cấu hình &amp; quản trị</summary><div>
       <a class="nav-item" th:classappend="${activePage == 'pricing' ? 'is-selected' : ''}" th:attr="aria-current=${activePage == 'pricing' ? 'page' : null}" th:href="@{/pricing}" th:if="${#sets.contains(currentAuthorities,'PRICING_MANAGE') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}">Bảng giá</a>
@@ -22,5 +23,33 @@
     </div></details>
   </nav>
   <div class="navigation-bottom"><a class="nav-item" th:href="@{/account/password}"><img th:src="@{/images/lucide/user-round.svg}" alt="">Đổi mật khẩu</a><form th:action="@{/logout}" method="post" class="dashboard-logout" th:attr="data-confirm=${activePage == 'accounts' ? 'Bạn muốn đăng xuất khỏi hệ thống?' : null},data-confirm-title=${activePage == 'accounts' ? 'Đăng xuất' : null}"><button class="nav-item" type="submit"><img th:src="@{/images/lucide/log-out.svg}" alt="">Đăng xuất</button></form><p>LumiPark · Smart Parking Operations</p></div>
+<script>
+  if (!window.parkingNavigationScrollInitialized) {
+    window.parkingNavigationScrollInitialized = true;
+    const revealActiveNavigation = navigation => {
+      const active = navigation?.querySelector('.nav-item[aria-current="page"]');
+      if (!active) return;
+      const position = { left: window.scrollX, top: window.scrollY };
+      active.scrollIntoView({ block: 'center', behavior: 'instant', container: 'nearest' });
+      if (window.scrollX !== position.left || window.scrollY !== position.top) {
+        window.scrollTo({ ...position, behavior: 'instant' });
+      }
+    };
+    const scheduleReveal = navigation => {
+      Promise.resolve(document.fonts?.ready).then(() => requestAnimationFrame(() => requestAnimationFrame(
+        () => revealActiveNavigation(navigation))));
+    };
+    matchMedia('(min-width: 64rem)').addEventListener('change', event => {
+      const dialog = document.querySelector('#navigationDialog');
+      if (event.matches && dialog?.open) dialog.close();
+    });
+    scheduleReveal(document.querySelector('.sidebar .dashboard-navigation'));
+    document.addEventListener('click', event => {
+      if (event.target.closest('#openNavigation')) {
+        scheduleReveal(document.querySelector('#navigationDialog .navigation-content'));
+      }
+    });
+  }
+</script>
 </div>
 </body></html>

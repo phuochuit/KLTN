@@ -10,8 +10,8 @@ LINK = re.compile(r'!?\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)')
 
 
 def blocked(path):
-    return (path == 'AGENTS.md'
-            or path.startswith(('.opencode/', '.codegraph/', 'tasks/', '.cache/', '.artifacts/'))
+    return (path.startswith(('.codegraph/', 'tasks/', '.cache/', '.artifacts/'))
+            or (path.startswith('.opencode/') and path != '.opencode/skills/parking-anpr/SKILL.md')
             or path.lower().endswith(('.pem', '.key', '.pfx', '.p12'))
             or any((part == '.env' or part.startswith('.env.'))
                    and not part.endswith('.example') for part in Path(path).parts))

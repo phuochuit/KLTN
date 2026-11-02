@@ -16,5 +16,6 @@ public interface SecurityAuditRepository extends JpaRepository<SecurityAuditEven
             + "or substring(e.action, 1, 16) = 'MANUAL_OVERRIDE_' "
             + "order by e.occurredAt desc, e.id desc")
     Page<SecurityAuditEvent> findOverrideEvents(Pageable pageable);
+    List<SecurityAuditEvent> findTop500ByOccurredAtBetweenOrderByOccurredAtDesc(Instant from, Instant to);
     List<SecurityAuditEvent> findTop100ByOccurredAtBeforeOrderByOccurredAtAsc(Instant cutoff);
 }

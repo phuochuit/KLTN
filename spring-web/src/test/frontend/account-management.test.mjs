@@ -98,6 +98,21 @@ test('row security actions use a top-layer auto popover without changing their P
     'the in-flow disclosure panel must no longer expand the table row');
 });
 
+test('confirmed administration pending feedback stays viewport-visible and resets on history restore', () => {
+  assert.match(script, /const adminActionPaths = \[[\s\S]*?'\/account-management\/shifts'[\s\S]*?\];/,
+    'shift assignment must share the existing administration pending guard');
+  assert.match(script, /if \(!adminSubmissionPending[\s\S]*?event\.stopImmediatePropagation\(\)/,
+    'a repeated eligible submit must be stopped in capture before shared confirmation can reopen');
+  assert.match(script, /window\.addEventListener\('pageshow'/,
+    'history restoration must clear transient pending state');
+  assert.match(script, /pendingControlState[\s\S]*?submitterDisabled[\s\S]*?removeAttribute\('disabled'\)/,
+    'pageshow must restore the accepted control to its original server-rendered eligibility');
+  assert.match(styles, /#admin-submit-status:not\(\[hidden\]\)[^{]*\{[^}]*position:\s*fixed/,
+    'pending feedback must remain visible in the current viewport without a scroll jump');
+  assert.match(styles, /#admin-submit-status\[hidden\]\s*\{\s*display:\s*none/,
+    'the status must remain truly hidden before an accepted submission');
+});
+
 test('account directory separates compact employee identity from role, status and row actions', () => {
   assert.ok(template.includes('<th scope="col">Thao tác</th>'), 'row actions need a dedicated table column');
   const row = template.match(/<tr th:each="account, accountStat : \$\{accounts\}"[\s\S]*?<\/tr>/)?.[0];

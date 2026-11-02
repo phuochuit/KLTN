@@ -88,7 +88,7 @@ Check 'Failure to retain the command log cannot silently pass' {
     Assert $threw
 }
 Check 'Maven bundled path is preferred' {
-    $bin = Join-Path $work '.cache/toolchains/apache-maven-3.9.11/bin'
+    $bin = Join-Path $work 'tools/apache-maven-3.9.11/bin'
     New-Item -ItemType Directory -Force $bin | Out-Null
     Set-Content (Join-Path $bin 'mvn.cmd') '@exit /b 0'
     Assert ((Resolve-ParkingMaven $work) -eq (Join-Path $bin 'mvn.cmd'))
@@ -105,7 +105,7 @@ Check 'Missing Maven produces actionable failure with empty PATH' {
 Check 'Maven falls back to PATH when bundled tool is absent' {
     $saved = $env:PATH
     try {
-        $bin = Join-Path $work '.cache/toolchains/apache-maven-3.9.11/bin'
+        $bin = Join-Path $work 'tools/apache-maven-3.9.11/bin'
         $env:PATH = $bin
         Assert ((Resolve-ParkingMaven (Join-Path $work 'missing')) -eq (Join-Path $bin 'mvn.cmd'))
     } finally { $env:PATH = $saved }
@@ -143,6 +143,20 @@ Check 'Native build directories are allowed by workspace guard' {
         New-Item -ItemType Directory -Force (Join-Path $fixture $path) | Out-Null
     }
     Assert (@(Get-ParkingWorkspaceFindings $fixture).Count -eq 0)
+}
+Check 'Laragon launcher targets local MySQL and reuses the secured Web launcher' {
+    $allLaragon = Get-Content (Join-Path $root 'scripts\run-all-laragon.ps1') -Raw
+    $webLaragon = Get-Content (Join-Path $root 'scripts\run-web-laragon.ps1') -Raw
+    $web = Get-Content (Join-Path $root 'scripts\run-web.ps1') -Raw
+    Assert ($allLaragon -match "run-web-laragon\.ps1")
+    Assert ($webLaragon -match "PARKING_DB_MODE\s*=\s*'laragon'")
+    Assert ($webLaragon -match '127\.0\.0\.1:3306/parking_anpr')
+    Assert ($webLaragon -match 'PARKING_LARAGON_PASSWORD')
+    Assert ($webLaragon -match 'Read-Host.*-AsSecureString')
+    Assert ($webLaragon -match 'PARKING_LARAGON_ALLOW_EMPTY_PASSWORD')
+    Assert ($webLaragon -match "run-web\.ps1")
+    Assert ($web.Contains('if (-not $isLaragon -and (Test-Path $localEnvironment))'))
+    Assert ($web -match 'Laragon mode only accepts MySQL')
 }
 if ($ReportPath) {
     $items = ($cases | ForEach-Object { '<testcase name="' + [System.Security.SecurityElement]::Escape($_) + '" />' }) -join ''

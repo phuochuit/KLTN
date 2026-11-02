@@ -116,6 +116,10 @@ Sidebar link min-height 44px, 12px horizontal padding, icon 20px, label 14/20px;
 
 Topbar: breadcrumb/title ngắn và account menu (tên, đổi mật khẩu, POST logout). Không global search/notification bell vô dụng khi chưa có contract. Mobile drawer có accessible name, Escape, focus containment/return và background inert; khi đóng không còn control tabbable. Skip link tới main, một main/h1, nav có label. Account/password dùng destination đã có, không invent profile endpoint.
 
+**Navigation scroll decision:** reveal the selected route inside navigation's own scroll container while preserving main-document position; retain native drawer keyboard/Escape/focus behavior and honor reduced motion.
+
+**Drawer usability clarification:** keep the native drawer close control visible at the top while only the navigation list scrolls; the close action must not cover the revealed active route. Close the open drawer when crossing the existing 64rem desktop breakpoint.
+
 ## 8. Component specifications
 
 Tất cả spec kế thừa tokens, keyboard và state matrix §9. Không mặc định panel có pointer khi nó không tương tác.

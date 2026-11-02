@@ -1,4 +1,4 @@
-import { matchesPaymentFilter, classifyPaymentResponse } from './payments-model.mjs';
+import { matchesPaymentFilter, hasReconciliationNote, classifyPaymentResponse } from './payments-model.mjs';
 
 const rows = [...document.querySelectorAll('.payment-row')];
 const forms = [...document.querySelectorAll('.payment-reconcile-form')];
@@ -9,6 +9,7 @@ const feedback = document.getElementById('paymentsFeedback');
 const feedbackMessage = document.getElementById('paymentsFeedbackMessage');
 const reload = document.getElementById('paymentsReload');
 const navigation = document.getElementById('navigationDialog');
+const ledger = document.querySelector('.payments-ledger');
 let selectedForm = null;
 let posting = false;
 let locked = false;
@@ -16,6 +17,23 @@ let locked = false;
 document.getElementById('openNavigation')?.addEventListener('click', () => navigation.showModal());
 document.getElementById('closeNavigation')?.addEventListener('click', () => navigation.close());
 navigation?.addEventListener('click', event => { if (event.target === navigation) navigation.close(); });
+dialog.addEventListener('keydown', event => {
+  if (event.key !== 'Tab') return;
+  const focusable = [...dialog.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter(element => !element.hidden);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  const activeIsTabbable = focusable.includes(active);
+  if (event.shiftKey && (active === first || !activeIsTabbable)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (active === last || !activeIsTabbable)) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 function filterRows() {
   let visible = 0;
@@ -41,12 +59,31 @@ function showFeedback(text, kind, canReload = false) {
 }
 
 for (const form of forms) {
+  const note = form.elements.note;
+  const noteError = form.querySelector('.payment-note-error');
+  note.addEventListener('input', () => {
+    if (!hasReconciliationNote(note.value)) return;
+    note.setCustomValidity('');
+    note.removeAttribute('aria-invalid');
+    noteError.hidden = true;
+  });
   form.addEventListener('submit', event => {
     event.preventDefault();
     if (posting || locked) return;
+    if (!hasReconciliationNote(note.value)) {
+      note.setCustomValidity('Vui lòng nhập ghi chú đối soát.');
+      note.setAttribute('aria-invalid', 'true');
+      noteError.hidden = false;
+      note.reportValidity();
+      return;
+    }
+    note.setCustomValidity('');
+    note.removeAttribute('aria-invalid');
+    noteError.hidden = true;
     selectedForm = form;
     document.getElementById('paymentReviewReceipt').textContent = form.dataset.receipt;
-    document.getElementById('paymentReviewNote').textContent = form.elements.note.value.trim();
+    document.getElementById('paymentReviewAmount').textContent = `${form.dataset.amount} đ`;
+    document.getElementById('paymentReviewNote').textContent = note.value.trim();
     dialog.showModal();
     document.getElementById('paymentReviewTitle').focus();
   });
@@ -56,6 +93,7 @@ document.getElementById('paymentConfirm').addEventListener('click', async () => 
   if (!selectedForm || posting || locked || !selectedForm.reportValidity()) return;
   dialog.close();
   posting = true;
+  ledger.setAttribute('aria-busy', 'true');
   forms.forEach(form => { form.querySelector('button').disabled = true; });
   showFeedback('Đang gửi xác nhận đối soát đến máy chủ…', 'pending');
   try {
@@ -72,5 +110,5 @@ document.getElementById('paymentConfirm').addEventListener('click', async () => 
   } catch {
     locked = true;
     showFeedback('Mất kết nối trước khi xác nhận kết quả. Không gửi lại ngay; tải lại danh sách để kiểm tra.', 'error', true);
-  } finally { posting = false; }
+  } finally { posting = false; ledger.setAttribute('aria-busy', 'false'); }
 });

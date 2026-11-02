@@ -27,7 +27,7 @@ Web camera chạy trong browser và cần quyền/thiết bị phù hợp; khác
 
 ### Thẻ, gói, giá và payment record
 
-[Thẻ & gói](../../spring-web/src/main/resources/templates/cards.html) (`/cards`): chọn **Xe đã đăng ký**, **Hình thức**, **Ngày bắt đầu**, **Số ngày**, **Trạng thái**, **Hình thức thu**, **Mã giao dịch ngoài** → **Tạo / gia hạn gói theo biển số**. Main dùng biển số chuẩn hóa làm mã nhận diện, không nhập/quẹt mã thẻ riêng. Có **Vé lượt** và **Gói 30 ngày**; số ngày default30, input cho1–366. Kiểm danh sách thẻ: vehicle, validity, subscription fee/status, và **Lịch sử thu tiền gói**.
+[Thẻ & gói](../../spring-web/src/main/resources/templates/cards.html) (`/cards`): chọn xe, **Gói theo ngày** hoặc **Gói 30 ngày**, ngày bắt đầu, số ngày (gói tháng cố định 30), hình thức thu và mã giao dịch ngoài → **Tạo / gia hạn và thu tiền**. Đăng ký cư dân cũng có bước chọn gói/thanh toán; chọn không mua gói vẫn lưu hồ sơ nhưng các lượt gửi xe tính giá khách vãng lai.
 
 Handler tạo subscription-payment và PaymentTransaction/biên nhận khi lưu gói tháng; yêu cầu hình thức thu, chuyển khoản/POS cần mã giao dịch ngoài. Đây là **ghi nhận thu do người vận hành xác nhận**, không tích hợp xác minh ngân hàng/POS hay proof tiền thực nhận. Không bấm gia hạn lại chỉ vì mất response: có thể tạo thêm payment record; main chưa có contract idempotency cho form gói. Activation payment-only vs debt approval, refund và policy expiry vẫn unresolved; đối soát theo [NV02](../requirements/nv02-cards-passes-pricing.md).
 

@@ -1,0 +1,6 @@
+﻿Scenario,Concurrency,TotalRequests,Success,Failures,ErrorRatePct,RPS,MinMs,AvgMs,P50Ms,P90Ms,P95Ms,MaxMs
+"GET /api/parking/health (Ping nhịp tim trạm gác)",15,150,150,0,0.00,3628.1,0.6,2.9,0.9,6.4,27.2,39.4
+"GET /api/parking/slots (Tra cứu sơ đồ bãi xe)",10,100,100,0,0.00,11.7,424.0,808.9,800.4,947.5,965.9,1182.1
+"GET /api/parking/lookup (Tra cứu biển số & thẻ cư dân)",10,100,100,0,0.00,11.8,441.4,815.9,826.5,904.9,914.2,1216.1
+"GET /api/parking/open (Danh sách lượt gửi xe đang đỗ)",8,80,80,0,0.00,12.0,346.7,640.8,640.0,741.8,767.5,991.7
+"GET /api/parking/exceptions (Khung báo cáo ngoại lệ - Task 6.2)",8,80,80,0,0.00,10.9,532.3,694.1,663.2,832.3,961.0,1292.8

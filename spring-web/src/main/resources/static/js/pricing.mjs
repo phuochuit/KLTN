@@ -1,4 +1,4 @@
-import { classifyPricingResponse } from './pricing-model.mjs';
+import { classifyPricingResponse, formatPricingValue, pricingValuesEqual } from './pricing-model.mjs';
 
 const forms = [...document.querySelectorAll('.pricing-form')];
 const dialog = document.getElementById('pricingReview');
@@ -6,6 +6,7 @@ const feedback = document.getElementById('pricingFeedback');
 const message = document.getElementById('pricingFeedbackMessage');
 const reload = document.getElementById('pricingReload');
 const navigation = document.getElementById('navigationDialog');
+const pricingList = document.getElementById('pricingList');
 let selectedForm = null;
 let locked = false;
 let posting = false;
@@ -13,6 +14,23 @@ let posting = false;
 document.getElementById('openNavigation')?.addEventListener('click', () => navigation.showModal());
 document.getElementById('closeNavigation')?.addEventListener('click', () => navigation.close());
 navigation?.addEventListener('click', event => { if (event.target === navigation) navigation.close(); });
+dialog.addEventListener('keydown', event => {
+  if (event.key !== 'Tab') return;
+  const focusable = [...dialog.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter(element => !element.hidden);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  const activeIsTabbable = focusable.includes(active);
+  if (event.shiftKey && (active === first || !activeIsTabbable)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (active === last || !activeIsTabbable)) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 function showFeedback(text, kind, canReload = false) {
   feedback.hidden = false;
@@ -28,6 +46,10 @@ function lockForms() {
   forms.forEach(form => { form.querySelector('button[type="submit"]').disabled = true; });
 }
 
+const originalValues = new Map(forms.map(form => [form, new Map(
+  [...form.querySelectorAll('label input[name]')].map(input => [input.name, input.value]),
+)]));
+
 for (const form of forms) {
   form.addEventListener('submit', event => {
     event.preventDefault();
@@ -42,7 +64,11 @@ for (const form of forms) {
       const term = document.createElement('dt');
       const detail = document.createElement('dd');
       term.textContent = label.querySelector('span').textContent;
-      detail.textContent = `${input.value} ${label.querySelector('.pricing-input span').textContent}`;
+      const unit = label.querySelector('.pricing-input span').textContent;
+      const original = originalValues.get(form).get(input.name);
+      detail.textContent = pricingValuesEqual(original, input.value)
+        ? `Không đổi · ${formatPricingValue(input.value, unit)}`
+        : `${formatPricingValue(original, unit)} → ${formatPricingValue(input.value, unit)}`;
       row.append(term, detail); values.append(row);
     });
     dialog.showModal();
@@ -54,6 +80,7 @@ document.getElementById('pricingConfirm').addEventListener('click', async () => 
   if (!selectedForm || posting || locked || !selectedForm.reportValidity()) return;
   dialog.close();
   posting = true;
+  pricingList.setAttribute('aria-busy', 'true');
   forms.forEach(form => { form.querySelector('button[type="submit"]').disabled = true; });
   showFeedback('Đang gửi cập nhật bảng giá đến máy chủ…', 'pending');
   try {
@@ -70,5 +97,5 @@ document.getElementById('pricingConfirm').addEventListener('click', async () => 
   } catch {
     lockForms();
     showFeedback('Mất kết nối trước khi xác nhận kết quả. Không gửi lại ngay; tải lại bảng giá để kiểm tra.', 'error', true);
-  } finally { posting = false; }
+  } finally { posting = false; pricingList.setAttribute('aria-busy', 'false'); }
 });

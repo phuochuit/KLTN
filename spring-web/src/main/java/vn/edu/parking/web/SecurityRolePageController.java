@@ -1,7 +1,11 @@
 package vn.edu.parking.web;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,7 +31,17 @@ public class SecurityRolePageController {
     }
 
     @GetMapping("/roles")
-    String page(Model model) {
+    String page(Model model, HttpSession session, Authentication authentication) {
+        String principalName = authentication == null || !authentication.isAuthenticated()
+            ? null : authentication.getName();
+        String previousPrincipal = (String) session.getAttribute("roleDraftPrincipal");
+        String draftScope = (String) session.getAttribute("roleDraftScope");
+        if (draftScope == null || !Objects.equals(principalName, previousPrincipal)) {
+            draftScope = UUID.randomUUID().toString();
+            session.setAttribute("roleDraftScope", draftScope);
+            session.setAttribute("roleDraftPrincipal", principalName);
+        }
+        model.addAttribute("roleDraftScope", draftScope);
         model.addAttribute("roles", roles.findAllByOrderByDisplayNameAsc().stream()
             .map(role -> new RoleView(role, accounts.countBySecurityRole_Id(role.getId()))).toList());
         model.addAttribute("permissionOptions", permissionOptions());

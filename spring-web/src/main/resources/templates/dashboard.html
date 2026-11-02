@@ -35,9 +35,10 @@
           <label id="monthField">Tháng<select id="filterMonth" name="month"></select></label>
           <label id="yearField">Năm<select id="filterYear" name="year"></select></label>
           <label id="fromField" hidden>Từ ngày<input type="date" id="filterFrom" name="from"></label>
-          <label id="toField" hidden>Đến ngày<input type="date" id="filterTo" name="to"></label>
-          <button type="submit" class="primary-button">Áp dụng kỳ</button>
-        </form>
+           <label id="toField" hidden>Đến ngày<input type="date" id="filterTo" name="to"></label>
+           <button type="submit" class="primary-button">Áp dụng kỳ</button>
+           <a id="exportRevenueCsv" class="secondary-button" th:if="${#sets.contains(currentAuthorities,'DASHBOARD_VIEW') or #sets.contains(currentAuthorities,'HISTORY_VIEW') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}" th:href="@{/revenue/export-csv}">Xuất CSV kỳ đang chọn</a>
+         </form>
            <p id="filterStatus" class="feedback" role="status">Đang tải kỳ doanh thu…</p>
       </section>
       <div class="bento-grid">

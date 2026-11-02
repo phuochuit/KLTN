@@ -40,6 +40,9 @@ public class GateEvidence {
     @Column(name = "liveness_score", precision = 8, scale = 6) private BigDecimal livenessScore;
     @Column(name = "liveness_provider", length = 80) private String livenessProvider;
     @Column(name = "liveness_model_version", length = 120) private String livenessModelVersion;
+    @Column(name = "quality_status", length = 16) private String qualityStatus;
+    @Column(name = "quality_warnings", length = 400) private String qualityWarnings;
+    @Column(name = "quality_version", length = 40) private String qualityVersion;
     @Column(name = "model_version", nullable = false, length = 160) private String modelVersion;
     @Column(name = "camera_id", length = 120) private String cameraId;
     @Column(name = "frame_index") private Integer frameIndex;
@@ -107,6 +110,20 @@ public class GateEvidence {
         faceReviewThreshold = decimal(reviewThreshold);
     }
 
+    public void setLivenessResult(LivenessStatus status, Double score, String provider,
+            String modelVersion) {
+        livenessStatus = status == null ? LivenessStatus.NOT_EVALUATED : status;
+        livenessScore = decimal(score);
+        livenessProvider = provider;
+        livenessModelVersion = modelVersion;
+    }
+
+    public void setQuality(String status, String warnings, String version) {
+        qualityStatus = status;
+        qualityWarnings = warnings;
+        qualityVersion = version;
+    }
+
     public void setCameraId(String value) { cameraId = value; }
     public void setRequestSha256(String value) { requestSha256 = value; }
     public String getId() { return id; }
@@ -131,6 +148,12 @@ public class GateEvidence {
     public BigDecimal getFaceMatchThreshold() { return faceMatchThreshold; }
     public BigDecimal getFaceReviewThreshold() { return faceReviewThreshold; }
     public LivenessStatus getLivenessStatus() { return livenessStatus; }
+    public BigDecimal getLivenessScore() { return livenessScore; }
+    public String getLivenessProvider() { return livenessProvider; }
+    public String getLivenessModelVersion() { return livenessModelVersion; }
+    public String getQualityStatus() { return qualityStatus; }
+    public String getQualityWarnings() { return qualityWarnings; }
+    public String getQualityVersion() { return qualityVersion; }
     public String getModelVersion() { return modelVersion; }
     public String getCameraId() { return cameraId; }
     public Integer getFrameIndex() { return frameIndex; }

@@ -94,9 +94,9 @@ class AccountManagementPageIntegrationTest {
     void rendersSessionAndShiftManagementSections() throws Exception {
         mvc.perform(get("/account-management"))
             .andExpect(status().isOk())
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("Nhân viên đang đăng nhập Desktop")))
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("Tài khoản đang đăng nhập Web")))
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("Phân công ca làm")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Phiên Desktop được ghi nhận")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Phiên Web được ghi nhận")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Ca làm gần đây")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"app-dialog\"")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"#live-shifts\"")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"#live-sessions\"")))
@@ -111,8 +111,9 @@ class AccountManagementPageIntegrationTest {
         String html = result.getResponse().getContentAsString();
         assertTrue(html.contains("id=\"live-sessions\""));
         assertTrue(html.contains("id=\"live-shifts\""));
-        assertTrue(html.contains("Theo dõi nhân viên đang làm việc"));
-        assertTrue(html.contains("Cập nhật lần cuối"), "Live data needs a visible successful-snapshot time.");
+        assertTrue(html.contains("Phiên Desktop được ghi nhận"));
+        assertTrue(html.contains("Dữ liệu đang hiển thị được ghi nhận lúc"),
+            "Live data needs a visible successful-snapshot time.");
         assertTrue(html.contains("id=\"live-refresh-retry\""), "Live data needs an explicit manual GET refresh control.");
         assertTrue(html.contains("data-snapshot-at="), "The rendered live fragments need a snapshot timestamp.");
         assertTrue(!html.contains("confirm("));
@@ -131,7 +132,7 @@ class AccountManagementPageIntegrationTest {
             .andReturn();
 
         String html = result.getResponse().getContentAsString();
-        assertTrue(html.contains("Phân công ca làm"));
+        assertTrue(html.contains("Ca làm gần đây"));
         assertTrue(html.contains("ops-gate-synthetic"));
         assertTrue(html.contains("Synthetic shift duty"));
         assertFalse(html.contains("PII_MARKER"));
@@ -141,8 +142,8 @@ class AccountManagementPageIntegrationTest {
         assertFalse(html.contains("1991-02-03"));
         assertFalse(html.contains("Synthetic private address"));
         assertFalse(html.contains("SYNTHETIC_TEMPORARY_SECRET"));
-        assertFalse(html.contains("Nhân viên đang đăng nhập Desktop"));
-        assertFalse(html.contains("Tài khoản đang đăng nhập Web"));
+        assertFalse(html.contains("Phiên Desktop được ghi nhận"));
+        assertFalse(html.contains("Phiên Web được ghi nhận"));
 
         Map<String, Object> model = result.getModelAndView().getModel();
         assertFalse(model.containsKey("accounts"));
@@ -206,8 +207,8 @@ class AccountManagementPageIntegrationTest {
         assertTrue(html.contains("1991-02-03"));
         assertTrue(html.contains("Synthetic private address"));
         assertFalse(html.contains("synthetic-password-hash"));
-        assertTrue(html.contains("Nhân viên đang đăng nhập Desktop"));
-        assertTrue(html.contains("Tài khoản đang đăng nhập Web"));
+        assertTrue(html.contains("Phiên Desktop được ghi nhận"));
+        assertTrue(html.contains("Phiên Web được ghi nhận"));
         assertTrue(result.getModelAndView().getModel().containsKey("accounts"));
         assertTrue(result.getModelAndView().getModel().containsKey("roles"));
         assertTrue(result.getModelAndView().getModel().containsKey("activeDesktopSessions"));
@@ -243,7 +244,7 @@ class AccountManagementPageIntegrationTest {
         assertTrue(html.contains("data-confirm-title=\"Xóa phân công ca\""));
         assertTrue(html.contains("data-confirm=\"Xóa ca Ca sắp diễn ra của shift-qa, bắt đầu"),
             "Delete confirmation must identify the specific shift and assignee.");
-        assertTrue(html.contains("Tối đa 50 ca"), "The displayed list cap must be disclosed.");
+        assertTrue(html.contains("tối đa 50 ca"), "The displayed list cap must be disclosed.");
     }
 
     @Test

@@ -15,9 +15,6 @@ openNavigation?.addEventListener('click', () => {
   closeNavigation?.focus();
 });
 closeNavigation?.addEventListener('click', () => navigation?.close());
-matchMedia('(min-width: 64rem)').addEventListener('change', event => {
-  if (event.matches && navigation?.open) navigation.close();
-});
 
 document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', event => {
   if (!window.confirm('Bạn muốn đăng xuất khỏi hệ thống?')) event.preventDefault();

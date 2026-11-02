@@ -4,7 +4,7 @@ $localDotnet = Join-Path $workspace 'tools\dotnet\dotnet.exe'
 $globalDotnet = Get-Command 'dotnet.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
 $dotnet = $globalDotnet
 if (-not $dotnet -or $dotnet -eq $localDotnet) {
-    throw 'Khong tim thay .NET 8 SDK toan cuc. Hay cai Microsoft.DotNet.SDK.8 hoac chay run-desktop.ps1 tu mot terminal da cai .NET 8.'
+    throw 'Khong tim thay .NET 8 SDK toan cuc. Hay cai Microsoft.DotNet.SDK.8 hoac chay scripts\run-desktop.ps1 tu mot terminal da cai .NET 8.'
 }
 $env:DOTNET_CLI_HOME = Join-Path $workspace '.cache\dotnet-cli'
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'

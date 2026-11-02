@@ -47,18 +47,12 @@ Trang này mô tả yêu cầu báo cáo đã ghi nhận và implementation th�
 
 ## Code observed: báo cáo và màn hình thực tế
 
-### Dashboard Web — lớp trình bày hiện hành
-
-Dashboard `/` dùng shell LumiPark riêng, Bento/Glass Light, KPI snapshot hiện tại, biểu đồ doanh thu vé lượt/gói tháng trong 12 tháng và cơ cấu doanh thu theo kỳ. Chọn tháng/bộ lọc tháng–năm–khoảng ngày cập nhật cơ cấu và chi tiết giao dịch, **không ghi đè KPI hiện tại** bằng counts/tổng của kỳ. Có loading/empty/error, kiểm tra số tiền tổng–chi tiết ở UI và hủy request cũ; đây không phải thay đổi công thức thu tiền hoặc xác nhận đối soát backend. Sidebar/drawer chỉ dẫn tới các route hiện có theo quyền; không thêm REVENUE_VIEW hoặc mở rộng quyền tài chính. [Dashboard design](../../design-system/kltn/pages/dashboard.md) sở hữu chi tiết thị giác; [test entry points](../../tests/README.md#dashboard--overview-browser-checks) phân biệt H2/API thật và browser-mocked visual fixtures. Snapshot observed bên dưới vẫn mô tả đường dữ liệu/backend và các giới hạn lịch sử, không phải mô tả bố cục UI mới.
-
-Lớp UX/data bổ sung API overview có `generatedAt`, trend/summary cùng half-open period và DTO giao dịch phân trang/tìm kiếm/nguồn thu. Bộ lọc đặt trước phân tích; URL giữ kỳ/trang/order để quay lại không mất trạng thái. Tổng toàn kỳ, tổng giao dịch khớp filter và các dòng của một trang là các phạm vi khác nhau: không cộng một trang rồi gọi là tổng kỳ/đối soát. KPI hiện tại chỉ đổi khi làm mới tổng quan, không khi chọn kỳ. Link xe trong bãi mở `/sessions?status=OPEN` có lọc thực ở server; không tự cấp HISTORY_VIEW cho người chỉ có DASHBOARD_VIEW. API legacy vẫn giữ để tương thích, Dashboard không dùng inclusive monthly cũ cho chart mới.
-
 References controller thuộc [AdminController](../../spring-web/src/main/java/vn/edu/parking/web/AdminController.java).
 
 | Entry point / exact lines | Quan sát / giới hạn |
 | --- | --- |
 | `dashboard`, GET `/` | Count households/vehicles/OPEN hiện tại, tổng hôm nay/tháng hiện tại và 8 sessions gần nhất. Visit = sum fee COMPLETED theo exitTime; subscription = sum amount theo paidAt |
-| `sessions`, GET `/sessions`; [sessions.html](../../spring-web/src/main/resources/templates/sessions.html) | History phân trang server-side theo entryTime/id; tìm biển số vào/ra hoặc mã thẻ, lọc status enum, sắp entryTime mới/cũ, page sizes 10/20/50. Optional `from`/`to` lọc entryTime theo ngày ISO inclusive, thực thi dạng half-open `[from 00:00, ngày sau to 00:00)` theo `LocalDateTime`/wall-clock JVM hiện hữu; ngày sai hoặc đảo chiều báo lỗi, không rơi về danh sách bỏ lọc. GET state gồm `q/status/from/to/sort/page/size`, refresh/pagination giữ khoảng ngày. Table giữ đủ chín cột; UI đánh dấu khác biển số vào/ra bằng so sánh `PlateNormalizer` trung tính, không kết luận lỗi ANPR hay sửa dữ liệu. Không có ảnh/timeline/payment detail. `/sessions?status=OPEN` lọc thật ở server; quyền HISTORY_VIEW/ROLE_MANAGEMENT không đổi. |
+| `sessions`, GET `/sessions`; [sessions.html](../../spring-web/src/main/resources/templates/sessions.html) | Toàn bộ history order entryTime desc; table plate vào-ra/type/card/time/status/fee. Không filters/ảnh/timeline/payment detail trong body/template này |
 | `monthlyRevenue`, GET `/api/parking/revenue/monthly` | 12 tháng tới tháng hiện tại; year/month/label, visitRevenue/subscriptionRevenue/totalRevenue; không nhóm gate/collector/PriceRule |
 | `revenueFilter` | type month/year/range, nếu thiếu tham số kỳ hoặc type không match thì default tháng hiện tại; type là request parameter bắt buộc. Range to +1 ngày 00:00; trả sessions/payments/sums và household/vehicle counts trước toTime, occupancy tại toTime |
 | `monthlyRevenueDetail` | Chi tiết kỳ tháng: session COMPLETED exitTime desc và payment paidAt desc, cùng sum logic |

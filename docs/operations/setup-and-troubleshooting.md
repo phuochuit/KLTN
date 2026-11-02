@@ -10,14 +10,6 @@ Desktop gọi Spring cho nghiệp vụ và các yêu cầu image/video/face/came
 
 ## Prerequisites và working directory
 
-### LumiPark Login frontend build
-
-Riêng Login dùng Tailwind CSS v4 local; trang cũ không load CSS/JS mới. Từ `spring-web`, cần Node22+ và npm11.19.0 theo package metadata: `npm ci --cache ../.cache/npm` (project .npmrc tắt lifecycle scripts của dependencies), rồi `npm run build`. `npm test` kiểm JS interactions bằng Node test doubles, không là browser E2E. Không Tailwind CDN hoặc Node trên production nếu chạy JAR đã đóng gói.
-
-Maven `process-classes` gọi `node src/main/frontend/build.mjs`; vì vậy `clean package` và `spring-boot:run` cần dependencies đã cài trước. Build thiếu Node/node_modules phải fail, không phục vụ CSS cũ. Output CSS/Lucide subset ở `target/classes/static`, được đóng gói vào executable JAR, không ghi generated CSS vào source. Không chạy Maven clean song song với browser harness. Production build: JDK21 + Maven + Node22+, npm ci trước Maven; không tự tải dependencies ở startup ứng dụng đã package.
-
-CLI scan chỉ Login/login.js; `web-ui.css` import tokens chung để mở rộng sau, nhưng không đưa Preflight vào shared header hoặc trang cũ. Lucide assets copy từ version pin, kèm license; original LP assets dưới `static/images/brand`. Thay UI không thay auth/session/CSRF hoặc cấu hình DB. Test bằng datasource cô lập, không dùng launcher operational mặc định làm browser harness.
-
 | Thành phần | Điều kiện theo source / cách chuẩn bị |
 | --- | --- |
 | Windows/PowerShell | CMD launchers gọi `powershell.exe`, script dùng `Get-NetTCPConnection`; Desktop target Windows. Mở terminal tại **root repository hiện tại**, không copy đường dẫn máy tác giả. |
@@ -46,11 +38,11 @@ scripts\run-anpr.cmd
 scripts\run-desktop.cmd
 ```
 
-Chạy từng lệnh trong terminal riêng để giữ log. [run-all.cmd](../../scripts/run-all.cmd) mở Web, đợi **5 giây**, mở ANPR, đợi **8 giây**, rồi Desktop. Đây là **fixed delays**, không readiness guarantee; model/download hoặc Maven startup có thể lâu hơn. Chưa ready thì chờ log và bấm Kiểm tra lại, không mở thêm process trùng.
+Chạy từng lệnh trong terminal riêng để giữ log. [scripts\run-all.cmd](../../scripts/run-all.cmd) mở Web, đợi **5 giây**, mở ANPR, đợi **8 giây**, rồi Desktop. Đây là **fixed delays**, không readiness guarantee; model/download hoặc Maven startup có thể lâu hơn. Chưa ready thì chờ log và bấm Kiểm tra lại, không mở thêm process trùng.
 
 ## Spring backend và database
 
-[run-web.ps1](../../scripts/run-web.ps1) chọn Maven, đọc `.env.local` tại root làm fallback cho biến process chưa có/đang trống; đòi `PARKING_DB_URL`, `PARKING_DB_USERNAME`, `PARKING_DB_PASSWORD`, kiểm URL có `/parking_anpr`, chuẩn bị internal token và JWT config/key paths, rồi chọn JDK. Sau đó kiểm health version `4.0-face-slots`, tái dùng Web cùng version, báo lỗi bản Web cũ hoặc port8080 đang bị chiếm, rồi gọi `clean spring-boot:run` từ `spring-web`. Đây là startup có thể cập nhật schema theo Hibernate, không chỉ read-only health probe.
+[scripts\run-web.ps1](../../scripts/run-web.ps1) chọn Maven, đọc `.env.local` tại root làm fallback cho biến process chưa có/đang trống; đòi `PARKING_DB_URL`, `PARKING_DB_USERNAME`, `PARKING_DB_PASSWORD`, kiểm URL có `/parking_anpr`, chuẩn bị internal token và JWT config/key paths, rồi chọn JDK. Sau đó kiểm health version `4.0-face-slots`, tái dùng Web cùng version, báo lỗi bản Web cũ hoặc port8080 đang bị chiếm, rồi gọi `clean spring-boot:run` từ `spring-web`. Đây là startup có thể cập nhật schema theo Hibernate, không chỉ read-only health probe.
 
 **Health/launcher trên main:** [ParkingApiController.health](../../spring-web/src/main/java/vn/edu/parking/web/ParkingApiController.java) trả đúng `version` mà Web launcher kiểm; [FastAPI health](../../anpr-service/app/main.py) trả đúng `service` mà ANPR launcher kiểm. Discrepancy được ghi ở nhánh Security trước đây không áp dụng ở đây. Tuy nhiên nhận diện chỉ dựa response fields không chứng nhận đúng môi trường/datasource; không tự kill process khi port conflict. Web launcher kiểm config/keys trước bước tái dùng service.
 
@@ -66,38 +58,27 @@ Nếu dùng Maven PATH, thay executable bằng `mvn`. Giữ working directory `s
 ### H2/MySQL: khác biệt không được che giấu
 
 - Hướng dẫn cũ từng mô tả H2 mặc định/MySQL Laragon tự tạo schema; đây không phải runtime evidence. README hiện dẫn về trang này để xác nhận datasource trước chạy.
-- [application.properties](../../spring-web/src/main/resources/application.properties) là cấu hình source main; không có `application.yml`. Nó map datasource tới `PARKING_DB_URL`/`PARKING_DB_USERNAME`/`PARKING_DB_PASSWORD`, driver MySQL, dialect MySQL và **`spring.jpa.hibernate.ddl-auto=update`**. Xác nhận backup/schema permissions trước mọi startup; không suy `update` là migration an toàn. `application-laragon.properties` không được coi là authority chỉ từ tên; active profile/external override cần kiểm riêng, không chép credentials vào docs.
+- [application.properties](../../spring-web/src/main/resources/application.properties) là cấu hình Aiven của main; không có `application.yml`. Nó map datasource tới `PARKING_DB_URL`/`PARKING_DB_USERNAME`/`PARKING_DB_PASSWORD`, driver MySQL, dialect MySQL và **`spring.jpa.hibernate.ddl-auto=update`**. [application-laragon.properties](../../spring-web/src/main/resources/application-laragon.properties) có fallback local tương ứng nhưng launcher chủ động truyền cùng nhóm biến datasource; không chép credentials vào docs.
 - [pom.xml](../../spring-web/pom.xml) không khai báo Flyway; main không có switch `PARKING_FLYWAY_ENABLED` của feature branch. Không hướng dẫn bật Flyway hoặc hứa rehearsal migration từ source main này. Desktop JWT mặc định **true**, dùng `PARKING_SECURITY_JWT_ENABLED`; issuer/audience/kid theo bảng dưới và external RS256 public/private keys bắt buộc khi bật. Có config không đồng nghĩa keys đã provisioned hay account đã tạo. Không tắt JWT để chữa login. Web dùng tài khoản DB, không có demo login mặc định.
 - Web launcher đọc `.env.local` (không tự đọc `.env`); ANPR launcher chỉ đọc token qua helper, không nạp mọi biến trong `.env.local`. Biến process có trước được ưu tiên. Spring chạy Maven thủ công không tự có logic loader PowerShell này; chuẩn bị environment qua kênh an toàn cho đúng process. Không giả định `.vscode/launch.json` và CMD dùng cùng environment.
-- Kiểm cả alias Spring trực tiếp: `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` có thể ghi đè các `${PARKING_DB_*}` trong properties dù file `.env.local` đã đúng. Chỉ báo presence/match, không dump giá trị. Nếu chủ dự án đã xác nhận file nguồn cho một lượt demo, đồng bộ alias trong **riêng process chạy đó** hoặc bỏ override đang xung đột theo phạm vi được duyệt; không tự sửa User/Machine environment hay đổi DB. Lỗi schema-validation phải được đối chiếu với datasource hiệu lực trước khi kết luận cần tạo bảng/migration.
-- `pom.xml` có MySQL connector **runtime**, H2 **test scope**. Vì vậy không được hứa `scripts/run-web.cmd` sẽ boot bằng H2 ở runtime. H2 memory/create-drop của integration test không là cấu hình development/production.
+- `pom.xml` có MySQL connector **runtime**, H2 **test scope**. Vì vậy không được hứa `scripts\run-web.cmd` sẽ boot bằng H2 ở runtime. H2 memory/create-drop của integration test không là cấu hình development/production.
 - Trước chạy, quản trị phải xác nhận nguồn cấu hình Spring được cung cấp, JDBC URL/driver, tài khoản qua kênh an toàn, schema và DDL policy. Không copy test `create-drop` tới DB thật; không tự xóa/reset database để sửa lỗi.
 - Nếu datasource chưa rõ hoặc Web báo driver/URL/schema lỗi, dừng ở bước Spring và lấy quyết định cấu hình từ quản trị; không có command trong tài liệu này được xác nhận tự thiết lập DB.
 
-### Laragon launchers và hạn chế thực tế
+### Laragon launcher dự phòng
 
-[run-all-laragon.cmd](../../scripts/run-all-laragon.cmd) gọi [run-all-laragon.ps1](../../scripts/run-all-laragon.ps1). Tên Laragon được giữ để tương thích, nhưng script hiện ghi database chính vẫn Aiven `parking_anpr`; không còn listener3306/password prompt/login probe. Nó có thể force-stop Web đã nhận diện ở8080, mở `run-web.ps1`, đợi tối đa60 vòng (mỗi vòng chờ1 giây và HTTP timeout2 giây) health/database chứa MySQL, rồi ANPR, chờ5 giây và Desktop.
+[scripts\run-all-laragon.cmd](../../scripts/run-all-laragon.cmd) gọi [scripts\run-all-laragon.ps1](../../scripts/run-all-laragon.ps1), sau đó mở [scripts\run-web-laragon.ps1](../../scripts/run-web-laragon.ps1). Web dùng MySQL local `127.0.0.1:3306/parking_anpr`, mặc định user `root` và thêm `createDatabaseIfNotExist=true`. Nếu chưa có `PARKING_LARAGON_PASSWORD`, launcher nhập mật khẩu ẩn; chỉ đặt `PARKING_LARAGON_ALLOW_EMPTY_PASSWORD=true` trên máy thật sự dùng mật khẩu rỗng. Có thể override URL/user bằng `PARKING_LARAGON_URL`, `PARKING_LARAGON_USERNAME`; không ghi secret vào file tracked.
 
-**Không coi tên launcher là cấu hình DB:** [run-web-laragon.ps1](../../scripts/run-web-laragon.ps1) riêng vẫn in nhãn cloud và gọi Maven, không set datasource/profile, không load `.env.local` hoặc chuẩn bị token/JWT như `run-web.ps1`; nó cũng có nhánh force-stop. `database:MySQL` chỉ cho biết sản phẩm JDBC, không chứng minh host/schema Aiven đúng. Nhãn cloud không được dùng làm connection instruction; không chép host/user/secret vào guide.
+Launcher Laragon đặt `PARKING_DB_MODE=laragon` rồi tái sử dụng [scripts\run-web.ps1](../../scripts/run-web.ps1), nên vẫn chuẩn bị service token, JWT keys và kiểm tra port như đường Aiven. Ở chế độ này `scripts\run-web.ps1` không đọc `.env.local` và từ chối URL không trỏ `localhost`/`127.0.0.1:3306`, tránh vô tình dùng credential cloud.
 
-Không chạy launcher Laragon nếu chưa rõ datasource đang dùng. Trước switch môi trường, giữ backup theo quy trình quản trị và đóng Web cũ có kiểm soát; script có nhánh `Stop-Process -Force`, không phải safe migration. Database auto-creation/persistence cần runtime evidence riêng.
+Trước switch môi trường, giữ backup theo quy trình quản trị và đóng Web cũ có kiểm soát; script tổng có nhánh `Stop-Process -Force`, không phải safe migration. `ddl-auto=update` chỉ cập nhật schema, không thay migration có version; xem ADR-0007.
 
 ### Tài khoản ban đầu, mật khẩu và JWT
 
-1. Quản trị cấp riêng `parking.security.bootstrap.username` và `parking.security.bootstrap.password` qua external Spring configuration (relaxed-binding env tương ứng `PARKING_SECURITY_BOOTSTRAP_USERNAME`/`PARKING_SECURITY_BOOTSTRAP_PASSWORD`). [ManagementBootstrap](../../spring-web/src/main/java/vn/edu/parking/config/ManagementBootstrap.java) mặc định cả hai trống: không tạo tài khoản. Cấu hình thiếu một trong hai làm lỗi; password cần ít nhất12 ký tự và tối đa72 byte UTF-8, username trim/lowercase tối đa80 ký tự. Không điền secret thật trong command/doc.
-2. Bootstrap cần role `MANAGEMENT` đã có; account đã tồn tại được giữ nguyên, **không reset password**. Startup cũng có data-initialization code, không được dùng như seed/reset DB được cho phép sẵn. Xác nhận DB/backup và quyền khởi động trước thực hiện.
+1. Khi bảng `system_accounts` trống và không cấu hình bootstrap riêng, [ManagementBootstrap](../../spring-web/src/main/java/vn/edu/parking/config/ManagementBootstrap.java) tạo tài khoản demo `admin`, lấy mật khẩu từ `PARKING_DEMO_ADMIN_PASSWORD` (fallback demo ghi trong `application.properties`) và bắt buộc đổi ở lần đăng nhập đầu. Đặt biến này rỗng để tắt seed khi triển khai thật.
+2. Môi trường thật nên cấp riêng `PARKING_SECURITY_BOOTSTRAP_USERNAME`/`PARKING_SECURITY_BOOTSTRAP_PASSWORD`; cấu hình thiếu một trong hai làm startup lỗi. Password cần 12–72 byte UTF-8, username trim/lowercase tối đa 80 ký tự. Bootstrap cần role `MANAGEMENT`; account đã tồn tại được giữ nguyên, **không reset password**.
 3. Đăng nhập Web `/login`, vào `/account/password` nếu buộc đổi mật khẩu. Nhập mật khẩu hiện tại, mật khẩu mới và xác nhận; minimum12 ký tự/maximum72 byte UTF-8. Đổi thành công thu hồi phiên, quay `/login?passwordChanged`; đăng nhập lại rồi mới dùng Desktop. Gỡ cấu hình bootstrap khỏi môi trường sau provisioning theo quy trình quản trị, không xóa account/DB.
 4. Web **Quản trị → Tài khoản** (`/account-management`) tạo/reset mật khẩu tạm, khóa/mở tài khoản và quản lý ca/phiên theo quyền. Cấp mật khẩu tạm qua kênh kín; không gửi ảnh chụp màn hình có secret. Tài khoản mới/reset phải đổi mật khẩu trên Web trước Desktop; không dùng mật khẩu demo từ tư liệu cũ.
-
-#### Phiên demo được chủ dự án cấp cho Dashboard UI/UX
-
-- Chủ dự án đã cấp tài khoản demo `admin` và cho phép đăng nhập phục vụ quan sát Dashboard, điều hướng/bộ lọc và đối chiếu dữ liệu hiện có. Đây là account đã tồn tại trong môi trường demo, **không phải account mặc định được ứng dụng tự tạo**, không thay quy trình bootstrap/production ở trên.
-- Thông tin đăng nhập lưu local trong `scripts/security/keys/dashboard-demo-login.local.json`; thư mục này đã được Git ignore. Docs/source/test fixtures không chứa mật khẩu. File local chưa được mã hóa; bảo vệ quyền truy cập máy/file, không chia sẻ hoặc force-add vào Git.
-- Khi tiếp tục tác vụ Dashboard đã được duyệt, agent có thể đọc file này và dùng đúng origin được ghi để đăng nhập qua form `/login`, không cần yêu cầu chủ dự án gửi lại cùng credential. Không in nội dung file, lưu trace/form screenshot/cookie hoặc đưa credential vào report. File local không có trên máy khác; thiếu/sai credential thì yêu cầu cấp lại, không đoán mật khẩu hoặc reset DB.
-- Cổng/origin demo có thể thay đổi. Chỉ tái sử dụng ở origin đã được chủ dự án xác nhận; không thử tài khoản trên môi trường khác. Session cũ có thể hết hạn, vì vậy không coi việc đã đăng nhập một lần là bảo đảm cho lần sau.
-- File `.env.local` phải nằm tại root workspace để launcher đọc được; bản giữ ở thư mục chuẩn bị máy bên ngoài không được tự nạp. Khi chủ dự án cung cấp bản đó, có thể chép nguyên file vào root **nếu chưa tồn tại**, kiểm Git ignore và chỉ kiểm tên/độ hiện diện biến, không in giá trị. Không ghi đè cấu hình local đang có hoặc đưa credentials lên Git. Các script setup máy không phải điều kiện bắt buộc cho mỗi lần chạy Web; đọc side effects trước khi dùng vì chúng có thể sinh keys/token hoặc tải model ngoài phạm vi kiểm Dashboard.
-- Kiểm Dashboard ở cổng riêng có thể chạy Maven `spring-boot:run` với `--server.port=8082` từ `spring-web` sau khi nạp `.env.local` vào process qua kênh an toàn. Lượt chỉ kiểm dữ liệu hiện có dùng process-only `--spring.jpa.hibernate.ddl-auto=validate --spring.sql.init.mode=never`, không sửa tracked defaults hoặc chuyển sang H2. Nếu schema validation thất bại thì dừng và báo, không tự đổi thành update/create-drop. Không gọi launcher8080 rồi mặc nhiên coi nó chạy ở8082. Không tự dừng process khác đang chiếm cổng.
-- Chủ dự án mô tả account có quyền quản trị toàn bộ; UI/API vẫn phải tuân quyền thực tế do server cấp. Quyền admin không tự cấp phép tạo/xóa/sửa dữ liệu, seed/reset, migrations, đổi tài khoản/mật khẩu hoặc mở camera. Mặc định quan sát dữ liệu thật chỉ đọc; mọi thao tác ghi ngoài tác vụ UI/UX cần phạm vi được duyệt riêng.
 
 | Spring env | Default main / launcher |
 | --- | --- |
@@ -109,7 +90,7 @@ Không khẳng định Secure session cookie default của nhánh Security trên
 
 ## ANPR startup và configuration
 
-[run-anpr.ps1](../../scripts/run-anpr.ps1):12–111 ưu tiên `PARKING_PYTHON`, rồi `py` (3.12/3.11/3.10/3), rồi Python PATH; probe version>=3.10. Nó kiểm venv, **đổi tên** venv incompatible để giữ lại, tạo venv mới, upgrade pip và install requirements nếu hash thay đổi. Đây là side effects của lần chạy sau, không được thực hiện trong đợt tài liệu.
+[scripts\run-anpr.ps1](../../scripts/run-anpr.ps1):12–111 ưu tiên `PARKING_PYTHON`, rồi `py` (3.12/3.11/3.10/3), rồi Python PATH; probe version>=3.10. Nó kiểm venv, **đổi tên** venv incompatible để giữ lại, tạo venv mới, upgrade pip và install requirements nếu hash thay đổi. Đây là side effects của lần chạy sau, không được thực hiện trong đợt tài liệu.
 
 | Biến / nguồn | Ý nghĩa, default source (không secret) |
 | --- | --- |
@@ -140,13 +121,13 @@ Launcher bind `0.0.0.0`, không chỉ loopback; mạng có thể truy cập tùy
 
 ## Desktop
 
-[run-desktop.ps1](../../scripts/run-desktop.ps1) tìm global `dotnet.exe`, set `DOTNET_CLI_HOME=.cache/dotnet-cli`, `DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1`, tắt CLI telemetry, build Release và mở EXE chờ kết thúc. Launcher này không set `DOTNET_GENERATE_ASPNET_CERTIFICATE` như test runner/CI. Lệnh build thủ công tương đương (không mở UI):
+[scripts\run-desktop.ps1](../../scripts/run-desktop.ps1) tìm global `dotnet.exe`, set `DOTNET_CLI_HOME=.cache/dotnet-cli`, `DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1`, tắt CLI telemetry, build Release và mở EXE chờ kết thúc. Launcher này không set `DOTNET_GENERATE_ASPNET_CERTIFICATE` như test runner/CI. Lệnh build thủ công tương đương (không mở UI):
 
 ```cmd
 dotnet build desktop-winform\ParkingGateDesktop.csproj --configuration Release
 ```
 
-Muốn vừa build vừa mở, dùng `scripts/run-desktop.cmd`. Thay Desktop source phải rebuild; không dùng EXE cũ để kết luận API incompatibility đã sửa. Desktop chỉ có Spring URL default `http://localhost:8080`; cả AI health/processing đi qua Spring tới `PARKING_AI_BASE_URL`, shared service token nằm ở Spring/FastAPI process, không đưa vào Desktop. Remote deployment chưa verified. Camera capture vẫn diễn ra trên máy ANPR.
+Muốn vừa build vừa mở, dùng `scripts\run-desktop.cmd`. Thay Desktop source phải rebuild; không dùng EXE cũ để kết luận API incompatibility đã sửa. Desktop chỉ có Spring URL default `http://localhost:8080`; cả AI health/processing đi qua Spring tới `PARKING_AI_BASE_URL`, shared service token nằm ở Spring/FastAPI process, không đưa vào Desktop. Remote deployment chưa verified. Camera capture vẫn diễn ra trên máy ANPR.
 
 **Cấu hình trạm:** chọn nguồn camera xe/mặt bằng chỉ số USB hoặc RTSP/HTTP(S), frame count default8 (UI cho1–60, proxy/ANPR clamp4–16 cho nhận dạng xe), barrier auto-close default5 giây (1–120). Chỉ driver `SIMULATOR` được hỗ trợ. [GateStationSettingsStore](../../desktop-winform/GateStationSettingsStore.cs) lưu `%LOCALAPPDATA%/ParkingGateDesktop/station-settings.json`; file hợp lệ được ưu tiên, nếu không đọc được/không hợp lệ mới fallback `PARKING_VEHICLE_CAMERA_SOURCE`/`PARKING_FACE_CAMERA_SOURCE` → biến `*_CAMERA_INDEX` → `0`. URL camera có thể chứa credentials, file này không được mã hóa bởi store: giới hạn quyền local, không chụp/log/publish cấu hình. Không gọi mở camera để kiểm tài liệu.
 
@@ -156,7 +137,7 @@ Muốn vừa build vừa mở, dùng `scripts/run-desktop.cmd`. Thay Desktop sou
 
 [run-demo.cmd](../../face-verification-demo/run-demo.cmd) gọi [run-demo.ps1](../../face-verification-demo/run-demo.ps1), tải YuNet/SFace qua `download-models.ps1` nếu thiếu, bind loopback port8002 và tìm free port tới8012; đọc URL được in thay vì luôn assume8002. `FACE_DEMO_NO_BROWSER=1` ngăn auto browser, `FACE_DEMO_NONINTERACTIVE=1` ngăn prompt duplicate-launcher.
 
-**Path limitation:** script resolve Python từ `parent-of-repository/anpr-service/.venv`, không từ ANPR directory bên trong repo. Nó có thể báo thiếu môi trường dù `scripts/run-anpr.cmd` đã tạo venv đúng trong repo. Không sửa script hoặc tạo venv giả để vượt lỗi. Manual alternative từ root, chỉ khi repo ANPR venv/deps và demo models đã chuẩn bị (chưa thực thi):
+**Path limitation:** script resolve Python từ `parent-of-repository/anpr-service/.venv`, không từ ANPR directory bên trong repo. Nó có thể báo thiếu môi trường dù `scripts\run-anpr.cmd` đã tạo venv đúng trong repo. Không sửa script hoặc tạo venv giả để vượt lỗi. Manual alternative từ root, chỉ khi repo ANPR venv/deps và demo models đã chuẩn bị (chưa thực thi):
 
 ```cmd
 cd face-verification-demo
@@ -171,7 +152,7 @@ Nếu8002 đã dùng, operator chọn port trống và dùng URL tương ứng. 
 
 Theo [workspace policy](../architecture/workspace-layout.md), `.cache/` có thể tái tạo khi công cụ đã dừng, `.artifacts/` cần giữ/backup riêng. Không tự xóa artifact hoặc private media. Maven có thể được chuẩn bị bằng cách giải nén bản3.9.11 được xác minh từ Apache vào `.cache/toolchains/`, hoặc cung cấp `mvn.cmd` trong PATH; ZIP local nằm ở `.cache/downloads/`, không tự tải khi thiếu.
 
-Từ root dùng `scripts/test/run-tests.ps1 -Suite spring|desktop|anpr|all|tooling|thesis` (chọn một giá trị, không chép dấu `|` thành lệnh). Spring runner yêu cầu `JAVA_HOME` JDK21. Xem [hướng dẫn test](../../tests/README.md) và [kết quả/giới hạn](../testing/strategy.md); runner không chạy các launcher/app servers hoặc cài dependencies. Spring tests tự boot application contexts theo cấu hình test, phải kiểm isolation trước chạy; main còn paths media tương đối/shared. Lựa chọn `thesis` cần tooling riêng, không mặc định sẵn trên main. `scripts/check-workspace.ps1` kiểm các đường dẫn legacy đã biết, không là security/secret audit đầy đủ. Source main health/launcher khớp fields như đã nêu; chưa có startup runtime verification.
+Từ root chạy trực tiếp từng suite: `mvn test` trong `spring-web` (cần `JAVA_HOME` JDK21), `dotnet test desktop-winform.Tests`, `pytest tests/` trong `anpr-service`. Các lệnh này không chạy launcher/app server và không tự cài dependencies. Spring tests tự boot application contexts theo cấu hình test, phải kiểm isolation trước chạy; main còn paths media tương đối/shared. Xem [kết quả/giới hạn](../testing/strategy.md). Source main health/launcher khớp fields như đã nêu; chưa có startup runtime verification.
 
 | Triệu chứng | Kiểm tra / hành động supported hoặc suy luận vận hành, không claim đã sửa |
 | --- | --- |
@@ -190,3 +171,8 @@ Từ root dùng `scripts/test/run-tests.ps1 -Suite spring|desktop|anpr|all|tooli
 | Nhận dạng sai/chậm | Ảnh rõ/đủ sáng, kiểm plate manual theo evidence; CPU/video có thể chậm. UI warning thresholds khác model thresholds; chưa có SLA/accuracy result. Không suy từ AI type ra quyền/charging. |
 
 Không có verified backup/restore, live offline queue/resync, production datasource/TLS/retention/security deployment trong đợt này; source có outbox/payment/shift không đóng các gaps đó. Xem [security](../security/overview.md), [NV07](../requirements/nv07-exceptions-recovery.md) và [testing strategy](../testing/strategy.md) trước đưa hệ thống vào vận hành thật.
+
+
+## LumiPark login frontend build
+
+Giao diện Thymeleaf dùng CSS nguồn trong `spring-web/src/main/frontend/styles/`, Tailwind CSS v4 và Lucide từ lockfile của `spring-web/package-lock.json`. Sau khi môi trường Node 22+ và dependencies đã được chuẩn bị, chạy `npm run build` trong `spring-web`; `npm test` chạy kiểm tra frontend. Maven cũng gọi cùng build ở phase `process-classes`. CSS/icon sinh ra nằm dưới `spring-web/target/classes/static/`, không commit generated output. Việc chuẩn bị dependencies cần quyền riêng; runner không tự cài. Đây là hướng dẫn build, không phải chứng nhận E2E hay kết quả chạy mới.

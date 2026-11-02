@@ -36,6 +36,7 @@ final class LoginTestIsolation {
             Map.entry("spring.servlet.multipart.location", media.toString()),
             Map.entry("parking.security.bootstrap.username", ""),
             Map.entry("parking.security.bootstrap.password", ""),
+            Map.entry("parking.security.bootstrap.demo-password", ""),
             Map.entry("parking.security.jwt.enabled", "false"),
             Map.entry("parking.ai.base-url", "http://127.0.0.1:1"),
             Map.entry("parking.ai.service-token", ""),

@@ -35,6 +35,8 @@
 .account-management-page .account-section-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: .45rem .8rem; border: 1px solid #c4cde1; border-radius: 999px; background: rgb(255 255 255 / 82%); color: var(--account-primary); font-size: .875rem; font-weight: 600; text-decoration: none; }
 .account-management-page .account-section-nav a:hover { border-color: #9aa9d1; background: #f0f2ff; }
 .account-management-page .account-flash { display: flex; align-items: flex-start; gap: .55rem; margin: 0; padding: .8rem .95rem; border: 1px solid #acd8bb; border-radius: .85rem; background: #ecfdf3; color: #176052; font-size: .875rem; line-height: 1.5; }
+.account-management-page #admin-submit-status:not([hidden]) { position: fixed; z-index: 100; inset-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right)); bottom: max(1rem, env(safe-area-inset-bottom)); box-sizing: border-box; width: max-content; max-width: min(42rem, calc(100vw - 2rem)); margin-inline: auto; border-color: #9db6ed; background: #eff6ff; color: #1e40af; box-shadow: 0 8px 24px rgb(23 33 59 / 18%); }
+.account-management-page #admin-submit-status[hidden] { display: none; }
 .account-management-page .account-flash.is-error { border-color: #e8b8b2; background: #fff1f0; color: #8e2b25; }
 .account-management-page .temporary-secret { padding: 1rem 1.15rem; border: 1px solid #d99a34; border-radius: 1rem; background: linear-gradient(110deg,#fff8e8,#fffdf6); color: #553b12; box-shadow: inset 0 1px 0 white; }
 .account-management-page .temporary-secret strong { display: block; color: #69470e; }

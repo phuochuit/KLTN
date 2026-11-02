@@ -164,6 +164,8 @@
   .revenue-chart.is-empty .month-bar[aria-pressed="true"] { background: #edf1fc; }
   .trend-panel:has(.revenue-chart.is-empty) #trendStatus { display: inline-block; padding: .55rem .8rem; border-radius: .7rem; background: #eef3fc; }
   .feedback:empty { display: none; }
+  .vehicles-page .vehicle-form > label { min-width: 0; }
+  .vehicles-page .vehicle-form select { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   @supports (appearance: base-select) {
     :is(.slots-page select, .sessions-page select, .dashboard-home :is(.filter-form select, .trend-actions select), .vehicles-page .vehicle-form select, .security-audit-page .audit-filter-form select),
     :is(.slots-page select, .sessions-page select, .dashboard-home :is(.filter-form select, .trend-actions select), .vehicles-page .vehicle-form select, .security-audit-page .audit-filter-form select)::picker(select) { appearance: base-select; }
@@ -199,7 +201,7 @@
   .noscript-navigation { display: none; border: 1px solid var(--d-line); border-radius: 1rem; background: #f6f8fd; padding: 1rem; margin-bottom: 1rem; }
   @media (max-width: 63.999rem) { .noscript-navigation { display: block; } }
   .icon-button { display: grid; place-items: center; border: 1px solid #96a3bf; background: white; border-radius: .65rem; width: 2.75rem; height: 2.75rem; flex-shrink: 0; }.icon-button.mobile-menu { display: none; }
-  .navigation-dialog { position: fixed; margin: 0; inset: 0 auto 0 0; height: 100dvh; max-height: 100dvh; width: min(21rem,90vw); max-width: 90vw; border: 0; padding: 1rem; background: #f1f5fd; color: var(--d-ink); }.navigation-dialog::backdrop { background: rgb(28 41 72 / 40%); }.close-navigation { min-height: 2.75rem; width: 100%; text-align: right; color: var(--d-blue); font-size: .875rem; }
+  .navigation-dialog { position: fixed; margin: 0; inset: 0 auto 0 0; height: 100dvh; max-height: 100dvh; width: min(21rem,90vw); max-width: 90vw; border: 0; padding: 1rem; background: #f1f5fd; color: var(--d-ink); overflow: hidden; }.navigation-dialog[open] { display: flex; flex-direction: column; }.navigation-dialog::backdrop { background: rgb(28 41 72 / 40%); }.navigation-dialog > .navigation-content { flex: 1; min-height: 0; padding: 0; overflow: hidden; }.navigation-dialog .dashboard-brand { flex: 0 0 auto; }.navigation-dialog .dashboard-navigation { flex: 1; min-height: 0; overflow-y: auto; }.navigation-dialog .navigation-bottom { flex: 0 0 auto; }.close-navigation { flex: 0 0 auto; min-height: 2.75rem; width: 100%; text-align: right; color: var(--d-blue); font-size: .875rem; background: #f1f5fd; }
   .skip-link { position: fixed; top: -6rem; left: 1rem; z-index: 10; background: white; color: #3042aa; padding: 1rem; }.skip-link:focus { top: 1rem; }
   @media (min-width: 96rem) { .dashboard-shell { gap: 2rem; padding: 1.75rem; grid-template-columns: 16rem minmax(0,1fr); }.sidebar { top: 1.75rem; height: calc(100svh - 3.5rem); }.dashboard-workspace main { padding-top: 2rem; } }
   @media (max-width: 79.999rem) { .dashboard-shell { grid-template-columns: 14rem minmax(0,1fr); gap: 1rem; }.navigation-content { padding-inline: .65rem; }.kpi-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }.bento-grid { grid-template-columns: minmax(0,1.6fr) minmax(15rem,1fr); }.snapshot-label { display: none; }.analysis-controls { display: block; }.analysis-controls .panel-heading { display: flex; margin-bottom: .7rem; } }

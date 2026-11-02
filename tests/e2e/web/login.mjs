@@ -1,3 +1,4 @@
+import { assertIsolatedHarness } from './isolated-harness.mjs';
 // Opt-in, loopback H2 harness only. No traces, cookies, form values or request bodies in evidence.
 import { createRequire } from 'node:module';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -8,10 +9,7 @@ import assert from 'node:assert/strict';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const require = createRequire(path.join(root, 'spring-web/package.json'));
 const { chromium, expect } = require('@playwright/test');
-const run = path.resolve(process.argv[2] ?? '');
-assert.ok(run.startsWith(path.join(root, '.artifacts/test-runs') + path.sep));
-const port = (await readFile(path.join(run, 'server.port'), 'utf8')).trim();
-assert.match(port, /^\d{1,5}$/);
+const { run, port } = await assertIsolatedHarness(root, process.argv[2]);
 const baseURL = `http://127.0.0.1:${port}`;
 const fixture = await readFile(path.join(root, 'spring-web/src/test/java/vn/edu/parking/LoginTestIsolation.java'), 'utf8');
 const password = fixture.match(/PASSWORD = "([^"]+)"/)[1];
