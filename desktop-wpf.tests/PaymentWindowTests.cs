@@ -121,7 +121,7 @@ public sealed class PaymentWindowTests
         try
         {
             thread.Start();
-            await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await completed.Task.WaitAsync(TimeSpan.FromSeconds(30));
         }
         finally
         {

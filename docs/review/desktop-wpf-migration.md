@@ -56,6 +56,6 @@ Giới hạn contract dùng chung có sẵn: xác nhận xe ra gửi biển số
 
 ## Chạy, CI và Git
 
-Lệnh build/test/demo: [README WPF](../../desktop-wpf/README.md). Workflow `Desktop WPF` mới chạy Core/WPF/WinForms tests và build hai ứng dụng trên Windows khi PR đổi các đường dẫn Desktop. Kết quả GitHub CI phải xem thực tế trên PR, không suy từ local PASS. Workflow Verify cũ vẫn chạy thủ công.
+Lệnh build/test/demo: [README WPF](../../desktop-wpf/README.md). Workflow `Desktop WPF` mới chạy Core/WPF/WinForms tests và build hai ứng dụng trên Windows khi PR đổi các đường dẫn Desktop. Kết quả GitHub CI phải xem thực tế trên PR, không suy từ local PASS. Workflow Verify cũ vẫn chạy thủ công. Lượt CI đầu có Workspace PASS nhưng smoke STA WPF vượt deadline toàn bài 5 giây; deadline được tăng có giới hạn lên 30 giây, giữ nguyên assertion/lifecycle và root targeted 1/1 PASS. Kết quả chạy lại xem trên PR.
 
 AGENTS.md local và hai property override được bảo toàn ngoài commit. Không đưa `.opencode`, artifacts/logs/TRX, fixture/journal, credentials hoặc media vận hành lên Git; các PNG ở đây là dữ liệu tổng hợp đã chọn cho tài liệu. Không merge hoặc deploy.
