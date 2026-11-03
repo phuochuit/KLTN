@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\desktop-winform\Models.cs;..\desktop-winform\ParkingApiClient.cs;..\desktop-winform\ApiResponseReader.cs;..\desktop-winform\DesktopAuthenticationException.cs;..\desktop-winform\DesktopAuthorizationException.cs;..\desktop-winform\OfflineQueuedException.cs;..\desktop-winform\TransientServerException.cs;..\desktop-winform\OfflineOutboxStore.cs;..\desktop-winform\GateStationSettings.cs;..\desktop-winform\GateStationSettingsStore.cs;..\desktop-winform\BarrierController.cs" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

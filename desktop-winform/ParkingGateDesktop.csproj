@@ -6,4 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Models.cs;ParkingApiClient.cs;ApiResponseReader.cs;DesktopAuthenticationException.cs;DesktopAuthorizationException.cs;OfflineQueuedException.cs;TransientServerException.cs;OfflineOutboxStore.cs;GateStationSettings.cs;GateStationSettingsStore.cs;BarrierController.cs" />
+    <ProjectReference Include="..\desktop-core\DesktopCore.csproj" />
+  </ItemGroup>
 </Project>

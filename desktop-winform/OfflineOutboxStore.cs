@@ -17,17 +17,57 @@ public sealed record OfflineOperation(
     [property: JsonPropertyName("lastAttemptAt")] DateTimeOffset? LastAttemptAt = null,
     [property: JsonPropertyName("lastError")] string? LastError = null);
 
+public sealed record OutboxSnapshot(int PendingCount, bool RequiresReview);
+
 public sealed class OfflineOutboxStore
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private readonly string _path;
 
+    public string StoragePath => Path.GetFullPath(_path);
+
     public OfflineOutboxStore(string? path = null)
     {
         _path = path ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ParkingGateDesktop", "offline-outbox.json");
+    }
+
+    public async Task<OutboxSnapshot> InspectAsync()
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            string fullPath = Path.GetFullPath(_path);
+            string directory = Path.GetDirectoryName(fullPath)!;
+            bool review;
+            try
+            {
+                review = Directory.EnumerateFiles(directory)
+                    .Any(file => Path.GetFileName(file).StartsWith(Path.GetFileName(fullPath) + ".corrupt-", StringComparison.OrdinalIgnoreCase));
+            }
+            catch (DirectoryNotFoundException) { return new OutboxSnapshot(0, false); }
+            try
+            {
+                await using FileStream stream = File.OpenRead(fullPath);
+                using JsonDocument document = await JsonDocument.ParseAsync(stream);
+                if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.EnumerateArray().Any(item =>
+                    item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("operationId", out _)
+                    || !item.TryGetProperty("type", out _) || !item.TryGetProperty("request", out _)
+                    || !item.TryGetProperty("createdAt", out _)))
+                    return new OutboxSnapshot(0, true);
+                var items = document.RootElement.Deserialize<List<OfflineOperation>>(_json);
+                return items is null || items.Any(item => item is null || item.Request is null
+                    || string.IsNullOrWhiteSpace(item.OperationId) || !Enum.IsDefined(item.Type)
+                    || !string.Equals(item.OperationId, item.Request.OperationId, StringComparison.OrdinalIgnoreCase))
+                    ? new OutboxSnapshot(0, true) : new OutboxSnapshot(items.Count, review);
+            }
+            catch (FileNotFoundException) { return new OutboxSnapshot(0, review); }
+            catch (DirectoryNotFoundException) { return new OutboxSnapshot(0, review); }
+            catch (JsonException) { return new OutboxSnapshot(0, true); }
+        }
+        finally { _gate.Release(); }
     }
 
     public async Task<int> EnqueueAsync(OfflineOperationType type, ParkingRequest request)

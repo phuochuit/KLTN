@@ -5,6 +5,9 @@ using System.Text.Json;
 
 namespace ParkingGateDesktop;
 
+public enum SingleAttemptOutcome { Success, Rejected, Unknown, NotSent }
+public sealed record SingleAttemptResult(SingleAttemptOutcome Outcome, ParkingResponse? Response = null, string? Message = null);
+
 public sealed class ParkingApiClient : IDisposable
 {
     private readonly HttpClient _http;
@@ -12,6 +15,7 @@ public sealed class ParkingApiClient : IDisposable
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly SemaphoreSlim _outboxGate = new(1, 1);
     private readonly OfflineOutboxStore _outbox;
+    private readonly bool _preserveAuthenticationOnTransientRefreshFailure;
     private readonly HashSet<long> _shownShiftSummaries = new();
     private string? _accessToken;
     private string? _refreshToken;
@@ -23,15 +27,25 @@ public sealed class ParkingApiClient : IDisposable
 
     public ParkingApiClient() : this(new HttpClientHandler { AllowAutoRedirect = false }) { }
 
-    internal ParkingApiClient(HttpMessageHandler handler)
+    internal ParkingApiClient(HttpMessageHandler handler) : this(handler,
+        new OfflineOutboxStore(), new GateStationSettingsStore().Load()) { }
+
+    public ParkingApiClient(HttpMessageHandler handler, OfflineOutboxStore outbox, GateStationSettings settings)
+        : this(handler, outbox, settings, false) { }
+
+    public ParkingApiClient(HttpMessageHandler handler, OfflineOutboxStore outbox, GateStationSettings settings,
+        bool preserveAuthenticationOnTransientRefreshFailure)
     {
+        ArgumentNullException.ThrowIfNull(handler);
+        _outbox = outbox ?? throw new ArgumentNullException(nameof(outbox));
+        StationSettings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _preserveAuthenticationOnTransientRefreshFailure = preserveAuthenticationOnTransientRefreshFailure;
         _http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
-        _outbox = new OfflineOutboxStore();
     }
 
     public string BaseUrl { get; set; } = "http://localhost:8080";
     public bool IsAuthenticated => _accessToken is not null && _refreshToken is not null;
-    public GateStationSettings StationSettings { get; set; } = new GateStationSettingsStore().Load();
+    public GateStationSettings StationSettings { get; set; }
     public int VehicleCameraIndex => StationSettings.VehicleCameraIndex;
     public int FaceCameraIndex => StationSettings.FaceCameraIndex;
 
@@ -184,6 +198,70 @@ public sealed class ParkingApiClient : IDisposable
     public Task<ParkingResponse> ConfirmExitAsync(ParkingRequest request) =>
         PostDurableAsync("/api/parking/exit-confirm", OfflineOperationType.ExitConfirm, request);
 
+    public Task<SingleAttemptResult> EntrySingleAttemptAsync(ParkingRequest request) =>
+        PostSingleAttemptAsync("/api/parking/entry", request);
+
+    public Task<SingleAttemptResult> ConfirmExitSingleAttemptAsync(ParkingRequest request) =>
+        PostSingleAttemptAsync("/api/parking/exit-confirm", request);
+
+    private async Task<SingleAttemptResult> PostSingleAttemptAsync(string path, ParkingRequest request)
+    {
+        if (request is null || !Guid.TryParse(request.OperationId, out _))
+            return new(SingleAttemptOutcome.NotSent, Message: "Mã giao dịch không hợp lệ.");
+        bool dispatched = false;
+        try
+        {
+            using var response = await SendProtectedAsync(path, HttpMethod.Post,
+                () => JsonContent.Create(request, options: _json),
+                onDispatch: () => dispatched = true, preserveUnauthorized: true);
+            var classified = await ClassifySingleAttemptErrorAsync(response);
+            if (classified is not null) return classified;
+            if (!response.IsSuccessStatusCode) return new(SingleAttemptOutcome.Unknown);
+            using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var result = payload.RootElement.Deserialize<ParkingResponse>(_json);
+            bool exit = path == "/api/parking/exit-confirm";
+            string expectedPlate = NormalizeSingleAttemptPlate(request.PlateNumber);
+            if (result is null || result.SessionId <= 0 || expectedPlate.Length == 0 ||
+                NormalizeSingleAttemptPlate(result.PlateNumber) != expectedPlate ||
+                result.Status != (exit ? "COMPLETED" : "OPEN") || result.EntryTime == default || result.Fee < 0 ||
+                !payload.RootElement.TryGetProperty("fee", out var fee) || fee.ValueKind != JsonValueKind.Number ||
+                (exit && (result.ExitTime is null || result.ExitTime == default || result.ExitTime < result.EntryTime)) ||
+                (!exit && result.ExitTime is not null))
+                return new(SingleAttemptOutcome.Unknown);
+            return new(SingleAttemptOutcome.Success, result);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TransientServerException or IOException or OperationCanceledException
+            or InvalidOperationException or JsonException or DesktopAuthenticationException or NotSupportedException or ArgumentException)
+        {
+            return new(dispatched ? SingleAttemptOutcome.Unknown : SingleAttemptOutcome.NotSent);
+        }
+    }
+
+    private static string NormalizeSingleAttemptPlate(string? plate) =>
+        new((plate ?? "").ToUpperInvariant().Where(c => c is >= 'A' and <= 'Z' or >= '0' and <= '9').ToArray());
+
+    private static async Task<SingleAttemptResult?> ClassifySingleAttemptErrorAsync(HttpResponseMessage response)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized &&
+            response.Headers.WwwAuthenticate.Any(h => h.Scheme.Equals("Bearer", StringComparison.OrdinalIgnoreCase)))
+            return new(SingleAttemptOutcome.Rejected, Message: "Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.");
+        if (response.StatusCode != HttpStatusCode.BadRequest ||
+            !string.Equals(response.Content.Headers.ContentType?.MediaType, "application/json", StringComparison.OrdinalIgnoreCase))
+            return null;
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        if (doc.RootElement.ValueKind == JsonValueKind.Object &&
+            doc.RootElement.EnumerateObject().Count() == 1 &&
+            doc.RootElement.TryGetProperty("message", out var value) && value.ValueKind == JsonValueKind.String)
+        {
+            string? detail = value.GetString();
+            if (!string.IsNullOrWhiteSpace(detail) && !detail.Contains('<') && !detail.Any(char.IsControl) && detail.Length <= 500 &&
+                detail != "Yêu cầu đang được xử lý. Vui lòng chờ rồi kiểm tra lại." &&
+                detail != "Yêu cầu đang được xử lý ở một trạm khác. Vui lòng chờ rồi kiểm tra lại.")
+                return new(SingleAttemptOutcome.Rejected, Message: detail);
+        }
+        return new(SingleAttemptOutcome.Unknown);
+    }
+
     public async Task<int> FlushOutboxAsync()
     {
         await _outboxGate.WaitAsync();
@@ -281,6 +359,29 @@ public sealed class ParkingApiClient : IDisposable
         using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}/dispatch-session", HttpMethod.Post,
             () => JsonContent.Create(new DispatchSessionRequest(sessionId), options: _json));
         await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "điều phối xe");
+    }
+
+    public async Task<SingleAttemptResult> DispatchSessionSingleAttemptAsync(long slotId, long sessionId)
+    {
+        if (slotId <= 0 || sessionId <= 0)
+            return new(SingleAttemptOutcome.NotSent, Message: "Thông tin điều phối không hợp lệ.");
+        bool dispatched = false;
+        try
+        {
+            using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}/dispatch-session", HttpMethod.Post,
+                () => JsonContent.Create(new DispatchSessionRequest(sessionId), options: _json),
+                onDispatch: () => dispatched = true, preserveUnauthorized: true);
+            var classified = await ClassifySingleAttemptErrorAsync(response);
+            if (classified is not null) return classified;
+            return response.IsSuccessStatusCode
+                ? new(SingleAttemptOutcome.Success)
+                : new(SingleAttemptOutcome.Unknown);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TransientServerException or IOException or OperationCanceledException
+            or InvalidOperationException or JsonException or DesktopAuthenticationException or NotSupportedException or ArgumentException)
+        {
+            return new(dispatched ? SingleAttemptOutcome.Unknown : SingleAttemptOutcome.NotSent);
+        }
     }
 
     public async Task<List<UnassignedSessionResponse>> GetRecentUnassignedSessionsAsync()
@@ -456,15 +557,21 @@ public sealed class ParkingApiClient : IDisposable
     };
 
     private async Task<HttpResponseMessage> SendProtectedAsync(string path, HttpMethod method,
-            Func<HttpContent?>? contentFactory = null, bool retrySafeRead = false, TimeSpan? requestTimeout = null)
+            Func<HttpContent?>? contentFactory = null, bool retrySafeRead = false, TimeSpan? requestTimeout = null,
+            Action? onDispatch = null, bool preserveUnauthorized = false)
     {
         string accessToken = await GetFreshAccessTokenAsync(requireCurrentOrigin: true);
         Uri uri = BuildProtectedUri(path);
         using var timeout = new CancellationTokenSource(requestTimeout ?? TimeSpan.FromSeconds(10));
         using var request = new HttpRequestMessage(method, uri) { Content = contentFactory?.Invoke() };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        if (onDispatch is not null && request.Content is not null)
+            await request.Content.LoadIntoBufferAsync();
+        onDispatch?.Invoke();
         HttpResponseMessage response = await _http.SendAsync(request, timeout.Token);
         if (response.StatusCode != HttpStatusCode.Unauthorized) return response;
+
+        if (preserveUnauthorized) return response;
 
         bool refreshed = await RefreshAfterUnauthorizedAsync(accessToken);
         if (!retrySafeRead || !refreshed) return response;
@@ -542,12 +649,27 @@ public sealed class ParkingApiClient : IDisposable
             return true;
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException
-                or JsonException or InvalidOperationException)
+                or JsonException or InvalidOperationException or TransientServerException)
         {
+            if (_preserveAuthenticationOnTransientRefreshFailure && IsTransientRefreshFailure(ex))
+                throw new TransientServerException(HttpStatusCode.ServiceUnavailable,
+                    "Không thể kết nối để xác minh phiên làm việc. Phiên hiện tại được giữ ở trạng thái chưa xác minh.", ex);
             ClearAuthentication();
             throw new DesktopAuthenticationException(
                 "Không thể xác minh an toàn phiên đăng nhập. Hãy đăng nhập lại trước khi tiếp tục.");
         }
+    }
+
+    private static bool IsTransientRefreshFailure(Exception exception)
+    {
+        if (exception is TransientServerException transient)
+            return TransientServerException.IsTransient(transient.StatusCode);
+        if (exception is HttpRequestException request && request.StatusCode is { } status)
+            return (int)status >= 500;
+        if (exception is HttpRequestException or IOException or OperationCanceledException) return true;
+        return exception is InvalidOperationException invalid
+            && (invalid.Message.Contains("mã lỗi 5", StringComparison.OrdinalIgnoreCase)
+                || invalid.Message.Contains("máy chủ gặp lỗi", StringComparison.OrdinalIgnoreCase));
     }
 
     private Uri BuildProtectedUri(string path)
