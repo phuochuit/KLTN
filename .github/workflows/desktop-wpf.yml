@@ -1,0 +1,59 @@
+name: Desktop WPF
+
+on:
+  pull_request:
+    paths:
+      - 'desktop-core/**'
+      - 'desktop-core.tests/**'
+      - 'desktop-wpf/**'
+      - 'desktop-wpf.tests/**'
+      - 'desktop-winform/**'
+      - 'desktop-winform.Tests/**'
+      - '.github/workflows/desktop-wpf.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-wpf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Shared core tests
+        run: dotnet test desktop-core.tests/DesktopCore.Tests.csproj -c Release --logger 'trx;LogFileName=core.trx' --results-directory .artifacts/desktop-ci
+      - name: WPF application tests
+        run: dotnet test desktop-wpf.tests/LumiPark.Desktop.Tests.csproj -c Release --logger 'trx;LogFileName=wpf.trx' --results-directory .artifacts/desktop-ci
+      - name: WinForms compatibility tests
+        run: dotnet test desktop-winform.Tests/ParkingGateDesktop.Tests.csproj -c Release --logger 'trx;LogFileName=winforms.trx' --results-directory .artifacts/desktop-ci
+      - name: Build both desktop applications
+        run: |
+          dotnet build desktop-wpf/LumiPark.Desktop.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build desktop-winform/ParkingGateDesktop.csproj -c Release
+          exit $LASTEXITCODE
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: desktop-wpf-tests
+          path: .artifacts/desktop-ci/*.trx
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
