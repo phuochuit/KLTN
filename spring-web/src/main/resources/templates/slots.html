@@ -440,6 +440,41 @@
             const target = document.getElementById(tabId);
             if (target) target.classList.add('active');
         }
+        // Tự động làm mới sơ đồ mỗi 5 giây để thay đổi từ trạm gác hiện ra
+        // mà không cần tải lại trang. Bỏ qua khi nhân viên đang mở hộp thao tác.
+        (function () {
+            const refreshIntervalMs = 5000;
+            let refreshing = false;
+            async function refreshSlotMap() {
+                if (refreshing) return;
+                const slotModal = document.getElementById('slotModal');
+                const batchModal = document.getElementById('batchModal');
+                if (slotModal && slotModal.style.display === 'flex') return;
+                if (batchModal && batchModal.style.display === 'flex') return;
+                refreshing = true;
+                try {
+                    const response = await fetch(window.location.href, { cache: 'no-store' });
+                    if (!response.ok) return;
+                    const html = await response.text();
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const grid = document.querySelector('.slot-grid-interactive');
+                    const newGrid = doc.querySelector('.slot-grid-interactive');
+                    if (grid && newGrid && grid.innerHTML !== newGrid.innerHTML) {
+                        grid.innerHTML = newGrid.innerHTML;
+                    }
+                    const summary = document.querySelector('.slot-summary-grid');
+                    const newSummary = doc.querySelector('.slot-summary-grid');
+                    if (summary && newSummary && summary.innerHTML !== newSummary.innerHTML) {
+                        summary.innerHTML = newSummary.innerHTML;
+                    }
+                } catch (error) {
+                    // Mạng gián đoạn: giữ nguyên sơ đồ đang hiển thị.
+                } finally {
+                    refreshing = false;
+                }
+            }
+            setInterval(refreshSlotMap, refreshIntervalMs);
+        })();
     </script>
 </body>
 

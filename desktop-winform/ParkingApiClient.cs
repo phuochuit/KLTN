@@ -46,7 +46,7 @@ public sealed class ParkingApiClient : IDisposable
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         using var response = await _http.SendAsync(request, timeout.Token);
         var tokens = await ApiResponseReader.ReadAsync<TokenResponse>(response, _json,
-            "Spring Web", "đăng nhập trạm gác");
+            "Hệ thống", "đăng nhập trạm gác");
         InstallTokens(tokens, baseUrl);
     }
 
@@ -61,7 +61,7 @@ public sealed class ParkingApiClient : IDisposable
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var response = await _http.SendAsync(request, timeout.Token);
-            await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "đăng xuất");
+            await ApiResponseReader.EnsureSuccessAsync(response, "Hệ thống", "đăng xuất");
         }
         finally { ClearAuthentication(); }
     }
@@ -82,7 +82,7 @@ public sealed class ParkingApiClient : IDisposable
             throw new DesktopAuthenticationException(
                 "Phiên làm việc đã được kết thúc. Vui lòng đăng nhập lại.");
         var profile = await ApiResponseReader.ReadAsync<OperatorProfile>(response, _json,
-            "Spring Web", "xác minh phiên làm việc");
+            "Hệ thống", "xác minh phiên làm việc");
         UpdateOperator(profile);
         return profile;
     }
@@ -94,7 +94,7 @@ public sealed class ParkingApiClient : IDisposable
             $"/api/auth/shift-summary?scope={scope}", HttpMethod.Get, retrySafeRead: true);
         if (response.StatusCode == HttpStatusCode.NoContent) return null;
         return await ApiResponseReader.ReadAsync<ShiftSummary>(response, _json,
-            "Spring Web", "tải tổng kết ca");
+            "Hệ thống", "tải tổng kết ca");
     }
 
     public async Task<int> GetOfflineQueueCountAsync() => (await _outbox.ReadAsync()).Count;
@@ -132,10 +132,10 @@ public sealed class ParkingApiClient : IDisposable
             "Hệ thống nhận dạng", "xác thực khuôn mặt");
     }
 
-    public async Task<FaceVerificationResponse> VerifyGuestCameraAsync(string vehicleEvidenceId)
+    public async Task<FaceVerificationResponse> VerifyGuestCameraAsync(string vehicleEvidenceId, long? sessionId = null)
     {
         using var response = await SendProtectedAsync("/api/ai/face/guest/verify-camera", HttpMethod.Post,
-            () => JsonContent.Create(new { vehicleEvidenceId, cameraIndex = FaceCameraIndex, cameraSource = StationSettings.FaceCameraSource }, options: _json),
+            () => JsonContent.Create(new { vehicleEvidenceId, sessionId, cameraIndex = FaceCameraIndex, cameraSource = StationSettings.FaceCameraSource }, options: _json),
             requestTimeout: TimeSpan.FromMinutes(2));
         return await ApiResponseReader.ReadAsync<FaceVerificationResponse>(response, _json,
             "Hệ thống nhận dạng", "xác thực khuôn mặt khách vãng lai");
@@ -156,11 +156,11 @@ public sealed class ParkingApiClient : IDisposable
     public Task<FaceVerificationResponse> VerifyFaceVideoAsync(long familyMemberId, string path, string operation) =>
         UploadFaceAsync("/api/ai/face/verify-video", familyMemberId, path, operation, image: false);
 
-    public Task<FaceVerificationResponse> VerifyGuestFaceImageAsync(string vehicleEvidenceId, string path) =>
-        UploadGuestFaceAsync("/api/ai/face/guest/verify-image", vehicleEvidenceId, path, image: true);
+    public Task<FaceVerificationResponse> VerifyGuestFaceImageAsync(string vehicleEvidenceId, string path, long? sessionId = null) =>
+        UploadGuestFaceAsync("/api/ai/face/guest/verify-image", vehicleEvidenceId, path, image: true, sessionId);
 
-    public Task<FaceVerificationResponse> VerifyGuestFaceVideoAsync(string vehicleEvidenceId, string path) =>
-        UploadGuestFaceAsync("/api/ai/face/guest/verify-video", vehicleEvidenceId, path, image: false);
+    public Task<FaceVerificationResponse> VerifyGuestFaceVideoAsync(string vehicleEvidenceId, string path, long? sessionId = null) =>
+        UploadGuestFaceAsync("/api/ai/face/guest/verify-video", vehicleEvidenceId, path, image: false, sessionId);
 
     public Task<FaceVerificationResponse> VerifyCapturedFaceAsync(long familyMemberId, string imageBase64, string operation)
     {
@@ -170,17 +170,23 @@ public sealed class ParkingApiClient : IDisposable
             Convert.FromBase64String(payload), "camera-face.jpg", "image/jpeg", operation);
     }
 
-    public Task<FaceVerificationResponse> VerifyCapturedGuestFaceAsync(string vehicleEvidenceId, string imageBase64)
+    public Task<FaceVerificationResponse> VerifyCapturedGuestFaceAsync(string vehicleEvidenceId, string imageBase64, long? sessionId = null)
     {
         int separator = imageBase64.IndexOf(',');
         string payload = separator >= 0 ? imageBase64[(separator + 1)..] : imageBase64;
         return UploadGuestFaceBytesAsync("/api/ai/face/guest/verify-image", vehicleEvidenceId,
-            Convert.FromBase64String(payload), "camera-face.jpg", "image/jpeg");
+            Convert.FromBase64String(payload), "camera-face.jpg", "image/jpeg", sessionId);
     }
 
     public Task<ParkingResponse> EntryAsync(ParkingRequest request) =>
         PostDurableAsync("/api/parking/entry", OfflineOperationType.Entry, request);
     public Task<ParkingResponse> PreviewExitAsync(ParkingRequest request) => PostAsync("/api/parking/exit-preview", request);
+    public async Task<List<ExitCandidateResponse>> ExitCandidatesAsync()
+    {
+        using var response = await SendProtectedAsync("/api/parking/exit-candidates", HttpMethod.Get, retrySafeRead: true);
+        return await ApiResponseReader.ReadAsync<List<ExitCandidateResponse>>(response, _json,
+            "Hệ thống", "tải danh sách xe chưa có biển đang đỗ");
+    }
     public Task<ParkingResponse> ConfirmExitAsync(ParkingRequest request) =>
         PostDurableAsync("/api/parking/exit-confirm", OfflineOperationType.ExitConfirm, request);
 
@@ -220,7 +226,7 @@ public sealed class ParkingApiClient : IDisposable
         string query = $"?plate={Uri.EscapeDataString(plate ?? "")}&cardCode={Uri.EscapeDataString(cardCode ?? "")}";
         using var response = await SendProtectedAsync("/api/parking/lookup" + query, HttpMethod.Get, retrySafeRead: true);
         return await ApiResponseReader.ReadAsync<ResidentLookupResponse>(response, _json,
-            "Spring Web", "tra cứu cư dân/phương tiện");
+            "Hệ thống", "tra cứu cư dân/phương tiện");
     }
 
     public async Task<EvidenceComparisonResponse> GetEvidenceComparisonAsync(
@@ -233,66 +239,66 @@ public sealed class ParkingApiClient : IDisposable
             + (sessionId.HasValue ? $"&sessionId={sessionId.Value}" : "");
         using var response = await SendProtectedAsync("/api/parking/evidence-comparison" + query, HttpMethod.Get, retrySafeRead: true);
         return await ApiResponseReader.ReadAsync<EvidenceComparisonResponse>(response, _json,
-            "Spring Web", "đối chiếu bằng chứng ảnh vào/ra");
+            "Hệ thống", "đối chiếu bằng chứng ảnh vào/ra");
     }
 
     public async Task<List<ParkingSlotResponse>> GetSlotsAsync()
     {
         using var response = await SendProtectedAsync("/api/parking/slots", HttpMethod.Get, retrySafeRead: true);
         return await ApiResponseReader.ReadAsync<List<ParkingSlotResponse>>(response, _json,
-            "Spring Web", "tải sơ đồ bãi xe");
+            "Hệ thống", "tải sơ đồ bãi xe");
     }
 
     public async Task AssignSlotAsync(long slotId, long? vehicleId)
     {
         using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}/assign", HttpMethod.Post,
             () => JsonContent.Create(new SlotAssignRequest(vehicleId), options: _json));
-        await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "gán xe vào ô");
+        await ApiResponseReader.EnsureSuccessAsync(response, "Hệ thống", "gán xe vào ô");
     }
 
     public async Task BorrowSlotAsync(long slotId, string borrowedPlate, int hours, string notes)
     {
         using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}/borrow", HttpMethod.Post,
             () => JsonContent.Create(new SlotBorrowRequest(borrowedPlate, hours, notes), options: _json));
-        await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "thiết lập đỗ nhờ");
+        await ApiResponseReader.EnsureSuccessAsync(response, "Hệ thống", "thiết lập đỗ nhờ");
     }
 
     public async Task CancelBorrowAsync(long slotId)
     {
         using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}/cancel-borrow", HttpMethod.Post);
-        await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "hủy đỗ nhờ");
+        await ApiResponseReader.EnsureSuccessAsync(response, "Hệ thống", "hủy đỗ nhờ");
     }
 
     public async Task UpdateSlotStatusAsync(long slotId, string statusOverride)
     {
         using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}/status", HttpMethod.Post,
             () => JsonContent.Create(new SlotStatusRequest(statusOverride), options: _json));
-        await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "đổi trạng thái ô");
+        await ApiResponseReader.EnsureSuccessAsync(response, "Hệ thống", "đổi trạng thái ô");
     }
 
     public async Task ReleaseSlotAsync(long slotId)
     {
         using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}/release", HttpMethod.Post);
-        await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "giải phóng ô");
+        await ApiResponseReader.EnsureSuccessAsync(response, "Hệ thống", "giải phóng ô");
     }
 
     public async Task DispatchSessionAsync(long slotId, long sessionId)
     {
         using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}/dispatch-session", HttpMethod.Post,
             () => JsonContent.Create(new DispatchSessionRequest(sessionId), options: _json));
-        await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "điều phối xe");
+        await ApiResponseReader.EnsureSuccessAsync(response, "Hệ thống", "điều phối xe");
     }
 
     public async Task<List<UnassignedSessionResponse>> GetRecentUnassignedSessionsAsync()
     {
         using var response = await SendProtectedAsync("/api/parking/recent-unassigned", HttpMethod.Get, retrySafeRead: true);
-        return await ApiResponseReader.ReadAsync<List<UnassignedSessionResponse>>(response, _json, "Spring Web", "lấy xe vừa vào trạm");
+        return await ApiResponseReader.ReadAsync<List<UnassignedSessionResponse>>(response, _json, "Hệ thống", "lấy xe vừa vào trạm");
     }
 
     public async Task<List<UnassignedVehicleResponse>> GetUnassignedVehiclesAsync()
     {
         using var response = await SendProtectedAsync("/api/parking/vehicles-unassigned", HttpMethod.Get, retrySafeRead: true);
-        return await ApiResponseReader.ReadAsync<List<UnassignedVehicleResponse>>(response, _json, "Spring Web", "lấy xe cư dân chưa có ô");
+        return await ApiResponseReader.ReadAsync<List<UnassignedVehicleResponse>>(response, _json, "Hệ thống", "lấy xe cư dân chưa có ô");
     }
 
     private async Task<ParkingResponse> PostAsync(string path, ParkingRequest request)
@@ -301,7 +307,7 @@ public sealed class ParkingApiClient : IDisposable
             () => JsonContent.Create(request, options: _json));
         string action = path.Contains("entry") ? "ghi nhận xe vào" :
             path.Contains("preview") ? "xem trước phí xe ra" : "xác nhận xe ra";
-        return await ApiResponseReader.ReadAsync<ParkingResponse>(response, _json, "Spring Web", action);
+        return await ApiResponseReader.ReadAsync<ParkingResponse>(response, _json, "Hệ thống", action);
     }
 
     private async Task<ParkingResponse> PostDurableAsync(string path, OfflineOperationType type,
@@ -380,13 +386,15 @@ public sealed class ParkingApiClient : IDisposable
     }
 
     private async Task<FaceVerificationResponse> UploadGuestFaceAsync(
-        string endpoint, string vehicleEvidenceId, string path, bool image)
+        string endpoint, string vehicleEvidenceId, string path, bool image, long? sessionId)
     {
         using var response = await SendProtectedAsync(endpoint, HttpMethod.Post, () =>
         {
             var multipart = new MultipartFormDataContent();
             var upload = image ? PrepareImageUpload(path) : (File.ReadAllBytes(path), Path.GetFileName(path), MediaTypeFor(path));
             multipart.Add(new StringContent(vehicleEvidenceId), "vehicleEvidenceId");
+            if (sessionId is > 0)
+                multipart.Add(new StringContent(sessionId.Value.ToString()), "sessionId");
             var file = new ByteArrayContent(upload.Item1);
             file.Headers.ContentType = new MediaTypeHeaderValue(upload.Item3);
             multipart.Add(file, "realtime", upload.Item2);
@@ -397,12 +405,14 @@ public sealed class ParkingApiClient : IDisposable
     }
 
     private async Task<FaceVerificationResponse> UploadGuestFaceBytesAsync(string endpoint,
-        string vehicleEvidenceId, byte[] bytes, string filename, string contentType)
+        string vehicleEvidenceId, byte[] bytes, string filename, string contentType, long? sessionId)
     {
         using var response = await SendProtectedAsync(endpoint, HttpMethod.Post, () =>
         {
             var multipart = new MultipartFormDataContent();
             multipart.Add(new StringContent(vehicleEvidenceId), "vehicleEvidenceId");
+            if (sessionId is > 0)
+                multipart.Add(new StringContent(sessionId.Value.ToString()), "sessionId");
             var file = new ByteArrayContent(bytes);
             file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
             multipart.Add(file, "realtime", filename);
@@ -534,10 +544,10 @@ public sealed class ParkingApiClient : IDisposable
                 ClearAuthentication();
                 return false;
             }
-            await ApiResponseReader.EnsureSuccessAsync(response, "Spring Web", "gia hạn phiên đăng nhập");
+            await ApiResponseReader.EnsureSuccessAsync(response, "Hệ thống", "gia hạn phiên đăng nhập");
             var tokens = await JsonSerializer.DeserializeAsync<TokenResponse>(
                 await response.Content.ReadAsStreamAsync(), _json)
-                ?? throw new JsonException("Spring Web returned an empty token response.");
+                ?? throw new JsonException("Hệ thống không trả về phiên đăng nhập.");
             InstallTokens(tokens, _authenticatedBaseUrl!);
             return true;
         }
@@ -561,7 +571,7 @@ public sealed class ParkingApiClient : IDisposable
         if (_authenticatedBaseUrl is null || !SameOrigin(
                 BuildUri(NormalizeBaseUrl(BaseUrl), "/"), BuildUri(_authenticatedBaseUrl, "/")))
             throw new DesktopAuthenticationException(
-                "Địa chỉ Spring đã thay đổi sau đăng nhập. Hãy đăng xuất và đăng nhập lại để không gửi token nhầm máy chủ.");
+                "Địa chỉ hệ thống đã thay đổi sau đăng nhập. Vui lòng đăng xuất và đăng nhập lại.");
     }
 
     private void InstallTokens(TokenResponse tokens, string baseUrl)
@@ -570,7 +580,7 @@ public sealed class ParkingApiClient : IDisposable
                 || !string.Equals(tokens.TokenType, "Bearer", StringComparison.OrdinalIgnoreCase)
                 || tokens.ExpiresIn is <= 0 or > 900
                 || tokens.AbsoluteExpiresAt <= DateTimeOffset.UtcNow)
-            throw new JsonException("Spring Web returned invalid Desktop authentication data.");
+            throw new JsonException("Hệ thống trả về dữ liệu đăng nhập không hợp lệ.");
         _accessToken = tokens.AccessToken;
         _refreshToken = tokens.RefreshToken;
         _accessExpiresAt = DateTimeOffset.UtcNow.AddSeconds(tokens.ExpiresIn);
@@ -603,9 +613,9 @@ public sealed class ParkingApiClient : IDisposable
         if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri)
                 || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)
                 || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
-            throw new InvalidOperationException("Spring API URL must be an absolute HTTP(S) origin without query or fragment.");
+            throw new InvalidOperationException("Địa chỉ hệ thống không hợp lệ. Vui lòng kiểm tra lại.");
         if (uri.Scheme == Uri.UriSchemeHttp && !uri.IsLoopback)
-            throw new InvalidOperationException("HTTP is allowed only for localhost; configure HTTPS for a network Spring API.");
+            throw new InvalidOperationException("Chỉ cho phép kết nối không bảo mật khi chạy trên máy. Vui lòng dùng HTTPS khi kết nối qua mạng.");
         return value.Trim().TrimEnd('/');
     }
 

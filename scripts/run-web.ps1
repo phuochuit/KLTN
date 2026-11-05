@@ -35,6 +35,10 @@ if ($isLaragon -and $env:PARKING_DB_URL -notmatch '^jdbc:mysql://(?:127\.0\.0\.1
     throw 'Laragon mode only accepts MySQL on 127.0.0.1:3306 or localhost:3306.'
 }
 
+if ([string]::IsNullOrWhiteSpace($env:PARKING_PRIVATE_STORAGE_PATH)) {
+    $env:PARKING_PRIVATE_STORAGE_PATH = Join-Path $workspace 'private-data'
+}
+
 . (Join-Path $workspace 'scripts\security\ensure-internal-service-token.ps1')
 
 if (Test-Path 'C:\Program Files\Java\jdk-21.0.12') {

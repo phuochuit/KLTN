@@ -1,6 +1,7 @@
 package vn.edu.parking.web;
 
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -13,5 +14,11 @@ public class AiProxyExceptionHandler {
         return ResponseEntity.status(exception.getStatus()).body(Map.of(
             "message", exception.getMessage(),
             "requestId", exception.getRequestId()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<Map<String, String>> handleInvalidRequest(IllegalArgumentException exception) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Map.of(
+            "message", exception.getMessage()));
     }
 }

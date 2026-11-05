@@ -111,6 +111,45 @@ class ParkingFlowIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "MANAGEMENT")
+    void linksReadableExitPlateWithOpenNoPlateSession() throws Exception {
+        ParkingSession noPlate = new ParkingSession();
+        noPlate.setEntryPlate("NPL20261105A8F955");
+        noPlate.setOpenPlate("NPL20261105A8F955");
+        noPlate.setDetectedVehicleType(VehicleType.MOTORBIKE);
+        noPlate.setEntryTime(LocalDateTime.now().minusMinutes(5));
+        noPlate.setEntryFaceImagePath("evidence:demo");
+        noPlate.setStatus(SessionStatus.OPEN);
+        noPlate = parkingSessions.save(noPlate);
+
+        String body = "{\"plateNumber\":\"17Z56789\",\"vehicleType\":\"MOTORBIKE\","
+            + "\"manualOverride\":false,\"faceVerified\":true,"
+            + "\"sessionId\":\"" + noPlate.getId() + "\"}";
+
+        mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sessionId", is(noPlate.getId().intValue())))
+            .andExpect(jsonPath("$.plateNumber", is("17Z56789")))
+            .andExpect(jsonPath("$.status", is("PREVIEW")));
+
+        mvc.perform(get("/api/parking/exit-candidates"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].plateNumber", is("NPL20261105A8F955")))
+            .andExpect(jsonPath("$[0].sessionId", is(noPlate.getId().intValue())));
+
+        mvc.perform(post("/api/parking/exit-confirm").contentType("application/json")
+                .content(body.replace("\"faceVerified\":true", "\"faceVerified\":true,\"paymentMethod\":\"CASH\"")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status", is("COMPLETED")))
+            .andExpect(jsonPath("$.plateNumber", is("17Z56789")));
+
+        ParkingSession completed = parkingSessions.findById(noPlate.getId()).orElseThrow();
+        assertThat(completed.getStatus()).isEqualTo(SessionStatus.COMPLETED);
+        assertThat(completed.getExitPlate()).isEqualTo("17Z56789");
+        assertThat(completed.getOpenPlate()).isNull();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void rejectsResidentExitWithoutAuthorizedFaceVerifiedCollector() throws Exception {
         Vehicle vehicle = new Vehicle();
         vehicle.setPlateNumber("30A123456");

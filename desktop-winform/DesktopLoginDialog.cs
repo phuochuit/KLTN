@@ -42,7 +42,7 @@ internal sealed class DesktopLoginDialog : Form
 
         var title = new Label
         {
-            Text = "PARKING ANPR — ĐĂNG NHẬP",
+            Text = "AUTO PARKING — ĐĂNG NHẬP",
             Dock = DockStyle.Fill,
             Font = new Font("Segoe UI", 16, FontStyle.Bold),
             ForeColor = Color.FromArgb(23, 54, 93),
@@ -115,11 +115,11 @@ internal sealed class DesktopLoginDialog : Form
         }
         catch (HttpRequestException)
         {
-            _error.Text = "Không kết nối được Spring API. Kiểm tra địa chỉ và trạng thái dịch vụ.";
+            _error.Text = "Không kết nối được đến hệ thống. Vui lòng kiểm tra kết nối mạng và thử lại.";
         }
         catch (TaskCanceledException)
         {
-            _error.Text = "Spring API phản hồi quá thời gian cho phép. Thử lại sau.";
+            _error.Text = "Hệ thống phản hồi quá thời gian. Vui lòng thử lại sau.";
         }
         catch (InvalidOperationException)
         {

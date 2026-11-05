@@ -27,15 +27,30 @@ public class GuestRegisteredFaceService {
 
     @Transactional(readOnly = true)
     public RegisteredGuestFace loadForExit(String exitVehicleEvidenceId) {
+        return loadForExit(exitVehicleEvidenceId, null);
+    }
+
+    /**
+     * Đối chiếu khuôn mặt khách vãng lai. Khi nhân viên đã chọn đúng lượt xe đang
+     * đỗ (ví dụ lượt vào dùng mã tạm NPL vì chưa đọc được biển), dùng thẳng
+     * sessionId thay vì dò lại theo biển số.
+     */
+    @Transactional(readOnly = true)
+    public RegisteredGuestFace loadForExit(String exitVehicleEvidenceId, Long sessionId) {
         var trusted = consumption.resolveForPreview(exitVehicleEvidenceId, null,
             EvidenceOperation.EXIT, null);
         if (trusted.legacy() || trusted.plateNumber() == null || trusted.plateNumber().isBlank())
             throw new IllegalStateException("Không xác định được biển số từ evidence xe ra");
 
-        ParkingSession parkingSession = parkingSessions
-            .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
-                trusted.plateNumber(), SessionStatus.OPEN)
-            .orElseThrow(() -> new IllegalStateException("Không tìm thấy phiên gửi xe đang mở"));
+        ParkingSession parkingSession = sessionId != null
+            ? parkingSessions.findById(sessionId)
+                .filter(item -> item.getStatus() == SessionStatus.OPEN)
+                .orElseThrow(() -> new IllegalStateException(
+                    "Lượt xe vào đã đóng hoặc không còn mở; vui lòng chọn lại xe đang đỗ"))
+            : parkingSessions
+                .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+                    trusted.plateNumber(), SessionStatus.OPEN)
+                .orElseThrow(() -> new IllegalStateException("Không tìm thấy phiên gửi xe đang mở"));
         if (parkingSession.getVehicle() != null)
             throw new IllegalStateException("Đối chiếu guest face chỉ dành cho khách vãng lai");
 

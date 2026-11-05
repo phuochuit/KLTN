@@ -34,14 +34,13 @@
 <main class="login-card">
     <section class="brand">
         <div class="brand-mark" aria-hidden="true">P</div>
-        <h1>Parking ANPR</h1>
+        <h1>Auto Parking</h1>
         <p>Đăng nhập hệ thống quản lý bãi đỗ xe</p>
     </section>
     <section class="content">
         <p class="message message-error" role="alert" th:if="${errorMessage}" th:text="${errorMessage}"></p>
         <p class="message message-success" role="status" th:if="${successMessage}" th:text="${successMessage}"></p>
         <form method="post" th:action="@{/login}">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <div class="field">
                 <label for="username">Tên đăng nhập</label>
                 <input id="username" name="username" type="text" maxlength="80" autocomplete="username" autofocus required>

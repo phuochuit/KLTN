@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><title>Bảng giá</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body><header th:replace="~{fragments :: header}"></header><main><h1>Bảng giá do Admin quản lý</h1>
+<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Bảng giá</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body><header th:replace="~{fragments :: header}"></header><main><h1>Bảng giá do Admin quản lý</h1>
 <p class="notice" th:if="${message}" th:text="${message}"></p>
 <div class="card help"><strong>Giá mặc định:</strong> lấy từ tài liệu khảo sát. Admin có thể điều chỉnh từng nhóm; thay đổi chỉ áp dụng cho giao dịch được tính sau thời điểm lưu.</div>
 <div class="price-grid"><form class="card price-form" method="post" th:action="@{/pricing}" th:each="p:${prices}">

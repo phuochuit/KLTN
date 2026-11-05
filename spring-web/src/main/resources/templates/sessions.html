@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Lịch sử &amp; Đối chiếu ảnh vào/ra</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <style>
@@ -34,8 +34,8 @@
             <th>ID</th>
             <th>Biển số vào</th>
             <th>Biển số ra</th>
-            <th>Loại xe AI</th>
-            <th>Thẻ / Mã</th>
+            <th>Loại xe nhận dạng</th>
+            <th>Biển số / Thẻ</th>
             <th>Thời gian vào</th>
             <th>Thời gian ra</th>
             <th>Trạng thái</th>
@@ -49,7 +49,7 @@
             <td th:text="${s.entryPlate}"></td>
             <td th:text="${s.exitPlate ?: '-'}"></td>
             <td th:text="${s.detectedVehicleType.displayName}"></td>
-            <td th:text="${s.parkingCard?.cardCode ?: '-'}"></td>
+            <td th:text="${s.parkingCard?.cardCode ?: s.entryPlate}"></td>
             <td th:text="${#temporals.format(s.entryTime,'dd/MM/yyyy HH:mm')}"></td>
             <td th:text="${s.exitTime == null ? '-' : #temporals.format(s.exitTime,'dd/MM/yyyy HH:mm')}"></td>
             <td th:text="${s.status.displayName}" th:class="${s.status.name() == 'OPEN' ? 'status-open' : 'status-completed'}"></td>
@@ -143,20 +143,24 @@ async function openComparison(sessionId) {
         banner.className = 'compare-banner ' + statusCls;
         banner.textContent = '[' + data.matchStatus + '] ' + data.summaryMessage
             + (data.manualOverride ? ' | (Có xử lý thủ công / Manual Override)' : '');
+        const missingEvidenceFiles = !data.entryVehicleImageBase64
+            && !data.exitVehicleImageBase64 && !data.entryFaceImageBase64
+            && !data.exitFaceImageBase64;
+        if (missingEvidenceFiles) {
+            banner.textContent += ' | Không tìm thấy file ảnh evidence trên máy chủ này dù DB vẫn còn dữ liệu.';
+        }
         setImg('imgEntryVeh', 'emptyEntryVeh', data.entryVehicleImageBase64);
         setImg('imgExitVeh', 'emptyExitVeh', data.exitVehicleImageBase64);
         setImg('imgEntryFace', 'emptyEntryFace', data.entryFaceImageBase64);
         setImg('imgExitFace', 'emptyExitFace', data.exitFaceImageBase64);
         document.getElementById('metaEntryVeh').innerHTML =
-            '<b>Biển số vào:</b> ' + (data.entryPlate || '-') + ' | <b>Loại xe:</b> ' + (data.entryVehicleType || '-') +
-            '<br><b>Confidence YOLO/OCR:</b> ' + fmtPct(data.entryDetectionConfidence) + ' / ' + fmtPct(data.entryOcrConfidence);
+            '<b>Biển số vào:</b> ' + (data.entryPlate || '-') + ' | <b>Loại xe:</b> ' + (data.entryVehicleType || '-');
         document.getElementById('metaExitVeh').innerHTML =
-            '<b>Biển số ra:</b> ' + (data.exitPlate || '-') + ' (' + (data.plateMatched ? 'Khớp' : 'Lệch/Chưa ra') + ') | <b>Loại xe:</b> ' + (data.exitVehicleType || '-') +
-            '<br><b>Confidence YOLO/OCR:</b> ' + fmtPct(data.exitDetectionConfidence) + ' / ' + fmtPct(data.exitOcrConfidence);
+            '<b>Biển số ra:</b> ' + (data.exitPlate || '-') + ' (' + (data.plateMatched ? 'Khớp' : 'Lệch/Chưa ra') + ') | <b>Loại xe:</b> ' + (data.exitVehicleType || '-');
         document.getElementById('metaEntryFace').innerHTML =
-            '<b>Kết quả mặt vào:</b> ' + (data.entryFaceDecision || '-') + ' | <b>Similarity:</b> ' + (data.entryFaceSimilarity == null ? '-' : data.entryFaceSimilarity.toFixed(3));
+            '<b>Kết quả khuôn mặt lúc vào:</b> ' + faceDecisionText(data.entryFaceDecision);
         document.getElementById('metaExitFace').innerHTML =
-            '<b>Kết quả mặt ra:</b> ' + (data.exitFaceDecision || '-') + ' | <b>Similarity:</b> ' + (data.exitFaceSimilarity == null ? '-' : data.exitFaceSimilarity.toFixed(3));
+            '<b>Kết quả khuôn mặt lúc ra:</b> ' + faceDecisionText(data.exitFaceDecision);
     } catch (e) {
         banner.className = 'compare-banner no_match';
         banner.textContent = 'Lỗi: ' + e.message;
@@ -168,6 +172,13 @@ function zoomImage(imgId, title) {
     document.getElementById('zoomCaption').textContent = title;
     document.getElementById('zoomTarget').src = img.src;
     document.getElementById('zoomDialog').showModal();
+}
+function faceDecisionText(value) {
+    if (value === 'PASS') return 'Khớp';
+    if (value === 'REVIEW') return 'Cần nhân viên kiểm tra';
+    if (value === 'REJECT') return 'Không khớp';
+    if (value === 'CAPTURED') return 'Đã chụp ảnh';
+    return 'Chưa có kết quả';
 }
 </script>
 </body>

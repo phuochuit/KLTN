@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -33,6 +34,7 @@ import vn.edu.parking.repository.GateShiftAssignmentRepository;
 import vn.edu.parking.repository.ManualOverrideEventRepository;
 import vn.edu.parking.repository.ParkingSessionRepository;
 import vn.edu.parking.repository.ParkingSlotRepository;
+import vn.edu.parking.repository.PaymentTransactionRepository;
 import vn.edu.parking.repository.SystemAccountRepository;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(properties = {
     "spring.datasource.url=jdbc:h2:mem:desktop-jwt-test;DB_CLOSE_DELAY=-1",
@@ -68,6 +72,7 @@ class DesktopJwtIntegrationTest {
     @Autowired ManualOverrideEventRepository manualEvents;
     @Autowired ParkingSessionRepository parkingSessions;
     @Autowired ParkingSlotRepository parkingSlots;
+    @Autowired PaymentTransactionRepository paymentTransactions;
     @MockitoBean AiProxyService aiProxy;
 
     @DynamicPropertySource
@@ -86,6 +91,7 @@ class DesktopJwtIntegrationTest {
         evidenceAssets.deleteAll();
         evidences.deleteAll();
         parkingSlots.deleteAll();
+        paymentTransactions.deleteAll();
         parkingSessions.deleteAll();
         shifts.deleteAll();
         refreshTokens.deleteAll();
@@ -174,7 +180,8 @@ class DesktopJwtIntegrationTest {
         Tokens tokens = login();
 
         String response = mvc.perform(multipart("/api/ai/recognize/image")
-                .file("file", new byte[]{1, 2, 3})
+                .file(new MockMultipartFile("file", "vehicle.png", "image/png",
+                    Base64.getDecoder().decode(png)))
                 .param("operation", "ENTRY")
                 .header("Content-Type", "multipart/form-data")
                 .header("Authorization", "Bearer " + tokens.accessToken())
@@ -189,7 +196,7 @@ class DesktopJwtIntegrationTest {
         var stored = evidences.findById(evidenceId).orElseThrow();
         assert stored.getStatus() == vn.edu.parking.domain.EvidenceStatus.READY;
         assert stored.getPlateNumber().equals("59A112345");
-        assert evidenceAssets.findByEvidenceIdAndDeletedAtIsNull(evidenceId).size() == 1;
+        assert evidenceAssets.findByEvidenceIdAndDeletedAtIsNull(evidenceId).size() == 2;
     }
 
     @Test
@@ -206,7 +213,8 @@ class DesktopJwtIntegrationTest {
         when(aiProxy.recognizeImage(any(), anyString())).thenReturn(upstream);
         Tokens tokens = login();
         String recognition = mvc.perform(multipart("/api/ai/recognize/image")
-                .file("file", new byte[]{1}).param("operation", "ENTRY")
+                .file(new MockMultipartFile("file", "vehicle.png", "image/png",
+                    Base64.getDecoder().decode(png))).param("operation", "ENTRY")
                 .header("Authorization", "Bearer " + tokens.accessToken())
                 .header("X-Request-ID", requestId))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
@@ -243,6 +251,99 @@ class DesktopJwtIntegrationTest {
     }
 
     @Test
+    void unplatedVehicleRequiresEvidenceAndGetsUniqueServerIdentifiers() throws Exception {
+        Tokens tokens = login();
+        String missingEvidence = objectMapper.writeValueAsString(java.util.Map.of(
+            "plateNumber", "", "vehicleType", "BICYCLE_ELECTRIC_BICYCLE", "noPlate", true));
+        mvc.perform(post("/api/parking/entry")
+                .header("Authorization", "Bearer " + tokens.accessToken())
+                .contentType("application/json").content(missingEvidence))
+            .andExpect(status().isBadRequest());
+
+        var account = accounts.findByUsername("gate-01").orElseThrow();
+        var desktopSession = sessions.findAll().stream().findFirst().orElseThrow();
+        String[] generated = new String[2];
+        for (int index = 0; index < 2; index++) {
+            Instant now = Instant.now();
+            var vehicle = new GateEvidence(UUID.randomUUID().toString(), EvidenceType.VEHICLE,
+                EvidenceOperation.ENTRY, EvidenceSourceKind.IMAGE, account, desktopSession,
+                "unplated-vehicle-" + index, "integration-model", "c".repeat(64), now,
+                now.plusSeconds(600));
+            vehicle.setVehicleResult("upstream-unplated-" + index, "",
+                "BICYCLE_ELECTRIC_BICYCLE", 0.9, 0.0, 0.91, 0);
+            vehicle.markReady();
+            vehicle = evidences.save(vehicle);
+
+            var face = new GateEvidence(UUID.randomUUID().toString(), EvidenceType.FACE,
+                EvidenceOperation.ENTRY, EvidenceSourceKind.IMAGE, account, desktopSession,
+                "unplated-face-" + index, "integration-face", "d".repeat(64), now,
+                now.plusSeconds(600));
+            face.setFaceResult("upstream-face-" + index, null, "CAPTURED", null, 0.36, 0.30);
+            face.markReady();
+            face = evidences.save(face);
+
+            String body = objectMapper.writeValueAsString(java.util.Map.of(
+                "plateNumber", "", "cardCode", "",
+                "vehicleType", "BICYCLE_ELECTRIC_BICYCLE", "noPlate", true,
+                "vehicleEvidenceId", vehicle.getId(), "faceEvidenceId", face.getId()));
+            String response = mvc.perform(post("/api/parking/entry")
+                    .header("Authorization", "Bearer " + tokens.accessToken())
+                    .contentType("application/json").content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.vehicleType").value("BICYCLE_ELECTRIC_BICYCLE"))
+                .andReturn().getResponse().getContentAsString();
+            generated[index] = objectMapper.readTree(response).get("plateNumber").asText();
+            assertTrue(generated[index].matches("NPL\\d{8}[A-F0-9]{6}"));
+            assertTrue(evidences.findById(vehicle.getId()).orElseThrow().getStatus()
+                == vn.edu.parking.domain.EvidenceStatus.CONSUMED);
+            assertTrue(evidences.findById(face.getId()).orElseThrow().getStatus()
+                == vn.edu.parking.domain.EvidenceStatus.CONSUMED);
+        }
+        assertNotEquals(generated[0], generated[1]);
+
+        var openSession = parkingSessions
+            .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+                generated[0], vn.edu.parking.domain.SessionStatus.OPEN)
+            .orElseThrow();
+        var occupiedSlot = parkingSlots.findFirstByCurrentSessionId(openSession.getId())
+            .map(slot -> slot.getId()).orElse(null);
+        Instant exitNow = Instant.now();
+        var exitVehicle = new GateEvidence(UUID.randomUUID().toString(), EvidenceType.VEHICLE,
+            EvidenceOperation.EXIT, EvidenceSourceKind.IMAGE, account, desktopSession,
+            "unplated-exit-vehicle", "integration-model", "e".repeat(64), exitNow,
+            exitNow.plusSeconds(600));
+        exitVehicle.setVehicleResult("upstream-unplated-exit", "",
+            "BICYCLE_ELECTRIC_BICYCLE", 0.9, 0.0, 0.91, 0);
+        exitVehicle.markReady();
+        exitVehicle = evidences.save(exitVehicle);
+
+        var exitFace = new GateEvidence(UUID.randomUUID().toString(), EvidenceType.FACE,
+            EvidenceOperation.EXIT, EvidenceSourceKind.IMAGE, account, desktopSession,
+            "unplated-exit-face", "integration-face", "f".repeat(64), exitNow,
+            exitNow.plusSeconds(600));
+        exitFace.setFaceResult("upstream-unplated-exit-face", null, "PASS", 0.99, 0.36, 0.30);
+        exitFace.markReady();
+        exitFace = evidences.save(exitFace);
+
+        String exitBody = objectMapper.writeValueAsString(java.util.Map.of(
+            "plateNumber", generated[0], "cardCode", generated[0],
+            "vehicleType", "BICYCLE_ELECTRIC_BICYCLE",
+            "vehicleEvidenceId", exitVehicle.getId(), "faceEvidenceId", exitFace.getId(),
+            "faceVerified", true, "paymentMethod", "CASH"));
+        mvc.perform(post("/api/parking/exit-confirm")
+                .header("Authorization", "Bearer " + tokens.accessToken())
+                .contentType("application/json").content(exitBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.plateNumber").value(generated[0]))
+            .andExpect(jsonPath("$.status").value("COMPLETED"));
+        assertTrue(parkingSessions
+            .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+                generated[0], vn.edu.parking.domain.SessionStatus.COMPLETED).isPresent());
+        if (occupiedSlot != null)
+            assertTrue(parkingSlots.findById(occupiedSlot).orElseThrow().getCurrentSession() == null);
+    }
+
+    @Test
     void onShiftGateStaffCanCorrectAiResultAndAuditBeforeAfterValues() throws Exception {
         String requestId = "manual-correction-test";
         String png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -257,7 +358,8 @@ class DesktopJwtIntegrationTest {
         when(aiProxy.recognizeImage(any(), anyString())).thenReturn(upstream);
         Tokens tokens = login();
         String recognition = mvc.perform(multipart("/api/ai/recognize/image")
-                .file("file", new byte[]{1}).param("operation", "ENTRY")
+                .file(new MockMultipartFile("file", "vehicle.png", "image/png",
+                    Base64.getDecoder().decode(png))).param("operation", "ENTRY")
                 .header("Authorization", "Bearer " + tokens.accessToken())
                 .header("X-Request-ID", requestId))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();

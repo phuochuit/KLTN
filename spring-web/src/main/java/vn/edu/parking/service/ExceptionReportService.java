@@ -45,7 +45,7 @@ public class ExceptionReportService {
         List<ManualOverrideEvent> overrides = manualOverrides.findTop500ByCreatedAtBetweenOrderByCreatedAtDesc(effectiveFrom, effectiveTo);
         for (ManualOverrideEvent ev : overrides) {
             Map<String, String> details = new LinkedHashMap<>();
-            if (ev.getOriginalPlateNumber() != null) details.put("Biển số gốc AI", ev.getOriginalPlateNumber());
+            if (ev.getOriginalPlateNumber() != null) details.put("Biển số ban đầu", ev.getOriginalPlateNumber());
             if (ev.getCorrectedPlateNumber() != null) details.put("Biển số đã sửa", ev.getCorrectedPlateNumber());
             if (ev.getOriginalVehicleType() != null) details.put("Loại xe gốc", ev.getOriginalVehicleType());
             if (ev.getCorrectedVehicleType() != null) details.put("Loại xe đã sửa", ev.getCorrectedVehicleType());
@@ -157,7 +157,7 @@ public class ExceptionReportService {
             EvidenceType.FACE, List.of("REJECT", "REVIEW"), effectiveFrom, effectiveTo);
         for (GateEvidence fe : faceEvidences) {
             Map<String, String> details = new LinkedHashMap<>();
-            if (fe.getFaceDecision() != null) details.put("Quyết định AI", fe.getFaceDecision());
+            if (fe.getFaceDecision() != null) details.put("Quyết định nhận dạng", fe.getFaceDecision());
             if (fe.getFaceSimilarity() != null) details.put("Độ tương đồng", String.format("%.3f", fe.getFaceSimilarity().doubleValue()));
             if (fe.getFaceMatchThreshold() != null) details.put("Ngưỡng cho phép", String.format("%.3f", fe.getFaceMatchThreshold().doubleValue()));
 
@@ -211,7 +211,7 @@ public class ExceptionReportService {
                 "QUA-" + qe.getId().substring(0, Math.min(qe.getId().length(), 12)),
                 qe.getCreatedAt(),
                 "AI_QUALITY",
-                "Cảnh báo chất lượng AI",
+                "Cảnh báo chất lượng ảnh",
                 "REJECT".equalsIgnoreCase(status) ? "CRITICAL" : "WARNING",
                 qe.getPlateNumber() != null ? qe.getPlateNumber() : "-",
                 opUser,
@@ -219,7 +219,7 @@ public class ExceptionReportService {
                 null,
                 qe.getOperation() != null ? qe.getOperation().name() : "GATE",
                 status,
-                "AI cảnh báo chất lượng ảnh: " + readable,
+                "Cảnh báo chất lượng ảnh: " + readable,
                 status,
                 qe.getParkingSession() != null ? qe.getParkingSession().getId() : null,
                 details
@@ -270,9 +270,9 @@ public class ExceptionReportService {
     private static String translateReasonCode(String code) {
         if (code == null) return "-";
         return switch (code) {
-            case "PLATE_NOT_DETECTED" -> "AI không đọc được biển số";
-            case "PLATE_CORRECTION" -> "AI đọc sai biển số";
-            case "VEHICLE_TYPE_CORRECTION" -> "AI nhận sai loại xe";
+            case "PLATE_NOT_DETECTED" -> "Không đọc được biển số";
+            case "PLATE_CORRECTION" -> "Biển số nhận dạng chưa đúng";
+            case "VEHICLE_TYPE_CORRECTION" -> "Loại xe nhận dạng chưa đúng";
             case "FACE_REVIEW" -> "Khuôn mặt cần xem xét lại";
             case "FACE_FAILED" -> "Đối chiếu khuôn mặt thất bại";
             case "REGISTRATION_IMAGE_MISSING" -> "Thiếu ảnh đăng ký cư dân";

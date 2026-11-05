@@ -1,0 +1,12 @@
+target/
+data/
+uploads/
+private-data/
+*.mv.db
+*.trace.db
+.git/
+.gitignore
+.idea/
+.vscode/
+*.log
+*.tmp

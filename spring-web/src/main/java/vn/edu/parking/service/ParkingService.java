@@ -13,6 +13,7 @@ import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class ParkingService {
@@ -48,6 +49,12 @@ public class ParkingService {
 
     @Transactional
     public ParkingResponse enter(EntryRequest request) {
+        if (request.noPlate() && (request.vehicleEvidenceId() == null
+                || request.vehicleEvidenceId().isBlank()
+                || request.faceEvidenceId() == null || request.faceEvidenceId().isBlank())) {
+            throw new IllegalStateException(
+                "Xe không biển số bắt buộc phải có evidence phương tiện và khuôn mặt");
+        }
         var previewEvidence = request.manualOverride()
             ? evidenceConsumption.resolveForPreview(request.vehicleEvidenceId(),
                 request.faceEvidenceId(), EvidenceOperation.ENTRY, request.familyMemberId())
@@ -58,8 +65,11 @@ public class ParkingService {
             request.faceEvidenceId(), EvidenceOperation.ENTRY, request.familyMemberId());
         String originalPlate = trusted.legacy() ? request.plateNumber() : trusted.plateNumber();
         String originalType = trusted.legacy() ? request.vehicleType() : trusted.vehicleType();
-        String plate = requirePlate(override.requested() ? request.plateNumber() : originalPlate);
-        String detectedType = override.requested() ? request.vehicleType() : originalType;
+        String plate = request.noPlate()
+            ? generateNoPlateIdentifier()
+            : requirePlate(override.requested() ? request.plateNumber() : originalPlate);
+        String detectedType = request.noPlate() || override.requested()
+            ? request.vehicleType() : originalType;
         Long familyMemberId = trusted.legacy() ? request.familyMemberId() : trusted.familyMemberId();
         boolean faceVerified = trusted.legacy() ? request.faceVerified() : trusted.faceVerified();
         Double faceSimilarity = trusted.legacy() ? request.faceSimilarity() : trusted.faceSimilarity();
@@ -79,18 +89,25 @@ public class ParkingService {
         FamilyMember driver = verifyDriver(vehicle, familyMemberId, faceVerified,
             faceSimilarity, override.requested());
         ParkingCard card = cards.findByCardCodeIgnoreCase(plate).orElse(null);
+        if (card == null && vehicle != null) {
+            card = cards.findByVehicleId(vehicle.getId()).orElse(null);
+        }
+        if (card != null && (vehicle == null || card.getVehicle() == null
+                || !card.getVehicle().getId().equals(vehicle.getId()))) {
+            card = null;
+        }
         VehicleType cameraType = parseDetectedType(detectedType);
         boolean warning = false;
         String message;
 
-        boolean cardMatches = card != null && card.getVehicle() != null
-            && card.getVehicle().getPlateNumber().equalsIgnoreCase(plate);
+        boolean cardMatches = card != null;
 
-        if (vehicle == null) {
-            message = "Khách vãng lai; tính giá theo lượt";
-        } else if (!cardMatches) {
-            warning = true;
-            message = "Xe cư dân nhưng thẻ không trùng khớp hoặc chưa quẹt thẻ; sẽ tính theo giá lượt";
+        if (request.noPlate()) {
+            message = "Xe không biển số; mã lượt " + plate + " dùng để xác nhận khi xe ra";
+        } else if (vehicle == null) {
+            message = "Khách vãng lai; dùng biển số để vào/ra và tính giá theo lượt";
+        } else if (card == null) {
+            message = "Xe cư dân; dùng biển số để vào/ra; chưa có gói nên tính giá lượt";
         } else if (card.isPrepaidPackageValid(LocalDate.now())) {
             message = "Xe cư dân có " + card.getPassType().getDisplayName() + " hợp lệ";
         } else if (card.getPassType() == PassType.DAILY || card.getPassType() == PassType.MONTHLY) {
@@ -131,19 +148,23 @@ public class ParkingService {
     public ParkingResponse previewExit(ExitRequest request) {
         var trusted = evidenceConsumption.resolveForPreview(request.vehicleEvidenceId(),
             request.faceEvidenceId(), EvidenceOperation.EXIT, request.familyMemberId());
-        String plate = requirePlate(request.manualOverride() ? request.plateNumber()
+        String plate = requirePlate(isNoPlateIdentifier(request.plateNumber())
+            ? request.plateNumber()
+            : request.manualOverride() ? request.plateNumber()
             : trusted.legacy() ? request.plateNumber() : trusted.plateNumber());
-        boolean faceVerified = trusted.legacy() ? request.faceVerified() : trusted.faceVerified();
+        boolean faceVerified = resolveExitFaceVerified(trusted, request);
         Double faceSimilarity = trusted.legacy() ? request.faceSimilarity() : trusted.faceSimilarity();
         Long familyMemberId = trusted.legacy() ? request.familyMemberId() : trusted.familyMemberId();
-        ParkingSession session = findOpenSession(plate, request.cardCode(), false);
+        ParkingSession session = resolveExitSession(request.sessionId(), plate, false);
         var override = manualOverrides.authorize(request.manualOverride(), EvidenceOperation.EXIT,
             request.manualOverrideReasonCode(), request.manualOverrideReasonText(), trusted);
         verifyExitPerson(session, familyMemberId, faceVerified, faceSimilarity, override.requested());
         LocalDateTime exitTime = LocalDateTime.now();
         BigDecimal fee = calculateFee(session, exitTime);
         ParkingResponse r = toResponse(session, "Xem trước phí gửi xe", false);
-        return new ParkingResponse(r.sessionId(), r.plateNumber(), r.ownerName(), r.vehicleType(),
+        String displayPlate = hasSessionId(request.sessionId())
+            ? PlateNormalizer.normalize(plate) : r.plateNumber();
+        return new ParkingResponse(r.sessionId(), displayPlate, r.ownerName(), r.vehicleType(),
             r.cardCode(), "PREVIEW", r.entryTime(), exitTime, fee, "Xem trước phí gửi xe", false);
     }
 
@@ -157,14 +178,16 @@ public class ParkingService {
             request.manualOverrideReasonCode(), request.manualOverrideReasonText(), previewEvidence);
         var trusted = evidenceConsumption.resolveForConsumption(request.vehicleEvidenceId(),
             request.faceEvidenceId(), EvidenceOperation.EXIT, request.familyMemberId());
-        String originalPlate = trusted.legacy() ? request.plateNumber() : trusted.plateNumber();
+        String originalPlate = isNoPlateIdentifier(request.plateNumber())
+            ? request.plateNumber()
+            : trusted.legacy() ? request.plateNumber() : trusted.plateNumber();
         String originalType = trusted.legacy() ? request.vehicleType() : trusted.vehicleType();
         String plate = requirePlate(override.requested() ? request.plateNumber() : originalPlate);
         String correctedType = override.requested() ? request.vehicleType() : originalType;
-        boolean faceVerified = trusted.legacy() ? request.faceVerified() : trusted.faceVerified();
+        boolean faceVerified = resolveExitFaceVerified(trusted, request);
         Double faceSimilarity = trusted.legacy() ? request.faceSimilarity() : trusted.faceSimilarity();
         Long familyMemberId = trusted.legacy() ? request.familyMemberId() : trusted.familyMemberId();
-        ParkingSession session = findOpenSession(plate, request.cardCode(), true);
+        ParkingSession session = resolveExitSession(request.sessionId(), plate, true);
         FamilyMember exitMember = verifyExitPerson(session, familyMemberId, faceVerified,
             faceSimilarity, override.requested());
         session.setExitPlate(PlateNormalizer.normalize(plate));
@@ -460,19 +483,32 @@ public class ParkingService {
         });
     }
 
-    private ParkingSession findOpenSession(String plate, String cardCode, boolean forUpdate) {
+    private ParkingSession findOpenSession(String plate, boolean forUpdate) {
         String normalizedPlate = PlateNormalizer.normalize(plate);
-        var byPlate = normalizedPlate.isBlank() ? java.util.Optional.<ParkingSession>empty()
-            : findOpenByPlate(normalizedPlate, forUpdate);
-        if (byPlate.isPresent()) return byPlate.get();
-        String normalizedIdentifier = PlateNormalizer.normalize(cardCode);
-        ParkingCard card = normalizedIdentifier.isBlank() ? null
-            : cards.findByCardCodeIgnoreCase(normalizedIdentifier).orElse(null);
-        if (card != null && card.getVehicle() != null) {
-            return findOpenByPlate(card.getVehicle().getPlateNumber(), forUpdate)
-                .orElseThrow(() -> new IllegalStateException("Không tìm thấy lượt xe vào đang mở"));
+        if (normalizedPlate.isBlank()) {
+            throw new IllegalStateException("Không tìm thấy lượt xe vào đang mở");
         }
-        throw new IllegalStateException("Không tìm thấy lượt xe vào đang mở");
+        return findOpenByPlate(normalizedPlate, forUpdate)
+            .orElseThrow(() -> new IllegalStateException("Không tìm thấy lượt xe vào đang mở"));
+    }
+
+    private static boolean hasSessionId(String sessionId) {
+        return sessionId != null && !sessionId.isBlank();
+    }
+
+    /** Cho phép nối lượt ra có biển thật với lượt vào đã dùng mã tạm NPL. */
+    private ParkingSession resolveExitSession(String sessionId, String plate, boolean forUpdate) {
+        if (!hasSessionId(sessionId)) return findOpenSession(plate, forUpdate);
+        long id;
+        try { id = Long.parseLong(sessionId.trim()); }
+        catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Lượt gửi xe đã chọn không hợp lệ");
+        }
+        ParkingSession session = (forUpdate ? sessions.findByIdForUpdate(id) : sessions.findById(id))
+            .orElseThrow(() -> new IllegalStateException("Không tìm thấy lượt xe vào đang mở"));
+        if (session.getStatus() != SessionStatus.OPEN)
+            throw new IllegalStateException("Lượt gửi xe đã chọn không còn mở");
+        return session;
     }
 
     private java.util.Optional<ParkingSession> findOpenByPlate(String plate, boolean forUpdate) {
@@ -503,6 +539,19 @@ public class ParkingService {
             throw new IllegalStateException("Khuôn mặt realtime chưa khớp ảnh đăng ký");
         }
         return member;
+    }
+
+    /**
+     * Khách vãng lai: nếu hệ thống chưa tự kết luận khớp khuôn mặt nhưng nhân viên đã xem
+     * đủ ảnh vào/ra và bấm xác nhận trong hộp đối chiếu thì dùng xác nhận đó, miễn là có
+     * ảnh khuôn mặt lúc ra và hệ thống không kết luận đây là người khác.
+     */
+    private static boolean resolveExitFaceVerified(
+            GateEvidenceConsumptionService.ResolvedEvidence trusted, ExitRequest request) {
+        if (trusted.legacy()) return request.faceVerified();
+        if (trusted.faceVerified()) return true;
+        if (!request.faceVerified() || trusted.faceEvidence() == null) return false;
+        return !"REJECT".equalsIgnoreCase(trusted.faceEvidence().getFaceDecision());
     }
 
     private FamilyMember verifyExitPerson(ParkingSession session, Long memberId,
@@ -627,6 +676,15 @@ public class ParkingService {
         String plate = PlateNormalizer.normalize(value);
         if (plate.length() < 5) throw new IllegalArgumentException("Biển số không hợp lệ");
         return plate;
+    }
+
+    private String generateNoPlateIdentifier() {
+        return "NPL" + LocalDate.now().toString().replace("-", "")
+            + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+    }
+
+    private boolean isNoPlateIdentifier(String value) {
+        return PlateNormalizer.normalize(value).matches("NPL\\d{8}[A-F0-9]{6}");
     }
 
     private VehicleType resolveVehicleType(String detectedType, Vehicle vehicle) {

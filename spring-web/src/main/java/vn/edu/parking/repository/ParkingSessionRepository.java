@@ -17,6 +17,9 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
     @Query("select s from ParkingSession s where upper(s.entryPlate) = upper(:plate) and s.status = :status order by s.entryTime desc")
     List<ParkingSession> findByPlateAndStatusForUpdate(@Param("plate") String plate,
         @Param("status") SessionStatus status);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from ParkingSession s where s.id = :id")
+    Optional<ParkingSession> findByIdForUpdate(@Param("id") Long id);
     Optional<ParkingSession> findFirstByParkingCard_CardCodeIgnoreCaseAndStatusOrderByEntryTimeDesc(String cardCode, SessionStatus status);
     boolean existsByEntryPlateIgnoreCaseAndStatus(String plate, SessionStatus status);
     List<ParkingSession> findAllByOrderByEntryTimeDesc();

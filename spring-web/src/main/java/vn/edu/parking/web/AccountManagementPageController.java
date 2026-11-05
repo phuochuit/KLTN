@@ -26,6 +26,7 @@ import vn.edu.parking.service.GateShiftService;
 import vn.edu.parking.service.DesktopRefreshTokenService;
 import vn.edu.parking.service.SecurityAuditService;
 import vn.edu.parking.service.AccountPrincipal;
+import vn.edu.parking.service.WebSessionDevices;
 import vn.edu.parking.service.AccountNotFoundException;
 import vn.edu.parking.service.DuplicateAccountException;
 import vn.edu.parking.service.LastManagementAccountException;
@@ -47,12 +48,14 @@ public class AccountManagementPageController {
     private final ObjectProvider<DesktopRefreshTokenService> refreshTokens;
     private final SessionRegistry webSessions;
     private final SecurityAuditService securityAudit;
+    private final WebSessionDevices webDevices;
 
     public AccountManagementPageController(SystemAccountRepository accounts, SecurityRoleRepository roles,
             SecurityAuditRepository audit, AccountManagementService management,
             DesktopSessionRepository desktopSessions, GateShiftAssignmentRepository shifts,
             GateShiftService shiftService, ObjectProvider<DesktopRefreshTokenService> refreshTokens,
-            SessionRegistry webSessions, SecurityAuditService securityAudit) {
+            SessionRegistry webSessions, SecurityAuditService securityAudit,
+            WebSessionDevices webDevices) {
         this.accounts = accounts;
         this.roles = roles;
         this.audit = audit;
@@ -63,6 +66,7 @@ public class AccountManagementPageController {
         this.refreshTokens = refreshTokens;
         this.webSessions = webSessions;
         this.securityAudit = securityAudit;
+        this.webDevices = webDevices;
     }
 
     @GetMapping("/account-management")
@@ -99,8 +103,15 @@ public class AccountManagementPageController {
             .filter(AccountPrincipal.class::isInstance)
             .map(AccountPrincipal.class::cast)
             .flatMap(principal -> webSessions.getAllSessions(principal, false).stream()
-                .map(info -> new WebSessionView(info.getSessionId(), principal.getUsername(),
-                    local(info.getLastRequest().toInstant()))))
+                .map(info -> {
+                    var device = webDevices.find(info.getSessionId());
+                    return new WebSessionView(info.getSessionId(), principal.getUsername(),
+                        local(info.getLastRequest().toInstant()),
+                        device == null ? "Không xác định" : device.label(),
+                        device == null ? "" : device.kind(),
+                        device == null ? "" : device.ip(),
+                        device == null ? null : local(device.since()));
+                }))
             .toList());
         model.addAttribute("shiftAssignments", shifts.findTop50ByOrderByStartsAtDesc().stream()
             .map(shift -> new ShiftView(shift.getId(), shift.getAccount().getUsername(), shift.getShiftName(),
@@ -138,32 +149,47 @@ public class AccountManagementPageController {
 
     @PostMapping("/account-management/sessions/desktop/revoke")
     String revokeDesktopSession(@RequestParam String sessionId, RedirectAttributes redirect) {
+        String revokedUsername = desktopSessions.findBySessionId(sessionId)
+            .map(session -> session.getAccount().getUsername()).orElse(null);
         var tokenService = refreshTokens.getIfAvailable();
         if (tokenService != null && tokenService.revokeSession(sessionId)) {
             securityAudit.recordCurrent("SESSION_REVOKE", "DESKTOP_SESSION", sessionId,
                 "SUCCESS", "ADMIN_REQUEST", null);
+            if (revokedUsername != null)
+                securityAudit.record(null, "LOGOUT", "DESKTOP_SESSION", revokedUsername,
+                    "SUCCESS", "ADMIN_REQUEST", null);
             redirect.addFlashAttribute("message", "Đã đăng xuất phiên Desktop.");
-        } else redirect.addFlashAttribute("error", "Phiên Desktop không tồn tại hoặc đã kết thúc.");
-        return "redirect:/account-management";
+            return "redirect:/account-management?session=ended";
+        }
+        redirect.addFlashAttribute("error", "Phiên Desktop không tồn tại hoặc đã kết thúc.");
+        return "redirect:/account-management?session=missing";
     }
 
     @PostMapping("/account-management/sessions/web/revoke")
     String revokeWebSession(@RequestParam String sessionId, HttpServletRequest request,
             RedirectAttributes redirect) {
-        if (request.getSession(false) != null && request.getSession(false).getId().equals(sessionId)) {
-            redirect.addFlashAttribute("error", "Không thể kết thúc phiên Web đang sử dụng.");
-            return "redirect:/account-management";
-        }
         var session = webSessions.getSessionInformation(sessionId);
         if (session == null || session.isExpired()) {
             redirect.addFlashAttribute("error", "Phiên Web không tồn tại hoặc đã kết thúc.");
-        } else {
-            session.expireNow();
-            securityAudit.recordCurrent("SESSION_REVOKE", "WEB_SESSION", sessionId,
-                "SUCCESS", "ADMIN_REQUEST", null);
-            redirect.addFlashAttribute("message", "Đã kết thúc phiên Web.");
+            return "redirect:/account-management?session=missing";
         }
-        return "redirect:/account-management";
+        String revokedUsername = session.getPrincipal() instanceof AccountPrincipal principal
+            ? principal.getUsername() : null;
+        var httpSession = request.getSession(false);
+        boolean currentSession = httpSession != null && httpSession.getId().equals(sessionId);
+        session.expireNow();
+        securityAudit.recordCurrent("SESSION_REVOKE", "WEB_SESSION", sessionId,
+            "SUCCESS", "ADMIN_REQUEST", null);
+        if (revokedUsername != null)
+            securityAudit.record(null, "LOGOUT", "WEB_SESSION", revokedUsername,
+                "SUCCESS", "ADMIN_REQUEST", null);
+        if (currentSession) {
+            // Tự kết thúc phiên đang mở: đăng xuất ngay về màn hình đăng nhập.
+            if (httpSession != null) httpSession.invalidate();
+            return "redirect:/login?ended=1";
+        }
+        redirect.addFlashAttribute("message", "Đã kết thúc phiên Web.");
+        return "redirect:/account-management?session=ended";
     }
 
     private static LocalDateTime local(Instant value) {
@@ -172,7 +198,8 @@ public class AccountManagementPageController {
 
     public record ActiveSessionView(String sessionId, String username, String deviceLabel, LocalDateTime loggedInAt,
             LocalDateTime lastSeenAt, String shiftName, String duty) { }
-    public record WebSessionView(String sessionId, String username, LocalDateTime lastSeenAt) { }
+    public record WebSessionView(String sessionId, String username, LocalDateTime lastSeenAt,
+            String device, String deviceKind, String ip, LocalDateTime loggedInAt) { }
     public record ShiftView(Long id, String username, String shiftName, LocalDateTime startsAt,
             LocalDateTime endsAt, String duty, String notes, boolean active) { }
 

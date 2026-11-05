@@ -73,6 +73,11 @@ public sealed class SlotControl : UserControl
     public void Update(ParkingSlotResponse slot)
     {
         Slot = slot;
+        string renderKey = string.Join("|", slot.SlotCode, slot.ZoneName, slot.AllowedVehicleType,
+            slot.OccupiedPlate, slot.BorrowedPlate, slot.AssignedPlate, slot.Status, slot.StatusDescription, slot.Overdue);
+        if (Tag is string previousKey && previousKey == renderKey) return;
+        Tag = renderKey;
+
         string vIcon = slot.AllowedVehicleType switch { "MOTORBIKE" => "🛵", "CAR" => "🚗", _ => "🅿" };
         _zoneHeader.Text = $"{vIcon} {slot.ZoneName}";
         _title.Text = slot.SlotCode;

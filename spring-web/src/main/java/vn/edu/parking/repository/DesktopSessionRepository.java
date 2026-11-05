@@ -11,11 +11,17 @@ import org.springframework.data.repository.query.Param;
 import vn.edu.parking.domain.DesktopSession;
 
 public interface DesktopSessionRepository extends JpaRepository<DesktopSession, String> {
+    @EntityGraph(attributePaths = "account")
+    Optional<DesktopSession> findBySessionIdAndAccount_Id(String sessionId, Long accountId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select session from DesktopSession session where session.sessionId = :sessionId")
     Optional<DesktopSession> lockBySessionId(@Param("sessionId") String sessionId);
 
     List<DesktopSession> findAllByAccount_IdAndRevokedAtIsNull(Long accountId);
+
+    @EntityGraph(attributePaths = "account")
+    Optional<DesktopSession> findBySessionId(String sessionId);
 
     @EntityGraph(attributePaths = "account")
     List<DesktopSession> findTop100ByOrderByCreatedAtDesc();

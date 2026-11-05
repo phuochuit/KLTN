@@ -79,7 +79,7 @@ public class SecurityRolePageController {
             option(SecurityPermission.SECURITY_AUDIT_VIEW, "Xem nhật ký bảo mật", "Kiểm tra hoạt động bảo mật và xử lý ngoại lệ."),
             option(SecurityPermission.PRIVATE_EVIDENCE_VIEW, "Xem ảnh xác minh riêng tư", "Xem ảnh khuôn mặt và ảnh xác minh được bảo vệ."),
             option(SecurityPermission.GATE_OPERATE, "Vận hành trạm gác", "Nhận dạng và xử lý xe vào, xe ra."),
-            option(SecurityPermission.AI_RESULT_CORRECT, "Chỉnh kết quả nhận dạng", "Chỉnh kết quả AI khi có ca trực và đủ dữ liệu kiểm tra.")
+            option(SecurityPermission.AI_RESULT_CORRECT, "Chỉnh kết quả nhận dạng", "Chỉnh kết quả nhận dạng khi có ca trực và đủ dữ liệu kiểm tra.")
         );
     }
 

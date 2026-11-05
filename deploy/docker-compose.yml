@@ -1,0 +1,32 @@
+services:
+  web:
+    build:
+      context: ../spring-web
+    env_file:
+      - .env.deploy
+    environment:
+      PARKING_AI_BASE_URL: http://host.docker.internal:8001
+      TZ: Asia/Ho_Chi_Minh
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      # Dat true neu chi truy cap qua HTTPS. De false de van dang nhap duoc
+      # bang http://localhost:8080 khi mat mang.
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: "false"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ../private-data:/data/private
+      - ./secrets:/run/secrets:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/parking/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

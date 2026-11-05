@@ -5,6 +5,9 @@ namespace ParkingGateDesktop;
 public sealed class EvidenceComparisonDialog : Form
 {
     public bool OverrideApplied { get; private set; }
+
+    /// <summary>Nhân viên đã xem đủ ảnh và xác nhận dữ liệu khớp.</summary>
+    public bool Confirmed { get; private set; }
     public string OverrideReasonCode { get; private set; } = "";
     public string OverrideReasonText { get; private set; } = "";
     public string CorrectedPlate { get; private set; } = "";
@@ -118,28 +121,28 @@ public sealed class EvidenceComparisonDialog : Form
         grid.RowStyles.Add(new ColumnStyle(SizeType.Percent, 48));
 
         grid.Controls.Add(BuildEvidenceCard(
-            "1. ẢNH XE LÚC VÀO (ENTRY VEHICLE)",
+            "1. ẢNH XE LÚC VÀO",
             data.EntryVehicleImageBase64,
-            $"Biển số AI: {Blank(data.EntryPlate)} | Loại xe: {DisplayVehicleType(data.EntryVehicleType)} ({FormatPct(data.EntryVehicleConfidence)})",
-            $"Độ tin cậy YOLO: {FormatPct(data.EntryDetectionConfidence)} | OCR: {FormatPct(data.EntryOcrConfidence)} | Mã chứng cứ: {Blank(data.EntryVehicleEvidenceId)}"), 0, 0);
+            $"Biển số: {Blank(data.EntryPlate)} | Loại xe: {DisplayVehicleType(data.EntryVehicleType)}",
+            "Ảnh được lưu khi phương tiện vào bãi"), 0, 0);
 
         grid.Controls.Add(BuildEvidenceCard(
-            "2. ẢNH XE LÚC RA (EXIT VEHICLE)",
+            "2. ẢNH XE LÚC RA",
             data.ExitVehicleImageBase64,
-            $"Biển số AI: {Blank(data.ExitPlate)} | Loại xe: {DisplayVehicleType(data.ExitVehicleType)} ({FormatPct(data.ExitVehicleConfidence)})",
-            $"Độ tin cậy YOLO: {FormatPct(data.ExitDetectionConfidence)} | OCR: {FormatPct(data.ExitOcrConfidence)} | Mã chứng cứ: {Blank(data.ExitVehicleEvidenceId)}"), 1, 0);
+            $"Biển số: {Blank(data.ExitPlate)} | Loại xe: {DisplayVehicleType(data.ExitVehicleType)}",
+            "Ảnh được lưu khi phương tiện ra khỏi bãi"), 1, 0);
 
         grid.Controls.Add(BuildEvidenceCard(
-            "3. KHUÔN MẶT LÚC VÀO (ENTRY FACE)",
+            "3. KHUÔN MẶT LÚC VÀO",
             data.EntryFaceImageBase64,
-            $"Kết quả: {Blank(data.EntryFaceDecision)} | Điểm SFace: {FormatScore(data.EntryFaceSimilarity)}",
-            $"Mã chứng cứ mặt vào: {Blank(data.EntryFaceEvidenceId)}"), 0, 1);
+            $"Kết quả đối chiếu: {DisplayFaceDecision(data.EntryFaceDecision)}",
+            "Ảnh khuôn mặt được lưu khi phương tiện vào bãi"), 0, 1);
 
         grid.Controls.Add(BuildEvidenceCard(
-            "4. KHUÔN MẶT LÚC RA (EXIT FACE)",
+            "4. KHUÔN MẶT LÚC RA",
             data.ExitFaceImageBase64,
-            $"Kết quả: {Blank(data.ExitFaceDecision)} | Điểm SFace: {FormatScore(data.ExitFaceSimilarity)}",
-            $"Mã chứng cứ mặt ra: {Blank(data.ExitFaceEvidenceId)}"), 1, 1);
+            $"Kết quả đối chiếu: {DisplayFaceDecision(data.ExitFaceDecision)}",
+            "Ảnh khuôn mặt được lưu khi phương tiện ra khỏi bãi"), 1, 1);
 
         root.Controls.Add(grid, 0, 2);
 
@@ -200,6 +203,25 @@ public sealed class EvidenceComparisonDialog : Form
             }
         };
 
+        var confirmBtn = new Button
+        {
+            Text = "XÁC NHẬN ĐÚNG DỮ LIỆU",
+            Width = 210,
+            Height = 36,
+            BackColor = Color.FromArgb(22, 163, 74),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat
+        };
+        confirmBtn.FlatAppearance.BorderSize = 0;
+        confirmBtn.Click += (_, _) =>
+        {
+            Confirmed = true;
+            DialogResult = DialogResult.OK;
+            Close();
+        };
+
+        footer.Controls.Add(confirmBtn);
         footer.Controls.Add(closeBtn);
         footer.Controls.Add(overrideBtn);
         root.Controls.Add(footer, 0, 3);
@@ -398,5 +420,13 @@ public sealed class EvidenceComparisonDialog : Form
     private static string Blank(string? val) => string.IsNullOrWhiteSpace(val) ? "-" : val;
     private static string FormatPct(double? val) => val.HasValue ? $"{val.Value:P0}" : "-";
     private static string FormatScore(double? val) => val.HasValue ? $"{val.Value:0.000}" : "-";
+    private static string DisplayFaceDecision(string? value) => value switch
+    {
+        "PASS" => "Khớp",
+        "REVIEW" => "Cần nhân viên kiểm tra",
+        "REJECT" => "Không khớp",
+        "CAPTURED" => "Đã chụp ảnh",
+        _ => "Chưa có kết quả"
+    };
     private static string FormatTime(DateTime? val) => val.HasValue ? val.Value.ToString("dd/MM/yyyy HH:mm:ss") : "-";
 }

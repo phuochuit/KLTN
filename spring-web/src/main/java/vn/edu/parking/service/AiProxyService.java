@@ -146,10 +146,10 @@ public class AiProxyService {
             var status = ex.getStatusCode().is4xxClientError()
                 ? org.springframework.http.HttpStatus.BAD_REQUEST
                 : org.springframework.http.HttpStatus.BAD_GATEWAY;
-            throw new AiProxyException(status, "Dịch vụ nhận dạng chưa thể xử lý yêu cầu.", requestId, ex);
+            throw new AiProxyException(status, "Tính năng nhận dạng chưa thể xử lý yêu cầu.", requestId, ex);
         } catch (ResourceAccessException ex) {
             throw new AiProxyException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
-                "Dịch vụ nhận dạng đang tạm thời không khả dụng.", requestId, ex);
+                "Tính năng nhận dạng đang tạm thời không khả dụng.", requestId, ex);
         }
     }
 
