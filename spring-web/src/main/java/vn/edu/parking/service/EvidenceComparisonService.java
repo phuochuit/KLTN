@@ -53,6 +53,14 @@ public class EvidenceComparisonService {
                 : (plate != null && !plate.isBlank() ? plate
                     : (session.getExitPlate() != null ? session.getExitPlate() : "")));
 
+        // Lượt vào bằng mã tạm (xe chưa đọc được biển) thì biển thật chỉ có khi xe
+        // ra. Khi nhân viên đã nối đúng lượt đang đỗ, dùng biển lúc ra làm biển
+        // của lượt vào để đối chiếu, tránh báo "không khớp" sai.
+        boolean entryPlateTemporary = isTemporaryNoPlateIdentifier(entryPlate);
+        if (entryPlateTemporary) {
+            entryPlate = resolvedExitPlate;
+        }
+
         String entryType = session.getDetectedVehicleType() != null
             ? session.getDetectedVehicleType().name()
             : (entryVehicle != null && entryVehicle.getVehicleType() != null ? entryVehicle.getVehicleType() : "UNKNOWN");
@@ -95,10 +103,13 @@ public class EvidenceComparisonService {
                 || isLowConfidence(exitVehicle)
                 || (!faceMatched && !"NOT_EVALUATED".equalsIgnoreCase(exitFaceDecision))) {
             matchStatus = "REVIEW";
-            summaryMessage = "CẦN XEM XÉT (REVIEW): Độ tin cậy AI thấp hoặc khuôn mặt ở ngưỡng cảnh báo. Nhân viên cần đối chiếu mắt thường.";
+            summaryMessage = "CẦN KIỂM TRA: Độ tin cậy nhận dạng thấp hoặc khuôn mặt ở ngưỡng cảnh báo. Nhân viên cần đối chiếu trực tiếp.";
         } else if (plateMatched && vehicleTypeMatched) {
             matchStatus = "MATCH";
-            summaryMessage = "KHỚP HỢP LỆ (MATCH): Biển số (" + entryPlate + ") và loại xe (" + entryType + ") trùng khớp giữa lúc vào và lúc ra.";
+            summaryMessage = entryPlateTemporary
+                ? "KHỚP HỢP LỆ: Lượt vào chưa đọc được biển số nên đã dùng mã tạm; "
+                    + "biển số " + entryPlate + " ghi nhận khi xe ra và khuôn mặt trùng khớp."
+                : "KHỚP HỢP LỆ (MATCH): Biển số (" + entryPlate + ") và loại xe (" + entryType + ") trùng khớp giữa lúc vào và lúc ra.";
         } else {
             matchStatus = "REVIEW";
             summaryMessage = "Đang chờ nhận diện đầy đủ thông tin xe ra để đối chiếu.";
@@ -142,6 +153,10 @@ public class EvidenceComparisonService {
             entryFaceImg,
             exitFaceImg
         );
+    }
+
+    private static boolean isTemporaryNoPlateIdentifier(String value) {
+        return PlateNormalizer.normalize(value).matches("NPL\\d{8}[A-F0-9]{6}");
     }
 
     private ParkingSession resolveSession(Long sessionId, String plate) {

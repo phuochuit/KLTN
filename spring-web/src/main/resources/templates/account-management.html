@@ -214,6 +214,39 @@
     }
     window.setInterval(refreshLiveData, 2000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLiveData(); });
+
+    // Kết thúc phiên ngay tại chỗ: không tải lại cả trang, danh sách và thông báo tự cập nhật.
+    document.addEventListener('submit', async event => {
+        const form = event.target.closest('form[data-live-revoke]');
+        if (!form) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const accepted = await window.ParkingUi.confirm(
+            form.dataset.confirm,
+            form.dataset.confirmTitle || 'Xác nhận thao tác');
+        if (!accepted) return;
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new URLSearchParams(new FormData(form)),
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const finalUrl = new URL(response.url, window.location.origin);
+            if (response.redirected && finalUrl.pathname === '/login') {
+                window.location.assign(finalUrl.toString());
+                return;
+            }
+            await refreshLiveData();
+            if (finalUrl.searchParams.get('session') === 'missing') {
+                window.ParkingToast?.show('Phiên này đã kết thúc trước đó.', 'out');
+            } else {
+                window.ParkingToast?.show(form.dataset.liveMessage || 'Đã cập nhật phiên làm việc.', 'out');
+            }
+        } catch (_) {
+            window.ParkingUi.alert('Chưa kết thúc được phiên. Vui lòng thử lại.');
+        }
+    }, true);
 })();
 </script>
 </body>

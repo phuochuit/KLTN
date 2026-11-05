@@ -101,6 +101,14 @@ cd anpr-service
 - **Python**: Cần Python 3.10+, script tự tìm qua `PARKING_PYTHON`, `py`, `python`
 - **.NET SDK**: Cần .NET 8 SDK để build WinForms.
 
+## Quy tắc nội dung hiển thị cho người dùng
+
+- Mọi thông báo trên Web/Desktop phải viết theo ngôn ngữ nghiệp vụ dễ hiểu, hướng dẫn rõ người dùng cần làm gì tiếp theo.
+- Không hiển thị thuật ngữ kỹ thuật như `AI`, `model`, `YOLO`, `OCR`, confidence, exception, stack trace, API, database hoặc tên class cho người dùng cuối.
+- Có thể giữ thuật ngữ kỹ thuật trong log chẩn đoán dành cho lập trình viên, nhưng giao diện phải chuyển thành nội dung thân thiện.
+- Ví dụ: thay `OCR confidence thấp` bằng `Biển số chưa rõ, vui lòng chụp lại hoặc nhập biển số`; thay `model không nhận dạng` bằng `Chưa xác định được loại xe, vui lòng chọn loại xe`.
+- Hệ thống tự đề xuất loại xe từ hình ảnh để giảm thao tác. Dữ liệu đăng ký của cư dân được ưu tiên khi đã có; nhân viên chỉ chọn lại khi kết quả không đúng hoặc chưa xác định được.
+
 ## Tài khoản
 
 - **Web**: `admin` / `Admin@123456` (bắt buộc đổi ở lần đăng nhập đầu)

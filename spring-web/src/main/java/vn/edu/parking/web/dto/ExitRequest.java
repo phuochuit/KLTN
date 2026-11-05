@@ -7,7 +7,7 @@ public record ExitRequest(String operationId, @NotBlank String plateNumber, Stri
     boolean manualOverride, Long familyMemberId, boolean faceVerified, Double faceSimilarity,
     String vehicleEvidenceId, String faceEvidenceId,
     String manualOverrideReasonCode, String manualOverrideReasonText,
-    PaymentMethod paymentMethod, String paymentReference) {
+    PaymentMethod paymentMethod, String paymentReference, String sessionId) {
 
     public ExitRequest(String plateNumber, String cardCode, String vehicleType,
             boolean manualOverride, Long familyMemberId, boolean faceVerified, Double faceSimilarity,
@@ -15,6 +15,6 @@ public record ExitRequest(String operationId, @NotBlank String plateNumber, Stri
             String manualOverrideReasonCode, String manualOverrideReasonText) {
         this(null, plateNumber, cardCode, vehicleType, manualOverride, familyMemberId, faceVerified,
             faceSimilarity, vehicleEvidenceId, faceEvidenceId, manualOverrideReasonCode,
-            manualOverrideReasonText, null, null);
+            manualOverrideReasonText, null, null, null);
     }
 }

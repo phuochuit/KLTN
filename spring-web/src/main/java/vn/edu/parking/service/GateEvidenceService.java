@@ -9,6 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.UUID;
@@ -23,7 +24,6 @@ import vn.edu.parking.repository.*;
 @Service
 public class GateEvidenceService {
     private final ObjectMapper json;
-    private final SystemAccountRepository accounts;
     private final DesktopSessionRepository desktopSessions;
     private final FamilyMemberRepository members;
     private final GateEvidenceRepository evidences;
@@ -31,14 +31,14 @@ public class GateEvidenceService {
     private final PrivateEvidenceStorage storage;
     private final Duration ttl;
 
-    public GateEvidenceService(ObjectMapper json, SystemAccountRepository accounts,
-            DesktopSessionRepository desktopSessions, FamilyMemberRepository members,
+    public GateEvidenceService(ObjectMapper json, DesktopSessionRepository desktopSessions,
+            FamilyMemberRepository members,
             GateEvidenceRepository evidences, GateEvidenceAssetRepository assets,
             PrivateEvidenceStorage storage,
             @Value("${parking.evidence.ttl-minutes:10}") long ttlMinutes) {
         if (ttlMinutes < 1 || ttlMinutes > 60)
             throw new IllegalArgumentException("Evidence TTL phải từ 1 đến 60 phút");
-        this.json = json; this.accounts = accounts; this.desktopSessions = desktopSessions;
+        this.json = json; this.desktopSessions = desktopSessions;
         this.members = members; this.evidences = evidences; this.assets = assets;
         this.storage = storage; this.ttl = Duration.ofMinutes(ttlMinutes);
     }
@@ -46,6 +46,13 @@ public class GateEvidenceService {
     @Transactional
     public CreatedEvidence createVehicle(Authentication authentication, EvidenceOperation operation,
             EvidenceSourceKind source, String expectedRequestId, byte[] upstreamJson) {
+        return createVehicle(authentication, operation, source, expectedRequestId, upstreamJson, null);
+    }
+
+    @Transactional
+    public CreatedEvidence createVehicle(Authentication authentication, EvidenceOperation operation,
+            EvidenceSourceKind source, String expectedRequestId, byte[] upstreamJson,
+            byte[] originalImage) {
         Identity identity = identity(authentication);
         ObjectNode result = parse(upstreamJson);
         validateCommon(result, expectedRequestId);
@@ -59,7 +66,7 @@ public class GateEvidenceService {
             number(result, "detectionConfidence"), number(result, "ocrConfidence"),
             number(result, "vehicleConfidence"), integer(result, "frameIndex"));
         return persistWithImage(evidence, result, "annotatedImageBase64",
-            EvidenceAssetRole.ANNOTATED_VEHICLE);
+            EvidenceAssetRole.ANNOTATED_VEHICLE, originalImage);
     }
 
     @Transactional
@@ -80,7 +87,8 @@ public class GateEvidenceService {
         evidence.setLivenessResult(
             vn.edu.parking.domain.LivenessStatus.fromDecision(text(result, "livenessDecision")),
             number(result, "livenessConfidence"), "anpr-service", text(result, "livenessModel"));
-        return persistWithImage(evidence, result, "realtimeImageBase64", EvidenceAssetRole.REALTIME_FACE);
+        return persistWithImage(evidence, result, "realtimeImageBase64",
+            EvidenceAssetRole.REALTIME_FACE, null);
     }
 
     private void applyQuality(GateEvidence evidence, ObjectNode result) {
@@ -102,32 +110,48 @@ public class GateEvidenceService {
     }
 
     private CreatedEvidence persistWithImage(GateEvidence evidence, ObjectNode result,
-            String imageField, EvidenceAssetRole role) {
+            String imageField, EvidenceAssetRole role, byte[] originalImage) {
         applyQuality(evidence, result);
-        PrivateEvidenceStorage.StoredAsset stored = null;
+        var storedAssets = new ArrayList<PrivateEvidenceStorage.StoredAsset>();
         try {
             String encoded = requiredText(result, imageField);
             int comma = encoded.indexOf(',');
             byte[] image = Base64.getDecoder().decode(comma >= 0 ? encoded.substring(comma + 1) : encoded);
-            stored = storage.storeImage(evidence.getId(), role, image);
+            var stored = storage.storeImage(evidence.getId(), role, image);
+            storedAssets.add(stored);
+            PrivateEvidenceStorage.StoredAsset original = null;
+            if (originalImage != null && originalImage.length > 0) {
+                original = storage.storeImage(evidence.getId(), EvidenceAssetRole.ORIGINAL_INPUT,
+                    originalImage);
+                storedAssets.add(original);
+            }
             // The asset is already durable at this point, so persist the
             // evidence directly in READY state. Saving PENDING first and then
             // marking READY generated an unnecessary UPDATE over remote MySQL
             // for every AI request.
             evidence.markReady();
             evidences.save(evidence);
-            assets.save(new GateEvidenceAsset(UUID.randomUUID().toString(), evidence, role,
-                stored.storageKey(), stored.sha256(), stored.mediaType(), stored.sizeBytes(),
-                stored.width(), stored.height(), Instant.now()));
+            var assetEntities = new ArrayList<GateEvidenceAsset>();
+            assetEntities.add(asset(evidence, role, stored));
+            if (original != null)
+                assetEntities.add(asset(evidence, EvidenceAssetRole.ORIGINAL_INPUT, original));
+            assets.saveAll(assetEntities);
             result.put("evidenceId", evidence.getId());
             return new CreatedEvidence(evidence.getId(), json.writeValueAsBytes(result));
         } catch (IllegalArgumentException ex) {
-            if (stored != null) storage.delete(stored.storageKey());
+            storedAssets.forEach(stored -> storage.delete(stored.storageKey()));
             throw ex;
         } catch (Exception ex) {
-            if (stored != null) storage.delete(stored.storageKey());
+            storedAssets.forEach(stored -> storage.delete(stored.storageKey()));
             throw new IllegalStateException("Không thể tạo Gate Evidence", ex);
         }
+    }
+
+    private static GateEvidenceAsset asset(GateEvidence evidence, EvidenceAssetRole role,
+            PrivateEvidenceStorage.StoredAsset stored) {
+        return new GateEvidenceAsset(UUID.randomUUID().toString(), evidence, role,
+            stored.storageKey(), stored.sha256(), stored.mediaType(), stored.sizeBytes(),
+            stored.width(), stored.height(), Instant.now());
     }
 
     private Identity identity(Authentication authentication) {
@@ -138,34 +162,32 @@ public class GateEvidenceService {
         catch (RuntimeException ex) { throw new IllegalArgumentException("JWT thiếu account ID hợp lệ", ex); }
         String sessionId = jwt.getToken().getClaimAsString("sid");
         if (sessionId == null || sessionId.isBlank()) throw new IllegalArgumentException("JWT thiếu Desktop session");
-        SystemAccount account = accounts.findById(accountId)
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản tạo evidence"));
-        DesktopSession session = desktopSessions.findById(sessionId)
-            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy Desktop session tạo evidence"));
+        DesktopSession session = desktopSessions.findBySessionIdAndAccount_Id(sessionId, accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phiên làm việc phù hợp"));
         if (!session.isActiveAt(Instant.now())) throw new IllegalArgumentException("Desktop session đã hết hiệu lực");
-        return new Identity(account, session);
+        return new Identity(session.getAccount(), session);
     }
 
     private ObjectNode parse(byte[] bytes) {
-        if (bytes == null || bytes.length == 0) throw new IllegalArgumentException("Kết quả AI trống");
+        if (bytes == null || bytes.length == 0) throw new IllegalArgumentException("Kết quả nhận dạng trống");
         try {
             JsonNode node = json.readTree(bytes);
-            if (!(node instanceof ObjectNode object)) throw new IllegalArgumentException("Kết quả AI không phải JSON object");
+            if (!(node instanceof ObjectNode object)) throw new IllegalArgumentException("Kết quả nhận dạng không hợp lệ");
             return object;
         } catch (IllegalArgumentException ex) { throw ex; }
-        catch (Exception ex) { throw new IllegalArgumentException("Kết quả AI không đúng JSON", ex); }
+        catch (Exception ex) { throw new IllegalArgumentException("Kết quả nhận dạng không hợp lệ", ex); }
     }
 
     private static void validateCommon(ObjectNode result, String expectedRequestId) {
         if (expectedRequestId == null || !expectedRequestId.equals(requiredText(result, "requestId")))
-            throw new IllegalArgumentException("Request ID của kết quả AI không khớp");
+            throw new IllegalArgumentException("Mã yêu cầu của kết quả nhận dạng không khớp");
         String contract = requiredText(result, "contractVersion");
-        if (!"1.0".equals(contract)) throw new IllegalArgumentException("Contract AI không được hỗ trợ: " + contract);
+        if (!"1.0".equals(contract)) throw new IllegalArgumentException("Phiên bản kết quả nhận dạng không được hỗ trợ: " + contract);
     }
 
     private static String requiredText(ObjectNode node, String name) {
         String value = text(node, name);
-        if (value == null || value.isBlank()) throw new IllegalArgumentException("Kết quả AI thiếu " + name);
+        if (value == null || value.isBlank()) throw new IllegalArgumentException("Kết quả nhận dạng thiếu " + name);
         return value;
     }
     private static String text(ObjectNode node, String name) {

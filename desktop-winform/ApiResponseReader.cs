@@ -11,34 +11,30 @@ public static class ApiResponseReader
         string body = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
         {
-            string message = BuildHttpError(response.StatusCode, body, serviceName, action);
+            string message = BuildHttpError(response.StatusCode, body, action);
             if (TransientServerException.IsTransient(response.StatusCode))
                 throw new TransientServerException(response.StatusCode, message);
             throw new InvalidOperationException(message);
         }
 
         if (string.IsNullOrWhiteSpace(body))
-            throw new InvalidOperationException($"{serviceName} không trả về dữ liệu khi {action}.\n\nCách xử lý: đóng và chạy lại dịch vụ, sau đó bấm Kiểm tra.");
+            throw new InvalidOperationException($"Không nhận được dữ liệu khi {action}.\n\nVui lòng thử lại.");
 
         if (LooksLikeHtml(body))
             throw new InvalidOperationException(
-                $"{serviceName} trả về một trang web thay vì dữ liệu API khi {action}.\n\n" +
-                "Nguyên nhân thường gặp:\n" +
-                "• Đang chạy phiên bản dịch vụ cũ.\n" +
-                "• Nhập sai địa chỉ API.\n" +
-                "• Yêu cầu bị chuyển tới trang đăng nhập hoặc trang báo lỗi.\n\n" +
-                "Cách xử lý: đóng các cửa sổ Parking Web/ANPR cũ, chạy lại run-all-laragon.cmd rồi bấm Kiểm tra.");
+                $"Không thể {action} vì hệ thống trả về dữ liệu không hợp lệ.\n\n" +
+                "Vui lòng thử lại. Nếu vẫn lỗi, liên hệ quản trị viên.");
 
         try
         {
             return JsonSerializer.Deserialize<T>(body, json)
-                ?? throw new InvalidOperationException($"{serviceName} trả về dữ liệu rỗng khi {action}.");
+                ?? throw new InvalidOperationException($"Không nhận được dữ liệu khi {action}.\n\nVui lòng thử lại.");
         }
         catch (JsonException)
         {
             throw new InvalidOperationException(
-                $"Dữ liệu trả về từ {serviceName} không đúng định dạng khi {action}.\n\n" +
-                "Cách xử lý: đóng dịch vụ cũ, chạy lại toàn bộ hệ thống và thử lại. Nếu lỗi tiếp diễn, báo quản trị viên kiểm tra log máy chủ.");
+                $"Dữ liệu nhận được không hợp lệ khi {action}.\n\n" +
+                "Vui lòng thử lại. Nếu vẫn lỗi, liên hệ quản trị viên.");
         }
     }
 
@@ -56,20 +52,43 @@ public static class ApiResponseReader
                value.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string BuildHttpError(HttpStatusCode status, string body, string service, string action)
+    private static string BuildHttpError(HttpStatusCode status, string body, string action)
     {
-        string detail = ExtractMessage(body);
-        string reason = status switch
+        string detail = Sanitize(ExtractMessage(body));
+        return status switch
         {
-            HttpStatusCode.BadRequest => detail.Length > 0 ? detail : "Thông tin gửi lên chưa hợp lệ.",
-            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "Không có quyền truy cập API hoặc phiên đăng nhập đã hết hạn.",
-            HttpStatusCode.NotFound => "Không tìm thấy chức năng API. Có thể đang chạy phiên bản chương trình cũ.",
-            HttpStatusCode.UnprocessableEntity => detail.Length > 0 ? detail : "Ảnh hoặc dữ liệu không đạt yêu cầu xử lý.",
-            HttpStatusCode.InternalServerError => "Máy chủ gặp lỗi khi xử lý dữ liệu.",
-            HttpStatusCode.ServiceUnavailable => detail.Length > 0 ? detail : "Mô hình AI hoặc dịch vụ chưa sẵn sàng.",
-            _ => detail.Length > 0 ? detail : $"Máy chủ trả về mã lỗi {(int)status}."
+            HttpStatusCode.BadRequest => detail.Length > 0
+                ? detail
+                : "Thông tin chưa hợp lệ.\n\nVui lòng kiểm tra lại.",
+            HttpStatusCode.Unauthorized => "Phiên đăng nhập đã hết hạn.\n\nVui lòng đăng nhập lại.",
+            HttpStatusCode.Forbidden => "Bạn không có quyền thực hiện thao tác này.\n\nVui lòng liên hệ quản trị viên nếu cần.",
+            HttpStatusCode.NotFound => "Không tìm thấy dữ liệu cần xử lý.\n\nVui lòng tải lại màn hình và thử lại.",
+            HttpStatusCode.Conflict => detail.Length > 0
+                ? detail
+                : "Dữ liệu đã thay đổi.\n\nVui lòng tải lại và thử lại.",
+            HttpStatusCode.UnprocessableEntity => detail.Length > 0
+                ? detail
+                : "Thông tin hoặc hình ảnh chưa đạt yêu cầu.\n\nVui lòng kiểm tra lại.",
+            HttpStatusCode.InternalServerError or HttpStatusCode.BadGateway or HttpStatusCode.GatewayTimeout =>
+                "Hệ thống đang gặp sự cố.\n\nVui lòng thử lại sau.",
+            HttpStatusCode.ServiceUnavailable => detail.Length > 0
+                ? detail
+                : "Tính năng nhận dạng tạm thời chưa sẵn sàng.\n\nVui lòng thử lại sau.",
+            _ => detail.Length > 0
+                ? detail
+                : $"Không thể {action}.\n\nVui lòng thử lại."
         };
-        return $"Không thể {action}.\n\nDịch vụ: {service}\nNguyên nhân: {reason}\n\nCách xử lý: kiểm tra dịch vụ bằng nút Kiểm tra; nếu vẫn lỗi, đóng các cửa sổ dịch vụ cũ và chạy lại run-all-laragon.cmd.";
+    }
+
+    private static string Sanitize(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        return text
+            .Replace("Spring Web", "hệ thống", StringComparison.OrdinalIgnoreCase)
+            .Replace("ANPR", "tính năng nhận dạng", StringComparison.OrdinalIgnoreCase)
+            .Replace("run-all-laragon.cmd", "ứng dụng", StringComparison.OrdinalIgnoreCase)
+            .Replace("run-all.cmd", "ứng dụng", StringComparison.OrdinalIgnoreCase)
+            .Trim();
     }
 
     private static string ExtractMessage(string body)

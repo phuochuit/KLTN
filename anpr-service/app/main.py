@@ -295,7 +295,7 @@ async def verify_face_camera(request: Request, registration: UploadFile = File(.
         attach_liveness(result, frames)
         best_frame_index = int(result.get("bestFrameIndex", len(frames) - 1))
         frame = frames[max(0, min(best_frame_index, len(frames) - 1))]
-        ok, encoded = cv2.imencode(".jpg", frame)
+        ok, encoded = cv2.imencode(".jpg", annotate_face(frame, result))
         result["realtimeImageBase64"] = base64.b64encode(encoded).decode() if ok else ""
         return enrich_face(result, request)
     except ValueError as exc:
@@ -365,11 +365,14 @@ def capture_face_camera(payload: CameraCaptureRequest, request: Request) -> dict
     try:
         frames = capture_camera_frames(payload.cameraIndex, count=8, camera_source=payload.cameraSource)
         frame = frames[-1]
-        face_engine.analyze(frame, "Ảnh realtime")
-        ok, encoded = cv2.imencode(".jpg", frame)
+        _, _, face_details = face_engine.analyze(frame, "Ảnh realtime")
+        result = {"decision":"CAPTURED","similarity":0.0,"message":"Đã chụp một khuôn mặt rõ ràng",
+                  "face": face_details}
+        annotated = annotate_face(frame, result)
+        ok, encoded = cv2.imencode(".jpg", annotated)
         if not ok: raise ValueError("Không mã hóa được ảnh camera")
         data = base64.b64encode(encoded).decode()
-        result = {"decision":"CAPTURED","similarity":0.0,"message":"Đã chụp một khuôn mặt rõ ràng","realtimeImageBase64":data}
+        result["realtimeImageBase64"] = data
         attach_liveness(result, frames)
         return enrich_face(result, request)
     except ValueError as exc:
@@ -444,8 +447,27 @@ def enrich_face(result: dict, request: Request) -> dict:
     }
 
 
+def annotate_face(frame: np.ndarray, result: dict) -> np.ndarray:
+    annotated = frame.copy()
+    box = (result.get("face") or {}).get("box")
+    if not isinstance(box, (list, tuple)) or len(box) != 4:
+        return annotated
+    x, y, width, height = (int(value) for value in box)
+    x1, y1 = max(0, x), max(0, y)
+    x2 = min(annotated.shape[1] - 1, x + max(0, width))
+    y2 = min(annotated.shape[0] - 1, y + max(0, height))
+    if x2 <= x1 or y2 <= y1:
+        return annotated
+    color = (32, 180, 70)
+    cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 3)
+    cv2.putText(annotated, "KHUON MAT", (x1, max(28, y1 - 10)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv2.LINE_AA)
+    return annotated
+
+
 def enrich_face_result(result: dict, frames: list[np.ndarray], request: Request) -> dict:
     best_index = max(0, min(int(result.get("bestFrameIndex", 0)), len(frames) - 1))
-    ok, encoded = cv2.imencode(".jpg", frames[best_index], [cv2.IMWRITE_JPEG_QUALITY, 80])
+    annotated = annotate_face(frames[best_index], result)
+    ok, encoded = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
     result["realtimeImageBase64"] = base64.b64encode(encoded).decode() if ok else ""
     return enrich_face(result, request)

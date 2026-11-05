@@ -17,7 +17,13 @@ public class RegisteredFaceService {
         if (familyMemberId == null) throw new IllegalArgumentException("Thiếu thành viên đối chiếu");
         var member = members.findById(familyMemberId)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thành viên đối chiếu"));
-        byte[] bytes = storage.readStoredReference(member.getRegistrationFaceImagePath());
+        byte[] bytes;
+        try {
+            bytes = storage.readStoredReference(member.getRegistrationFaceImagePath());
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            throw new IllegalArgumentException(
+                "Chủ xe chưa có ảnh khuôn mặt hợp lệ. Vui lòng cập nhật ảnh cư dân trước khi đối chiếu.", ex);
+        }
         return new RegisteredFace(member.getId(), bytes, "registered-face.jpg", "image/jpeg");
     }
 

@@ -50,8 +50,12 @@ public class AiProxyController {
             @RequestParam EvidenceOperation operation, Authentication authentication,
             @RequestHeader(value = "X-Request-ID", required = false) String supplied) {
         String requestId = requestId(supplied);
+        byte[] originalImage;
+        try { originalImage = file.getBytes(); }
+        catch (java.io.IOException ex) { throw new IllegalArgumentException("Không đọc được ảnh đã chọn", ex); }
         byte[] result = proxy.recognizeImage(file, requestId);
-        var created = evidence.createVehicle(authentication, operation, EvidenceSourceKind.IMAGE, requestId, result);
+        var created = evidence.createVehicle(authentication, operation, EvidenceSourceKind.IMAGE,
+            requestId, result, originalImage);
         audit.recordCurrent("AI_RECOGNIZE_IMAGE", "GATE_EVIDENCE", created.evidenceId(), "SUCCESS", null, created.evidenceId());
         return response(created.responseBody(), requestId);
     }
@@ -131,7 +135,7 @@ public class AiProxyController {
             Authentication authentication,
             @RequestHeader(value = "X-Request-ID", required = false) String supplied) {
         String requestId = requestId(supplied);
-        var registered = guestFaces.loadForExit(request.vehicleEvidenceId());
+        var registered = guestFaces.loadForExit(request.vehicleEvidenceId(), request.sessionId());
         byte[] result = proxy.verifyCamera(registered.bytes(), request.cameraIndex(), request.cameraSource(), requestId);
         var created = evidence.createFace(authentication, EvidenceOperation.EXIT,
             EvidenceSourceKind.CAMERA, null, requestId, result);
@@ -143,10 +147,11 @@ public class AiProxyController {
     @PostMapping(value = "/face/guest/verify-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<byte[]> verifyGuestImage(@RequestParam String vehicleEvidenceId,
+            @RequestParam(required = false) Long sessionId,
             @RequestParam("realtime") MultipartFile file, Authentication authentication,
             @RequestHeader(value = "X-Request-ID", required = false) String supplied) {
         String requestId = requestId(supplied);
-        var registered = guestFaces.loadForExit(vehicleEvidenceId);
+        var registered = guestFaces.loadForExit(vehicleEvidenceId, sessionId);
         byte[] result = proxy.verifyFaceImage(registered.bytes(), file, requestId);
         var created = evidence.createFace(authentication, EvidenceOperation.EXIT,
             EvidenceSourceKind.IMAGE, null, requestId, result);
@@ -158,10 +163,11 @@ public class AiProxyController {
     @PostMapping(value = "/face/guest/verify-video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<byte[]> verifyGuestVideo(@RequestParam String vehicleEvidenceId,
+            @RequestParam(required = false) Long sessionId,
             @RequestParam("realtime") MultipartFile file, Authentication authentication,
             @RequestHeader(value = "X-Request-ID", required = false) String supplied) {
         String requestId = requestId(supplied);
-        var registered = guestFaces.loadForExit(vehicleEvidenceId);
+        var registered = guestFaces.loadForExit(vehicleEvidenceId, sessionId);
         byte[] result = proxy.verifyFaceVideo(registered.bytes(), file, requestId);
         var created = evidence.createFace(authentication, EvidenceOperation.EXIT,
             EvidenceSourceKind.VIDEO, null, requestId, result);
@@ -193,7 +199,8 @@ public class AiProxyController {
     }
 
     public record FaceCameraRequest(Long familyMemberId, int cameraIndex, String cameraSource, EvidenceOperation operation) { }
-    public record GuestFaceCameraRequest(String vehicleEvidenceId, int cameraIndex, String cameraSource) { }
+    public record GuestFaceCameraRequest(String vehicleEvidenceId, int cameraIndex, String cameraSource,
+            Long sessionId) { }
     public record CameraCaptureRequest(int cameraIndex, String cameraSource, EvidenceOperation operation) { }
     public record RecognitionCameraRequest(int cameraIndex, String cameraSource, int frameCount, EvidenceOperation operation) { }
 }

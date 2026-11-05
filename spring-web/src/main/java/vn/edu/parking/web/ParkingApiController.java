@@ -65,36 +65,49 @@ public class ParkingApiController {
     @GetMapping("/open")
     public Object openSessions() { return sessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN); }
 
+    @GetMapping("/exit-candidates")
+    public List<ExitCandidateResponse> exitCandidates() {
+        return sessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN).stream()
+            .filter(session -> session.getEntryPlate() != null
+                && session.getEntryPlate().toUpperCase(java.util.Locale.ROOT).startsWith("NPL"))
+            .map(session -> new ExitCandidateResponse(session.getId(), session.getEntryPlate(),
+                session.getEntryTime(),
+                slots.findFirstByCurrentSessionId(session.getId())
+                    .map(ParkingSlot::getSlotCode).orElse(null),
+                session.getDetectedVehicleType() == null ? null : session.getDetectedVehicleType().name()))
+            .toList();
+    }
+
     @GetMapping("/lookup")
     public ResidentLookupResponse lookup(@RequestParam(required = false, defaultValue = "") String plate,
                                          @RequestParam(required = false, defaultValue = "") String cardCode) {
         String normalizedPlate = PlateNormalizer.normalize(plate);
         var vehicle = normalizedPlate.isBlank() ? null
             : vehicles.findByPlateNumberIgnoreCase(normalizedPlate).orElse(null);
-        String identifier = cardCode.isBlank() ? normalizedPlate : PlateNormalizer.normalize(cardCode);
-        var card = identifier.isBlank() ? null
-            : cards.findByCardCodeIgnoreCase(identifier).orElse(null);
-
-        if (vehicle == null && card != null) vehicle = card.getVehicle();
+        var card = vehicle == null ? null
+            : cards.findByVehicleId(vehicle.getId()).orElse(null);
+        if (card == null && !normalizedPlate.isBlank()) {
+            card = cards.findByCardCodeIgnoreCase(normalizedPlate).orElse(null);
+        }
+        if (card != null && card.getVehicle() != null) {
+            if (vehicle == null) vehicle = card.getVehicle();
+            else if (!card.getVehicle().getId().equals(vehicle.getId())) card = null;
+        }
         if (vehicle == null) {
             boolean guestFaceAvailable = !normalizedPlate.isBlank() && sessions
                 .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(normalizedPlate, SessionStatus.OPEN)
                 .map(s -> s.getEntryFaceImagePath() != null && !s.getEntryFaceImagePath().isBlank())
                 .orElse(false);
-            return new ResidentLookupResponse(false, card == null, normalizedPlate,
-                "Khách vãng lai", "", "", "", cardCode.trim().toUpperCase(),
+            return new ResidentLookupResponse(false, false, normalizedPlate,
+                "Khách vãng lai", "", "", "", normalizedPlate,
                 "", null, false, "Biển số chưa được đăng ký trong danh sách cư dân", java.util.List.of(),
                 guestFaceAvailable);
         }
 
-        boolean cardMatched = card == null || (card.getVehicle() != null
-            && card.getVehicle().getId().equals(vehicle.getId())
-            && (normalizedPlate.isBlank() || vehicle.getPlateNumber().equalsIgnoreCase(normalizedPlate)));
-        boolean packageValid = cardMatched && card != null
-            && card.isPrepaidPackageValid(LocalDate.now());
+        boolean cardMatched = true;
+        boolean packageValid = card != null && card.isPrepaidPackageValid(LocalDate.now());
         String message;
-        if (!cardMatched) message = "Thẻ không thuộc biển số đang nhận diện";
-        else if (card == null) message = "Xe cư dân đã đăng ký; chưa nhập thẻ nên sẽ tính giá lượt";
+        if (card == null) message = "Xe cư dân đã đăng ký; dùng biển số để vào/ra; chưa có gói nên tính giá lượt";
         else if (packageValid)
             message = card.getPassType().getDisplayName() + " còn hiệu lực đến " + card.getValidUntil();
         else if (card.getPassType() == PassType.DAILY || card.getPassType() == PassType.MONTHLY)
@@ -110,7 +123,7 @@ public class ParkingApiController {
             .toList();
         return new ResidentLookupResponse(true, cardMatched, vehicle.getPlateNumber(),
             vehicle.getEffectiveOwnerName(), vehicle.getOwnerPhone(), vehicle.getEffectiveApartmentNumber(),
-            vehicle.getVehicleType().name(), card == null ? "" : card.getCardCode(),
+            vehicle.getVehicleType().name(), normalizedPlate,
             card == null ? "" : card.getPassType().name(), card == null ? null : card.getValidUntil(),
             packageValid, message, authorized, false);
     }

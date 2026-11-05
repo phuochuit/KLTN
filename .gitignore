@@ -25,6 +25,14 @@ qa_*
 scripts/security/keys/
 *.pem
 .env.local
+scripts/sync/.venv/
+scripts/sync/logs/
+scripts/sync/.sync.lock
+scripts/sync/.sync-loop.lock
+scripts/db-failover/.state.json
+scripts/db-failover/.watch.lock
+scripts/db-failover/logs/
+backups/
 
 e2e_screenshots/
 test_e2e_full.py
@@ -33,3 +41,8 @@ scripts/operations/Benchmark/obj/
 
 .cache/
 .artifacts/
+deploy/.env.deploy
+deploy/secrets/*.pem
+deploy/secrets/*.key
+deploy/secrets/*.p12
+private-data/

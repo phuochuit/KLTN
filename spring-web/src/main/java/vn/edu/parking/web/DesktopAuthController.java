@@ -51,6 +51,8 @@ public class DesktopAuthController {
             var tokens = authenticationService.login(
                 request.username(), request.password(), request.deviceLabel());
             loginThrottle.recordSuccess(request.username(), remoteAddress);
+            audit.record(null, "LOGIN_SUCCESS", "DESKTOP_SESSION", request.username(),
+                "SUCCESS", null, null);
             return ResponseEntity.ok(toResponse(tokens));
         } catch (AuthenticationException ex) {
             loginThrottle.recordFailure(request.username(), remoteAddress);

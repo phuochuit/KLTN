@@ -25,7 +25,6 @@ import vn.edu.parking.repository.*;
 class GateEvidenceServiceTest {
     @TempDir Path temp;
     private final ObjectMapper json = new ObjectMapper();
-    private final SystemAccountRepository accounts = mock(SystemAccountRepository.class);
     private final DesktopSessionRepository sessions = mock(DesktopSessionRepository.class);
     private final FamilyMemberRepository members = mock(FamilyMemberRepository.class);
     private final GateEvidenceRepository evidences = mock(GateEvidenceRepository.class);
@@ -38,9 +37,8 @@ class GateEvidenceServiceTest {
         Instant now = Instant.now();
         var account = new SystemAccount("gate", "hash", AccountRole.GATE_STAFF, false);
         var session = new DesktopSession("session-1", account, now, now.plusSeconds(3600), "test");
-        when(accounts.findById(42L)).thenReturn(Optional.of(account));
-        when(sessions.findById("session-1")).thenReturn(Optional.of(session));
-        service = new GateEvidenceService(json, accounts, sessions, members, evidences, assets,
+        when(sessions.findBySessionIdAndAccount_Id("session-1", 42L)).thenReturn(Optional.of(session));
+        service = new GateEvidenceService(json, sessions, members, evidences, assets,
             new PrivateEvidenceStorage(temp.toString()), 10);
         Jwt jwt = new Jwt("token", now, now.plusSeconds(300), Map.of("alg", "none"),
             Map.of("sub", "42", "sid", "session-1"));
@@ -67,7 +65,7 @@ class GateEvidenceServiceTest {
         var captor = ArgumentCaptor.forClass(GateEvidence.class);
         verify(evidences).save(captor.capture());
         assertEquals(EvidenceStatus.READY, captor.getValue().getStatus());
-        verify(assets).save(any(GateEvidenceAsset.class));
+        verify(assets).saveAll(any());
     }
 
     @Test

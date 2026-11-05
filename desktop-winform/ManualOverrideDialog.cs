@@ -23,9 +23,9 @@ public sealed class ManualOverrideDialog : Form
         Font = new Font("Segoe UI", 10);
 
         _reason.Items.AddRange(new object[] {
-            new ReasonOption("PLATE_NOT_DETECTED", "AI không đọc được biển số"),
-            new ReasonOption("PLATE_CORRECTION", "AI đọc sai biển số"),
-            new ReasonOption("VEHICLE_TYPE_CORRECTION", "AI nhận sai loại xe"),
+            new ReasonOption("PLATE_NOT_DETECTED", "Không đọc được biển số"),
+            new ReasonOption("PLATE_CORRECTION", "Biển số nhận dạng chưa đúng"),
+            new ReasonOption("VEHICLE_TYPE_CORRECTION", "Loại xe nhận dạng chưa đúng"),
             new ReasonOption("FACE_REVIEW", "Kết quả khuôn mặt cần xem xét"),
             new ReasonOption("FACE_FAILED", "Đối chiếu khuôn mặt thất bại"),
             new ReasonOption("REGISTRATION_IMAGE_MISSING", "Thiếu ảnh đăng ký khuôn mặt")
@@ -33,12 +33,20 @@ public sealed class ManualOverrideDialog : Form
         _reason.SelectedIndex = string.IsNullOrWhiteSpace(currentPlate) ? 0 : 1;
         _plate.Text = currentPlate;
         _vehicleType.Items.AddRange(new object[] {
-            new VehicleTypeOption("MOTORBIKE", "Xe máy"),
-            new VehicleTypeOption("CAR", "Ô tô"),
+            new VehicleTypeOption("BICYCLE_ELECTRIC_BICYCLE", "Xe đạp / xe đạp điện"),
+            new VehicleTypeOption("MOTORBIKE", "Xe máy / xe máy điện thông thường"),
+            new VehicleTypeOption("LARGE_MOTORBIKE", "Xe mô tô phân khối lớn"),
+            new VehicleTypeOption("CAR", "Ô tô 4-5 chỗ"),
+            new VehicleTypeOption("CAR_6_7", "Ô tô 6-7 chỗ"),
+            new VehicleTypeOption("CAR_8_9", "Ô tô 8-9 chỗ"),
             new VehicleTypeOption("UNKNOWN", "Không xác định")
         });
-        _vehicleType.SelectedIndex = string.Equals(currentVehicleType, "CAR", StringComparison.OrdinalIgnoreCase) ? 1
-            : string.Equals(currentVehicleType, "MOTORBIKE", StringComparison.OrdinalIgnoreCase) ? 0 : 2;
+        int selectedVehicleType = Enumerable.Range(0, _vehicleType.Items.Count)
+            .FirstOrDefault(index => string.Equals(
+                (_vehicleType.Items[index] as VehicleTypeOption)?.Code,
+                currentVehicleType, StringComparison.OrdinalIgnoreCase), -1);
+        _vehicleType.SelectedIndex = selectedVehicleType >= 0
+            ? selectedVehicleType : _vehicleType.Items.Count - 1;
 
         var ok = new Button { Text = "Xác nhận xử lý", Width = 145, DialogResult = DialogResult.None };
         var cancel = new Button { Text = "Hủy", Width = 90, DialogResult = DialogResult.Cancel };
@@ -65,7 +73,7 @@ public sealed class ManualOverrideDialog : Form
             Padding = new Padding(20), AutoScroll = true
         };
         layout.Controls.Add(new Label {
-            Text = "Chỉ sử dụng khi AI hoặc camera nhận diện không chính xác. Thao tác sẽ được lưu lại để quản lý kiểm tra.",
+            Text = "Chỉ sử dụng khi kết quả nhận dạng chưa chính xác. Thao tác sẽ được lưu lại để quản lý kiểm tra.",
             Width = 340, Height = 45, ForeColor = Color.DarkRed
         });
         layout.Controls.Add(new Label { Text = "Lý do cần xử lý thủ công", AutoSize = true });

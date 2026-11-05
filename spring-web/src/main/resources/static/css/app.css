@@ -184,3 +184,69 @@ h2 { color:var(--navy); margin-top:26px; }
     .filter-form select { width: 100%; }
 }
 
+/* Giao diện dùng trên điện thoại: đọc được, chạm dễ, không tràn ngang */
+@media (max-width: 900px) {
+    html { width:100%; max-width:100%; overflow-x:hidden; }
+    body { width:100%; max-width:100%; min-width:0; overflow-x:hidden; -webkit-text-size-adjust:100%; }
+    img { max-width: 100%; height: auto; }
+    .site-header,.main-nav { width:100%; max-width:100%; min-width:0; }
+    main,.slots-container { width:100%; max-width:100vw; min-width:0; margin:14px 0; padding:0 12px 32px; }
+    main > *, .slots-container > * { max-width:100%; min-width:0; }
+    .card,.filter-card,.filter-bar,fieldset { width:100%; max-width:100%; min-width:0; overflow:hidden; padding:14px; border-radius:10px; }
+    h1 { font-size: 23px; margin-bottom: 14px; }
+    h2 { font-size: 19px; margin-top: 20px; }
+    .grid, .grid-four, .grid-five { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .profile-grid, .price-grid, .price-form, .car-fields, .shift-form { grid-template-columns: 1fr; }
+    .span-2, .span-all { grid-column: 1 / -1; }
+    .form-actions { justify-content: stretch; }
+    .form-actions button { width: 100%; }
+    .toolbar,.filter-row { width:100%; max-width:100%; align-items:stretch; }
+    .toolbar > label, .toolbar > input, .toolbar > select { width: 100%; }
+    .filter-row > label { flex:1 1 130px; min-width:0; }
+    .filter-row > button { flex:1 1 150px; min-width:0; margin-left:0 !important; }
+    input, select, textarea, button { min-width:0; max-width:100%; }
+    .table-scroll { display:block; width:100%; max-width:100%; overflow-x:auto; overflow-y:hidden; border:1px solid var(--border); -webkit-overflow-scrolling:touch; }
+    .table-scroll table { width:max-content; min-width:620px; max-width:none; font-size:13px; }
+    .card > table { display:block; width:100%; max-width:100%; overflow-x:auto; white-space:nowrap; font-size:13px; -webkit-overflow-scrolling:touch; }
+    .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .revenue-row { grid-template-columns: 1fr !important; }
+    .stats-item,.revenue-item { min-width:0; overflow-wrap:anywhere; }
+    .stats-item .value,.revenue-item .value { font-size:clamp(16px,5vw,21px) !important; overflow-wrap:anywhere; }
+    .chart-container,.chart { width:100%; max-width:100%; min-width:0; overflow:hidden; }
+    .chart { gap:2px !important; padding-left:2px !important; padding-right:2px !important; }
+    .chart-bar-wrapper { min-width:0; }
+    .chart-month { font-size:8px !important; }
+    .compare-grid { grid-template-columns: 1fr !important; }
+    .role-grid { grid-template-columns: 1fr !important; }
+    .permissions { grid-template-columns: 1fr !important; }
+    th, td { padding: 9px 10px; white-space: nowrap; }
+    .app-dialog { width: calc(100vw - 24px); padding: 18px; }
+    .slots-container { padding: 0 12px 40px; }
+    .slot-grid-interactive { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .nav-menu { max-width: calc(100vw - 24px); }
+}
+
+@media (max-width: 600px) {
+    .site-header { padding: 10px 12px; }
+    .site-brand { font-size: 18px; }
+    .main-nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+    .nav-link,.nav-group,.logout-form { width:100%; min-width:0; margin:0; }
+    .nav-link, .nav-group > summary, .nav-logout { width:100%; padding:8px 9px; font-size:13px; justify-content:center; }
+    .nav-menu,.nav-menu-right { position:static; width:100%; min-width:0; max-width:100%; margin-top:4px; }
+    .nav-menu a { white-space:normal; overflow-wrap:anywhere; }
+    .account-greeting { grid-column:1/-1; width:100%; min-width:0; margin:5px 0 0; font-size:13px; white-space:normal; text-align:center; overflow-wrap:anywhere; }
+    .logout-form { grid-column:1/-1; }
+    .grid, .grid-four, .grid-five, .form-grid { grid-template-columns: 1fr; }
+    .metric { font-size: 24px; }
+    .slot-grid-interactive { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .table-scroll table { min-width: 560px; }
+    .app-dialog { padding: 16px; }
+}
+
+@media (max-width: 380px) {
+    main,.slots-container { padding-left:8px; padding-right:8px; }
+    .card,.filter-card,.filter-bar { padding:11px; }
+    .stats-grid { grid-template-columns:1fr !important; }
+}
+

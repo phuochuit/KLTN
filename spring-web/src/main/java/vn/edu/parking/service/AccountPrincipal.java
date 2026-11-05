@@ -51,6 +51,12 @@ public final class AccountPrincipal implements UserDetails {
     }
     @Override public String getPassword() { return passwordHash; }
     @Override public String getUsername() { return username; }
+    @Override public boolean equals(Object other) {
+        // Quản lý phiên đăng nhập dựa trên tên tài khoản, không dựa trên đối tượng.
+        return this == other || (other instanceof AccountPrincipal principal
+            && username != null && username.equals(principal.username));
+    }
+    @Override public int hashCode() { return username == null ? 0 : username.hashCode(); }
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return enabled; }
     @Override public boolean isCredentialsNonExpired() { return true; }

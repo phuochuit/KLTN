@@ -17,8 +17,11 @@ from .schemas import BoundingBox, RecognitionResponse
 
 CAR_CLASS = "car"
 MOTORCYCLE_CLASSES = {"motorcycle", "motorbike"}
+BICYCLE_CLASSES = {"bicycle", "bike"}
 VIETNAM_PLATE_PATTERN = re.compile(r"^\d{2}[A-Z]{1,2}\d{4,6}$")
 STANDARD_PLATE_WITH_EXTRA_LETTER = re.compile(r"^(\d{2})[A-Z]([A-Z]\d{6})$")
+OCR_DIGIT_CONFUSIONS = str.maketrans({"O": "0", "Q": "0", "I": "1", "L": "1", "Z": "2", "S": "5", "G": "6", "B": "8"})
+OCR_LETTER_CONFUSIONS = str.maketrans({"0": "O", "1": "I", "2": "Z", "5": "S", "6": "G", "8": "B"})
 
 
 def normalize_plate(value: str) -> str:
@@ -34,6 +37,21 @@ def canonicalize_plate(value: str) -> str:
     two-letter + six-digit shape, discard only that inserted first letter.
     """
     text = normalize_plate(value)
+    # Correct only position-safe OCR confusions. The first two and final four
+    # to six characters are numeric; the series between them is alphabetic.
+    # Do not guess between genuinely numeric glyphs (for example 2 versus 7).
+    if 7 <= len(text) <= 10 and not VIETNAM_PLATE_PATTERN.fullmatch(text):
+        prefix = text[:2].translate(OCR_DIGIT_CONFUSIONS)
+        suffix_start = next(
+            (index for index in range(3, len(text)) if text[index:].isalnum()
+             and len(text) - index in (4, 5, 6)),
+            max(3, len(text) - 5),
+        )
+        series = text[2:suffix_start].translate(OCR_LETTER_CONFUSIONS)
+        suffix = text[suffix_start:].translate(OCR_DIGIT_CONFUSIONS)
+        corrected = prefix + series + suffix
+        if VIETNAM_PLATE_PATTERN.fullmatch(corrected):
+            text = corrected
     match = STANDARD_PLATE_WITH_EXTRA_LETTER.fullmatch(text)
     return "".join(match.groups()) if match else text
 
@@ -52,14 +70,88 @@ def plate_format_score(value: str) -> float:
     return 0.0
 
 
+def plate_shape_is_plausible(value: str, aspect_ratio: float) -> bool:
+    """Reject incomplete OCR results for square two-line motorcycle plates."""
+    text = normalize_plate(value)
+    if not VIETNAM_PLATE_PATTERN.fullmatch(text):
+        return False
+    # A two-line plate normally contains at least the province, series and
+    # four trailing digits. Seven-character readings indicate that OCR has
+    # dropped part of one row (for example 59A1122 instead of 59A3/11122).
+    return not (aspect_ratio <= 1.8 and len(text) < 8)
+
+
 def vehicle_type_from_detections(detections: list[tuple[str, float]]) -> tuple[str, float]:
     best_car = max((score for name, score in detections if name == CAR_CLASS), default=0.0)
     best_motorcycle = max(
         (score for name, score in detections if name in MOTORCYCLE_CLASSES), default=0.0
     )
-    if best_car == 0.0 and best_motorcycle == 0.0:
+    best_bicycle = max(
+        (score for name, score in detections if name in BICYCLE_CLASSES), default=0.0
+    )
+    if best_car == 0.0 and best_motorcycle == 0.0 and best_bicycle == 0.0:
         return "UNKNOWN", 0.0
-    return ("CAR", best_car) if best_car >= best_motorcycle else ("MOTORBIKE", best_motorcycle)
+    candidates = [
+        ("CAR", best_car),
+        ("MOTORBIKE", best_motorcycle),
+        ("BICYCLE_ELECTRIC_BICYCLE", best_bicycle),
+    ]
+    return max(candidates, key=lambda item: item[1])
+
+
+def best_two_wheeler_type(detections: list[tuple[str, float]]) -> tuple[str, float]:
+    """Chọn nhóm xe hai bánh khi biển số đã loại trừ khả năng ô tô."""
+    best_motorcycle = max(
+        (score for name, score in detections if name in MOTORCYCLE_CLASSES), default=0.0
+    )
+    best_bicycle = max(
+        (score for name, score in detections if name in BICYCLE_CLASSES), default=0.0
+    )
+    if best_bicycle >= best_motorcycle:
+        return "BICYCLE_ELECTRIC_BICYCLE", best_bicycle
+    return "MOTORBIKE", best_motorcycle
+
+
+def vehicle_type_near_plate(
+    detections: list[tuple[str, float, np.ndarray]], plate_box: np.ndarray
+) -> tuple[str, float]:
+    """Classify only the vehicle spatially associated with the detected plate.
+
+    Hình dạng biển số Việt Nam là bằng chứng đáng tin hơn lớp do mô hình đoán:
+    ô tô dùng biển dài và biển chỉ chiếm một dải nhỏ trên thân xe, còn xe hai
+    bánh dùng biển vuông hoặc biển chiếm phần lớn chiều ngang thân xe. Khi mô
+    hình đoán "ô tô" nhưng hình học biển số nói ngược lại, chọn nhóm hai bánh
+    để nhân viên không phải sửa lại từ đầu.
+    """
+    px1, py1, px2, py2 = map(float, plate_box)
+    center_x, center_y = (px1 + px2) / 2, (py1 + py2) / 2
+    nearby: list[tuple[str, float, np.ndarray]] = []
+    for name, score, box in detections:
+        x1, y1, x2, y2 = map(float, box)
+        margin_x = max(8.0, (x2 - x1) * 0.08)
+        margin_y = max(8.0, (y2 - y1) * 0.08)
+        if x1 - margin_x <= center_x <= x2 + margin_x and y1 - margin_y <= center_y <= y2 + margin_y:
+            nearby.append((name, score, box))
+
+    if not nearby:
+        return "UNKNOWN", 0.0
+    summary = [(name, score) for name, score, _ in nearby]
+    vehicle_type, confidence = vehicle_type_from_detections(summary)
+    plate_ratio = max(0.0, px2 - px1) / max(1.0, py2 - py1)
+    vehicle_box = max(nearby, key=lambda item: item[1])[2]
+    vehicle_width = max(1.0, float(vehicle_box[2]) - float(vehicle_box[0]))
+    plate_span = max(0.0, px2 - px1) / vehicle_width
+
+    # Biển vuông hoặc biển rộng gần bằng thân xe: ô tô không có kiểu biển này.
+    if vehicle_type == "CAR" and (plate_ratio <= 1.8 or plate_span >= 0.45):
+        two_wheeler_type, two_wheeler_conf = best_two_wheeler_type(summary)
+        if two_wheeler_conf > 0.0:
+            return two_wheeler_type, two_wheeler_conf
+        return "UNKNOWN", 0.0
+    # Biển dài và nhỏ so với thân xe: gần như chắc chắn là ô tô.
+    if vehicle_type != "CAR" and plate_ratio >= 2.6 and plate_span <= 0.30:
+        return "CAR", max(confidence, 0.5)
+    return vehicle_type, confidence
 
 
 @dataclass
@@ -118,11 +210,13 @@ class AnprRecognizer:
                 )[0]
             vehicle_result = self.vehicle_model.predict(
                 image, conf=self.vehicle_confidence, imgsz=640, verbose=False,
-                classes=[2, 3],
+                classes=[1, 2, 3],
             )[0]
 
-        vehicle_detections = self._detections(vehicle_result)
-        vehicle_type, vehicle_conf = vehicle_type_from_detections(vehicle_detections)
+        vehicle_detections = self._vehicle_detections(vehicle_result)
+        vehicle_type, vehicle_conf = vehicle_type_from_detections(
+            [(name, score) for name, score, _ in vehicle_detections]
+        )
         plate_boxes = self._all_boxes(plate_result)
         if not plate_boxes:
             return self._empty_result(
@@ -134,13 +228,30 @@ class AnprRecognizer:
             )
 
         plate_conf, xyxy = max(plate_boxes, key=lambda item: item[0])
+        vehicle_type, vehicle_conf = vehicle_type_near_plate(vehicle_detections, xyxy)
+        if vehicle_type == "UNKNOWN":
+            # Khung hình camera thường rộng: dò lại ở độ phân giải cao hơn để
+            # bắt được xe nhỏ (xe đạp, xe đạp điện) mà lượt dò đầu bỏ sót.
+            extra_detections = self._vehicle_detections_at(image, 960)
+            if extra_detections:
+                vehicle_type, vehicle_conf = vehicle_type_near_plate(
+                    vehicle_detections + extra_detections, xyxy
+                )
         x1, y1, x2, y2 = self._expand_box(xyxy, image.shape, 0.10)
         if vehicle_type == "UNKNOWN":
             vehicle_type, vehicle_conf = self._vehicle_type_from_plate_shape(xyxy)
-        crop = image[y1:y2, x1:x2]
+        plate_width = max(1, int(xyxy[2]) - int(xyxy[0]))
+        plate_height = max(1, int(xyxy[3]) - int(xyxy[1]))
+        # Biển dài cần giữ đúng mép khung phát hiện. Việc thêm viền đưa các
+        # chi tiết nền vào ảnh và từng làm 30F55775 bị đọc thành 80F55275.
+        ocr_margin = 0.0 if plate_width / plate_height >= 2.6 else 0.10
+        ox1, oy1, ox2, oy2 = self._expand_box(xyxy, image.shape, ocr_margin)
+        crop = image[oy1:oy2, ox1:ox2]
+        tx1, ty1, tx2, ty2 = self._expand_box(xyxy, image.shape, 0.0)
+        tight_crop = image[ty1:ty2, tx1:tx2]
         from .quality import assess_plate
         plate_quality = assess_plate(image, (x1, y1, x2 - x1, y2 - y1))
-        plate_text, ocr_conf = self._read_plate(crop)
+        plate_text, ocr_conf = self._read_plate(crop, tight_crop)
 
         annotated = image.copy()
         color = (32, 180, 70) if plate_text else (0, 165, 255)
@@ -229,7 +340,7 @@ class AnprRecognizer:
             raise ValueError("Không phân tích được frame ứng viên từ video")
         return best.response
 
-    def _read_plate(self, crop: np.ndarray) -> tuple[str, float]:
+    def _read_plate(self, crop: np.ndarray, tight_crop: np.ndarray | None = None) -> tuple[str, float]:
         if crop.size == 0:
             return "", 0.0
         scale = max(1.0, 420 / max(1, crop.shape[1]))
@@ -239,15 +350,42 @@ class AnprRecognizer:
         gray = cv2.cvtColor(straightened, cv2.COLOR_BGR2GRAY)
         equalized = cv2.equalizeHist(gray)
         denoised = cv2.bilateralFilter(equalized, 7, 35, 35)
+        sharpened = cv2.filter2D(
+            denoised, -1, np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
+        )
+        adaptive = cv2.adaptiveThreshold(
+            denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 31, 7,
+        )
 
-        # Ảnh cân bằng + khử nhiễu thường tốt nhất với biển số ngoài trời.
-        # Chạy nó trước để đa số trường hợp chỉ cần một lượt OCR. Bản phóng to
-        # xếp ngay sau vì đây là biến thể duy nhất đọc đúng trên ảnh gốc lớn bị
-        # thu nhỏ, còn clahe bị loại vì luôn cho điểm cấu trúc kém trong đo đạc.
-        variants = [denoised, enlarged, equalized]
-        if straightened is not enlarged:
-            variants.insert(2, straightened)
+        # Wide Vietnamese car plates respond much better to a tightly cropped,
+        # 2x enlarged inverse Otsu image. In particular this preserves the open
+        # shape of "3", which EasyOCR otherwise tends to read as "B"/"8".
+        raw_gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        raw_enlarged_2x = cv2.resize(
+            raw_gray, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC
+        )
+        raw_otsu_inverted = cv2.threshold(
+            raw_enlarged_2x, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+        )[1]
 
+        # Biển vuông hai dòng: khung mở rộng giúp đọc chữ nhưng có thể kéo cả
+        # nền vào và làm sai chữ số; biển đúng khung phát hiện phóng 2x + Otsu
+        # thường đọc ổn định nhất nên thử trước.
+        crop_aspect_ratio = crop.shape[1] / max(1, crop.shape[0])
+        if crop_aspect_ratio >= 2.6:
+            variants = [raw_otsu_inverted, straightened, enlarged, equalized, sharpened, adaptive]
+        else:
+            variants = [equalized, denoised, straightened, sharpened, adaptive]
+            tight_otsu = self._tight_otsu(tight_crop)
+            if tight_otsu is not None:
+                variants.insert(0, tight_otsu)
+
+        # Nhiều biến thể có thể cùng đọc ra một biển: đó là bằng chứng mạnh hơn
+        # một lượt đọc có độ tin cậy cao nhưng lẻ loi. Cách này sửa được các ca
+        # "17Z..." từng thắng nhờ tin cậy cao trong khi 4 biến thể khác đều đọc
+        # đúng "47B...".
+        votes: dict[str, list[float]] = {}
         best_text, best_conf, best_quality = "", 0.0, -1.0
         with self._lock:
             for variant in variants:
@@ -255,6 +393,7 @@ class AnprRecognizer:
                     variant,
                     detail=1,
                     paragraph=False,
+                    mag_ratio=1.0,
                     allowlist="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
                 )
                 ordered = self._order_ocr_results(results)
@@ -262,19 +401,35 @@ class AnprRecognizer:
                 token_lengths = [max(1, len(normalize_plate(str(item[1])))) for item in ordered]
                 confidence = (sum(float(item[2]) * length for item, length in zip(ordered, token_lengths))
                               / sum(token_lengths)) if ordered else 0.0
-                plausible_length = 7 <= len(text) <= 10
                 format_score = plate_format_score(text)
-                quality = confidence + min(len(text), 10) / 50 + format_score
-                if text and quality > best_quality:
+                if format_score < 0.35 or not plate_shape_is_plausible(text, crop_aspect_ratio):
+                    continue
+                votes.setdefault(text, []).append(confidence)
+                quality = confidence + format_score
+                if quality > best_quality:
                     best_text, best_conf, best_quality = text, confidence, quality
 
                 # Dừng ngay khi đã có biển đúng cấu trúc và độ tin cậy tốt.
-                # Nhờ vậy ảnh rõ chỉ chạy một biến thể OCR thay vì cả bốn.
-                # Ngưỡng 0.80 nằm giữa kết quả sai 0.7756 và kết quả đúng
-                # 0.8126 đo được trên ảnh benchmark.
-                if confidence >= 0.80 and format_score >= 0.35:
+                if confidence >= 0.80:
                     break
+                # Hoặc khi hai biến thể độc lập cùng đọc ra một biển đủ rõ.
+                if (max(len(scores) for scores in votes.values()) >= 2
+                        and max(max(scores) for scores in votes.values()) >= 0.70):
+                    break
+
+        if votes:
+            agreed_text = max(votes, key=lambda value: (len(votes[value]), max(votes[value])))
+            if len(votes[agreed_text]) >= 2:
+                return agreed_text, max(votes[agreed_text])
         return best_text, best_conf
+
+    @staticmethod
+    def _tight_otsu(crop: np.ndarray | None) -> np.ndarray | None:
+        if crop is None or crop.size == 0:
+            return None
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        enlarged = cv2.resize(gray, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+        return cv2.threshold(enlarged, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
     @classmethod
     def _order_ocr_results(cls, results: list) -> list:
@@ -330,6 +485,35 @@ class AnprRecognizer:
         for box in result.boxes:
             name = str(result.names[int(box.cls.item())]).lower()
             detections.append((name, float(box.conf.item())))
+        return detections
+
+    def _vehicle_detections_at(
+        self, image: np.ndarray, imgsz: int
+    ) -> list[tuple[str, float, np.ndarray]]:
+        """Lượt dò bổ sung cho khung hình lớn, bỏ qua ảnh chụp cận cảnh."""
+        if min(image.shape[:2]) < 480:
+            return []
+        result = self.vehicle_model.predict(
+            image,
+            conf=max(0.10, self.vehicle_confidence * 0.5),
+            imgsz=imgsz,
+            verbose=False,
+            classes=[1, 2, 3],
+        )[0]
+        return self._vehicle_detections(result)
+
+    @staticmethod
+    def _vehicle_detections(result: object) -> list[tuple[str, float, np.ndarray]]:
+        detections: list[tuple[str, float, np.ndarray]] = []
+        if result.boxes is None:
+            return detections
+        for box in result.boxes:
+            name = str(result.names[int(box.cls.item())]).lower()
+            detections.append((
+                name,
+                float(box.conf.item()),
+                box.xyxy[0].cpu().numpy().astype(int),
+            ))
         return detections
 
     @staticmethod

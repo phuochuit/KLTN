@@ -1,6 +1,6 @@
 # Các phần còn thiếu trước khi triển khai thực tế
 
-Cập nhật 28/10/2026, sau khi hoàn tất hardening trên nhánh `feat/final-hardening`.
+Cập nhật 28/10/2026, gồm hardening trên `main` và nhánh `feat/pre-report-completion`.
 
 ## Đã hoàn tất
 
@@ -17,6 +17,11 @@ Cập nhật 28/10/2026, sau khi hoàn tất hardening trên nhánh `feat/final-
 - API trạm gác fail-closed: JWT bật mặc định; request nghiệp vụ không token trả `401`.
 - Tài khoản quản trị mẫu được tạo khi bảng tài khoản còn trống (`ManagementBootstrap`), bắt buộc đổi mật khẩu ở lần đăng nhập đầu.
 - Kiểm thử tự động hợp nhất bằng một runner: Spring, Desktop, ANPR và tooling, ghi báo cáo vào `.artifacts/test-runs/<run-id>/`.
+- Giá và quyền gói được snapshot tại entry; thay bảng giá, khóa card hoặc gói hết hạn sau entry không làm đổi lượt đang mở.
+- Cư dân ra bắt buộc chọn người lấy xe active, có quyền sử dụng xe và face match; confirm lưu `exitMember`. Chỉ manual override đủ quyền/lý do/evidence/ca trực mới được bỏ qua.
+- Khách vãng lai bắt buộc có ảnh/face evidence lúc vào và đối chiếu lúc ra; evidence replay bị từ chối.
+- Database bảo đảm mỗi biển số chỉ có một lượt OPEN bằng unique `open_plate`; confirm exit dùng pessimistic lock; idempotency reservation có kiểm thử hai thread.
+- Known-total test xác minh tổng doanh thu và phân loại CASH/BANK_TRANSFER/POS cùng trạng thái chờ đối soát. Spring suite mới nhất đạt **163/163** trên H2.
 
 ## Còn thiếu
 
@@ -28,4 +33,4 @@ Cập nhật 28/10/2026, sau khi hoàn tất hardening trên nhánh `feat/final-
 6. Thực hiện checklist nghiệm thu tại hiện trường: camera ban đêm, ngược sáng, mưa, biển số bẩn/che, mất mạng, mất điện, xe bám đuôi và mở barrier thủ công.
 7. Cấu hình lịch backup/monitoring thật trên Task Scheduler hoặc nền tảng vận hành của đơn vị và diễn tập phục hồi định kỳ.
 8. Kiểm thử lại WinForms sau mỗi bản cập nhật .NET SDK Windows (hiện dùng .NET 8 LTS).
-9. Chuyển schema sang migration có version (Flyway) trước khi dùng dữ liệu thật; hiện schema do `ddl-auto=update` và script tay trong `scripts/database/` quản lý, xem [ADR-0007](docs/decisions/0007-schema-migration-khong-dung-flyway.md).
+9. Chạy và xác nhận các migration SQL thủ công có version trên bản sao MySQL trước khi áp dụng dữ liệu thật; phạm vi đồ án không dùng Flyway theo [ADR-0007](docs/decisions/0007-schema-migration-khong-dung-flyway.md). Concurrency hiện đã pass trên H2 nhưng chưa chạy trên MySQL test riêng vì chưa có tài khoản/database test tách biệt; tuyệt đối không dùng Aiven hoặc `parking_anpr` chính cho destructive integration test.

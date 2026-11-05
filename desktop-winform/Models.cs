@@ -49,7 +49,9 @@ public record ParkingRequest(
     [property: JsonPropertyName("manualOverrideReasonText")] string ManualOverrideReasonText,
     [property: JsonPropertyName("paymentMethod")] string? PaymentMethod = null,
     [property: JsonPropertyName("paymentReference")] string? PaymentReference = null,
-    [property: JsonPropertyName("operationId")] string? OperationId = null);
+    [property: JsonPropertyName("operationId")] string? OperationId = null,
+    [property: JsonPropertyName("noPlate")] bool NoPlate = false,
+    [property: JsonPropertyName("sessionId")] string? SessionId = null);
 
 public record AuthorizedMemberResponse(
     [property: JsonPropertyName("id")] long Id,
@@ -73,6 +75,13 @@ public record ParkingResponse(
     [property: JsonPropertyName("receiptNumber")] string? ReceiptNumber = null,
     [property: JsonPropertyName("paymentMethod")] string? PaymentMethod = null,
     [property: JsonPropertyName("paymentReference")] string? PaymentReference = null);
+
+public record ExitCandidateResponse(
+    [property: JsonPropertyName("sessionId")] long SessionId,
+    [property: JsonPropertyName("plateNumber")] string PlateNumber,
+    [property: JsonPropertyName("entryTime")] DateTime EntryTime,
+    [property: JsonPropertyName("slotCode")] string? SlotCode,
+    [property: JsonPropertyName("vehicleType")] string? VehicleType);
 
 public record ResidentLookupResponse(
     [property: JsonPropertyName("registered")] bool Registered,

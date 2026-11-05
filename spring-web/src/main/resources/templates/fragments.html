@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <header class="site-header" th:fragment="header">
-    <a class="site-brand" th:href="@{/}">Parking ANPR</a>
+    <a class="site-brand" th:href="@{/}">Auto Parking</a>
     <nav class="main-nav" aria-label="Điều hướng chính">
         <a class="nav-link" th:href="@{/}"
            th:if="${#sets.contains(currentAuthorities, 'DASHBOARD_VIEW') or #sets.contains(currentAuthorities, 'ROLE_MANAGEMENT')}">Tổng quan</a>
@@ -62,6 +62,9 @@
         </div>
     </dialog>
     <script th:src="@{/js/app-dialog.js}" defer></script>
+    <link rel="stylesheet" th:href="@{/css/auth-toast.css}">
+    <div id="auth-toast-area" class="auth-toast-area" aria-live="polite" aria-atomic="false"></div>
+    <script th:src="@{/js/auth-toast.js}" defer></script>
 </header>
 </body>
 </html>

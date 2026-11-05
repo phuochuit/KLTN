@@ -16,6 +16,8 @@
                 <td th:text="${desktopSession.shiftName ?: 'Chưa phân ca'}"></td>
                 <td th:text="${desktopSession.duty ?: 'Nhân viên trạm gác'}"></td>
                 <td><form method="post" th:action="@{/account-management/sessions/desktop/revoke}"
+                          data-live-revoke="true"
+                          data-live-message="Đã đăng xuất nhân viên khỏi Desktop."
                           data-confirm="Nhân viên sẽ được đưa về màn hình đăng nhập trên thiết bị này. Bạn có muốn tiếp tục?"
                           data-confirm-title="Đăng xuất thiết bị">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -31,12 +33,21 @@
         <h2>Tài khoản đang đăng nhập Web</h2>
         <p class="help">Các tài khoản quản trị đang sử dụng hệ thống.</p>
         <div class="table-scroll"><table>
-            <thead><tr><th>Tài khoản</th><th>Hoạt động gần nhất</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th>Tài khoản</th><th>Thiết bị</th><th>Hoạt động gần nhất</th><th>Thao tác</th></tr></thead>
             <tbody>
             <tr th:each="webLogin : ${activeWebSessions}">
                 <td><span class="badge badge-online">Trực tuyến</span> <strong th:text="${webLogin.username}"></strong></td>
+                <td>
+                    <span th:text="${webLogin.device}">Chrome · Windows</span>
+                    <div class="muted" style="font-size:12px">
+                        <span th:text="${webLogin.deviceKind}">Máy tính</span><span
+                            th:if="${!#strings.isEmpty(webLogin.ip)}" th:text="' · ' + ${webLogin.ip}"></span>
+                    </div>
+                </td>
                 <td th:text="${#temporals.format(webLogin.lastSeenAt, 'dd/MM/yyyy HH:mm')}"></td>
                 <td><form method="post" th:action="@{/account-management/sessions/web/revoke}"
+                          data-live-revoke="true"
+                          data-live-message="Đã kết thúc phiên Web."
                           data-confirm="Tài khoản này sẽ phải đăng nhập lại trên trình duyệt đang sử dụng. Bạn có muốn tiếp tục?"
                           data-confirm-title="Kết thúc phiên làm việc">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -44,7 +55,7 @@
                     <button class="btn btn-danger" type="submit">Kết thúc phiên</button>
                 </form></td>
             </tr>
-            <tr th:if="${#lists.isEmpty(activeWebSessions)}"><td colspan="3" class="muted">Không có phiên Web nào được ghi nhận.</td></tr>
+            <tr th:if="${#lists.isEmpty(activeWebSessions)}"><td colspan="4" class="muted">Không có phiên Web nào được ghi nhận.</td></tr>
             </tbody>
         </table></div>
     </section>

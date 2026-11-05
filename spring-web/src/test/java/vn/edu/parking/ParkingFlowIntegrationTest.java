@@ -23,6 +23,7 @@ import vn.edu.parking.service.ResidentImageStorage;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.io.ByteArrayOutputStream;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -33,6 +34,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.anyOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,9 +68,11 @@ class ParkingFlowIntegrationTest {
     @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void completesEntryPreviewAndExitFlow() throws Exception {
         seedCollectorAccount();
-        String body = """
-            {"plateNumber":"59A1-123.45","cardCode":"59A112345","vehicleType":"MOTORBIKE","manualOverride":false}
-            """;
+        Vehicle sample = vehicles.findByPlateNumberIgnoreCase("59A112345").orElseThrow();
+        FamilyMember collector = authorizeMember(sample, "FLOW-01");
+        String body = "{\"plateNumber\":\"59A1-123.45\",\"cardCode\":\"59A112345\","
+            + "\"vehicleType\":\"MOTORBIKE\",\"manualOverride\":false,"
+            + "\"familyMemberId\":" + collector.getId() + ",\"faceVerified\":true}";
 
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
             .andExpect(status().isOk())
@@ -84,18 +88,125 @@ class ParkingFlowIntegrationTest {
 
         mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(body))
             .andExpect(status().isBadRequest());
-        assertThat(parkingSessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN)).hasSize(1);
+        assertThat(parkingSessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+            "59A112345", SessionStatus.OPEN)).isPresent();
         assertThat(paymentTransactions.count()).isZero();
 
-        String paidBody = """
-            {"plateNumber":"59A1-123.45","cardCode":"59A112345","vehicleType":"MOTORBIKE","manualOverride":false,"paymentMethod":"CASH"}
-            """;
+        String paidBody = "{\"plateNumber\":\"59A1-123.45\",\"cardCode\":\"59A112345\","
+            + "\"vehicleType\":\"MOTORBIKE\",\"manualOverride\":false,"
+            + "\"familyMemberId\":" + collector.getId()
+            + ",\"faceVerified\":true,\"paymentMethod\":\"CASH\"}";
         mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(paidBody))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status", is("COMPLETED")))
             .andExpect(jsonPath("$.fee", anyOf(is(5000), is(8000))))
             .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("biên nhận")));
         assertThat(paymentTransactions.count()).isEqualTo(1);
+        ParkingSession completed = parkingSessions
+            .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc("59A112345", SessionStatus.COMPLETED)
+            .orElseThrow();
+        assertThat(completed.getExitMember().getId()).isEqualTo(collector.getId());
+        assertThat(completed.isExitFaceVerified()).isTrue();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
+    void linksReadableExitPlateWithOpenNoPlateSession() throws Exception {
+        ParkingSession noPlate = new ParkingSession();
+        noPlate.setEntryPlate("NPL20261105A8F955");
+        noPlate.setOpenPlate("NPL20261105A8F955");
+        noPlate.setDetectedVehicleType(VehicleType.MOTORBIKE);
+        noPlate.setEntryTime(LocalDateTime.now().minusMinutes(5));
+        noPlate.setEntryFaceImagePath("evidence:demo");
+        noPlate.setStatus(SessionStatus.OPEN);
+        noPlate = parkingSessions.save(noPlate);
+
+        String body = "{\"plateNumber\":\"17Z56789\",\"vehicleType\":\"MOTORBIKE\","
+            + "\"manualOverride\":false,\"faceVerified\":true,"
+            + "\"sessionId\":\"" + noPlate.getId() + "\"}";
+
+        mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sessionId", is(noPlate.getId().intValue())))
+            .andExpect(jsonPath("$.plateNumber", is("17Z56789")))
+            .andExpect(jsonPath("$.status", is("PREVIEW")));
+
+        mvc.perform(get("/api/parking/exit-candidates"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].plateNumber", is("NPL20261105A8F955")))
+            .andExpect(jsonPath("$[0].sessionId", is(noPlate.getId().intValue())));
+
+        mvc.perform(post("/api/parking/exit-confirm").contentType("application/json")
+                .content(body.replace("\"faceVerified\":true", "\"faceVerified\":true,\"paymentMethod\":\"CASH\"")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status", is("COMPLETED")))
+            .andExpect(jsonPath("$.plateNumber", is("17Z56789")));
+
+        ParkingSession completed = parkingSessions.findById(noPlate.getId()).orElseThrow();
+        assertThat(completed.getStatus()).isEqualTo(SessionStatus.COMPLETED);
+        assertThat(completed.getExitPlate()).isEqualTo("17Z56789");
+        assertThat(completed.getOpenPlate()).isNull();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
+    void rejectsResidentExitWithoutAuthorizedFaceVerifiedCollector() throws Exception {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setPlateNumber("30A123456");
+        vehicle.setOwnerName("Chủ xe kiểm thử NV04");
+        vehicle.setVehicleType(VehicleType.CAR);
+        vehicle = vehicles.save(vehicle);
+        FamilyMember authorized = authorizeMember(vehicle, "NV04-AUTH");
+
+        ParkingCard card = new ParkingCard();
+        card.setCardCode("NV04-CARD");
+        card.setVehicle(vehicle);
+        card.setStatus(CardStatus.ACTIVE);
+        card.setPassType(PassType.MONTHLY);
+        card.setValidFrom(LocalDate.now());
+        card.setValidUntil(LocalDate.now().plusDays(29));
+        card.setSubscriptionFee(BigDecimal.valueOf(500_000));
+        cards.save(card);
+
+        String entry = "{\"plateNumber\":\"30A123456\",\"cardCode\":\"NV04-CARD\","
+            + "\"vehicleType\":\"CAR\",\"manualOverride\":false,\"familyMemberId\":"
+            + authorized.getId() + ",\"faceVerified\":true}";
+        mvc.perform(post("/api/parking/entry").contentType("application/json").content(entry))
+            .andExpect(status().isOk());
+
+        String missingCollector = "{\"plateNumber\":\"30A123456\",\"cardCode\":\"NV04-CARD\","
+            + "\"vehicleType\":\"CAR\",\"manualOverride\":false,\"faceVerified\":true}";
+        mvc.perform(post("/api/parking/exit-preview").contentType("application/json")
+                .content(missingCollector))
+            .andExpect(status().isBadRequest());
+
+        FamilyMember unauthorized = new FamilyMember();
+        unauthorized.setHousehold(authorized.getHousehold());
+        unauthorized.setFullName("Người không được ủy quyền");
+        unauthorized.setCitizenId("CID-NV04-UNAUTH");
+        unauthorized.setRegistrationFaceImagePath("resident:face-unauthorized.jpg");
+        unauthorized.setActive(true);
+        unauthorized = members.save(unauthorized);
+        String unauthorizedCollector = "{\"plateNumber\":\"30A123456\",\"cardCode\":\"NV04-CARD\","
+            + "\"vehicleType\":\"CAR\",\"manualOverride\":false,\"familyMemberId\":"
+            + unauthorized.getId() + ",\"faceVerified\":true}";
+        mvc.perform(post("/api/parking/exit-preview").contentType("application/json")
+                .content(unauthorizedCollector))
+            .andExpect(status().isBadRequest());
+
+        String faceMismatch = "{\"plateNumber\":\"30A123456\",\"cardCode\":\"NV04-CARD\","
+            + "\"vehicleType\":\"CAR\",\"manualOverride\":false,\"familyMemberId\":"
+            + authorized.getId() + ",\"faceVerified\":false}";
+        mvc.perform(post("/api/parking/exit-preview").contentType("application/json")
+                .content(faceMismatch))
+            .andExpect(status().isBadRequest());
+
+        ParkingSession stillOpen = parkingSessions
+            .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+                "30A123456", SessionStatus.OPEN)
+            .orElseThrow();
+        assertThat(stillOpen.getExitMember()).isNull();
+        assertThat(stillOpen.getExitTime()).isNull();
     }
 
     @Test
@@ -110,6 +221,7 @@ class ParkingFlowIntegrationTest {
         vehicle.setApartmentNumber("A1-1205");
         vehicle.setVehicleType(VehicleType.MOTORBIKE);
         vehicle = vehicles.save(vehicle);
+        FamilyMember collector = authorizeMember(vehicle, "MONTHLY-01");
 
         ParkingCard card = new ParkingCard();
         card.setCardCode("29A006131");
@@ -121,9 +233,9 @@ class ParkingFlowIntegrationTest {
         card.setSubscriptionFee(BigDecimal.valueOf(120000));
         cards.save(card);
 
-        String body = """
-            {"plateNumber":"29A0-061.31","cardCode":"29A006131","vehicleType":"MOTORBIKE","manualOverride":false}
-            """;
+        String body = "{\"plateNumber\":\"29A0-061.31\",\"cardCode\":\"29A006131\","
+            + "\"vehicleType\":\"MOTORBIKE\",\"manualOverride\":false,"
+            + "\"familyMemberId\":" + collector.getId() + ",\"faceVerified\":true}";
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.ownerName", is("Cư dân A1-1205")))
@@ -145,6 +257,36 @@ class ParkingFlowIntegrationTest {
     }
 
     @Test
+    void entryPersistsPriceSnapshotAndIgnoresLaterPriceChanges() throws Exception {
+        String onePixelPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+        String body = "{\"plateNumber\":\"88A765432\",\"cardCode\":\"88A765432\","
+            + "\"vehicleType\":\"CAR\",\"manualOverride\":false,\"faceVerified\":true,"
+            + "\"realtimeFaceImageBase64\":\"" + onePixelPng + "\"}";
+        PricingRule carPrice = prices.findByVehicleType(VehicleType.CAR).orElseThrow();
+        BigDecimal originalBase = carPrice.getBasePrice();
+
+        mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
+            .andExpect(status().isOk());
+        ParkingSession persisted = parkingSessions
+            .findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc("88A765432", SessionStatus.OPEN)
+            .orElseThrow();
+        assertThat(persisted.getPriceBaseSnapshot()).isEqualByComparingTo(originalBase);
+        assertThat(persisted.getBaseHoursSnapshot()).isEqualTo(carPrice.getBaseHours());
+        assertThat(persisted.getPrepaidPackageApplied()).isFalse();
+
+        try {
+            carPrice.setBasePrice(BigDecimal.valueOf(999_000));
+            prices.saveAndFlush(carPrice);
+            mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fee").value(originalBase.intValue()));
+        } finally {
+            carPrice.setBasePrice(originalBase);
+            prices.saveAndFlush(carPrice);
+        }
+    }
+
+    @Test
     void ignoresForeignCardCodeAndUsesRecognizedPlateAsIdentifier() throws Exception {
         Vehicle subscribedVehicle = new Vehicle();
         subscribedVehicle.setPlateNumber("30A999999");
@@ -161,9 +303,10 @@ class ParkingFlowIntegrationTest {
         monthly.setValidUntil(LocalDate.now().plusDays(30));
         cards.save(monthly);
 
-        String body = """
-            {"plateNumber":"77A888888","cardCode":"30A999999","vehicleType":"MOTORBIKE","manualOverride":false}
-            """;
+        String onePixelPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+        String body = "{\"plateNumber\":\"77A888888\",\"cardCode\":\"30A999999\","
+            + "\"vehicleType\":\"MOTORBIKE\",\"manualOverride\":false,"
+            + "\"realtimeFaceImageBase64\":\"" + onePixelPng + "\"}";
         mvc.perform(post("/api/parking/entry").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.plateNumber", is("77A888888")))
@@ -193,6 +336,31 @@ class ParkingFlowIntegrationTest {
             .andExpect(status().isBadRequest());
         mvc.perform(post("/api/parking/exit-confirm").contentType("application/json").content(exitWithFace))
             .andExpect(status().isOk()).andExpect(jsonPath("$.status", is("COMPLETED")));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
+    void rejectsGuestEntryWithoutFaceCapture() throws Exception {
+        String entry = """
+            {"plateNumber":"77A654321","vehicleType":"MOTORBIKE","manualOverride":false}
+            """;
+
+        mvc.perform(post("/api/parking/entry").contentType("application/json").content(entry))
+            .andExpect(status().isBadRequest());
+        assertThat(parkingSessions.existsByEntryPlateIgnoreCaseAndStatus(
+            "77A654321", SessionStatus.OPEN)).isFalse();
+    }
+
+    @Test
+    void databaseRejectsTwoOpenSessionsForSamePlate() {
+        ParkingSession first = openSession("92A123456");
+        parkingSessions.saveAndFlush(first);
+
+        ParkingSession duplicate = openSession("92A123456");
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+            () -> parkingSessions.saveAndFlush(duplicate));
+        assertThat(parkingSessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(
+            "92A123456", SessionStatus.OPEN)).isPresent();
     }
 
     @Test
@@ -349,5 +517,38 @@ class ParkingFlowIntegrationTest {
             "test-password-hash", AccountRole.MANAGEMENT, false);
         account.setEnabled(true);
         systemAccounts.save(account);
+    }
+
+    private FamilyMember authorizeMember(Vehicle vehicle, String suffix) {
+        Household household = new Household();
+        household.setHouseholdCode("HH-AUTH-" + suffix);
+        household.setApartmentNumber("AUTH-" + suffix);
+        household = households.save(household);
+        FamilyMember member = new FamilyMember();
+        member.setHousehold(household);
+        member.setFullName(vehicle.getRegisteredOwner() == null
+            ? vehicle.getOwnerName()
+            : "Người lấy xe " + suffix);
+        member.setCitizenId("CID-AUTH-" + suffix);
+        member.setRegistrationFaceImagePath("resident:face-" + suffix + ".jpg");
+        member.setActive(true);
+        member = members.save(member);
+        if (vehicle.getHousehold() == null) vehicle.setHousehold(household);
+        if (vehicle.getRegisteredOwner() == null) vehicle.setRegisteredOwner(member);
+        var authorized = new java.util.LinkedHashSet<>(vehicle.getAuthorizedMembers());
+        authorized.add(member);
+        vehicle.setAuthorizedMembers(authorized);
+        vehicles.save(vehicle);
+        return member;
+    }
+
+    private ParkingSession openSession(String plate) {
+        ParkingSession session = new ParkingSession();
+        session.setEntryPlate(plate);
+        session.setOpenPlate(plate);
+        session.setEntryTime(LocalDateTime.now());
+        session.setStatus(SessionStatus.OPEN);
+        session.setDetectedVehicleType(VehicleType.CAR);
+        return session;
     }
 }
