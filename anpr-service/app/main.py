@@ -303,7 +303,7 @@ async def verify_face_camera(request: Request, registration: UploadFile = File(.
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, "Không xử lý được ảnh đăng ký: " + str(exc)) from exc
+        raise HTTPException(502, "Chưa xử lý được ảnh đăng ký; vui lòng thử lại hoặc chọn ảnh khác") from exc
 
 
 @app.post("/face/verify-image")
@@ -320,7 +320,7 @@ async def verify_face_image(request: Request, registration: UploadFile = File(..
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, "Không xử lý được ảnh khuôn mặt: " + str(exc)) from exc
+        raise HTTPException(502, "Chưa xử lý được ảnh khuôn mặt; vui lòng thử lại hoặc chọn ảnh khác") from exc
 
 
 @app.post("/face/verify-video")
@@ -355,7 +355,7 @@ async def verify_face_video(request: Request, registration: UploadFile = File(..
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(502, "Không xử lý được video khuôn mặt: " + str(exc)) from exc
+        raise HTTPException(502, "Chưa xử lý được video khuôn mặt; vui lòng thử lại hoặc chọn video khác") from exc
     finally:
         temp_path.unlink(missing_ok=True)
 
@@ -365,7 +365,7 @@ def capture_face_camera(payload: CameraCaptureRequest, request: Request) -> dict
     try:
         frames = capture_camera_frames(payload.cameraIndex, count=8, camera_source=payload.cameraSource)
         frame = frames[-1]
-        _, _, face_details = face_engine.analyze(frame, "Ảnh realtime")
+        _, _, face_details = face_engine.analyze(frame, "Ảnh chụp tại cổng")
         result = {"decision":"CAPTURED","similarity":0.0,"message":"Đã chụp một khuôn mặt rõ ràng",
                   "face": face_details}
         annotated = annotate_face(frame, result)

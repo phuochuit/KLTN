@@ -6,12 +6,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.annotation.Transactional;
+import vn.edu.parking.domain.ParkingSlot;
 import vn.edu.parking.domain.ParkingSession;
 import vn.edu.parking.domain.SessionStatus;
 import vn.edu.parking.domain.VehicleType;
 import vn.edu.parking.repository.ParkingSessionRepository;
 import vn.edu.parking.repository.ParkingSlotRepository;
 import vn.edu.parking.repository.VehicleRepository;
+import vn.edu.parking.repository.VehicleTypeRepository;
 import vn.edu.parking.service.ParkingService;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,11 +26,44 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
     "parking.evidence.required=false"
 })
 @WithMockUser(username = "slot-manager", roles = "MANAGEMENT")
+@Transactional
 class ParkingSlotVehicleTypeIntegrationTest {
     @Autowired ParkingService parkingService;
     @Autowired ParkingSlotRepository slots;
     @Autowired VehicleRepository vehicles;
     @Autowired ParkingSessionRepository sessions;
+    @Autowired VehicleTypeRepository vehicleTypes;
+
+    @Test
+    void allowsVehicleTypesInSameCapacityGroup() {
+        var motorbikeType = vehicleTypes.findByCodeIgnoreCase("MOTORBIKE").orElseThrow();
+        var bicycleType = vehicleTypes.findByCodeIgnoreCase("BICYCLE_ELECTRIC_BICYCLE").orElseThrow();
+        ParkingSlot slot = new ParkingSlot();
+        slot.setSlotCode("GROUP-UNIT-1");
+        slot.setVehicleTypeRef(motorbikeType);
+        slot.setAllowedVehicleType(motorbikeType.getCategory());
+        slot.setActive(true);
+
+        org.assertj.core.api.Assertions.assertThat(
+            parkingService.isSlotVehicleCompatible(slot, bicycleType, bicycleType.getCategory())).isTrue();
+        parkingService.ensureSlotVehicleCompatible(slot, bicycleType, bicycleType.getCategory());
+    }
+
+    @Test
+    void rejectsVehicleTypesFromDifferentCapacityGroups() {
+        var motorbikeType = vehicleTypes.findByCodeIgnoreCase("MOTORBIKE").orElseThrow();
+        var carType = vehicleTypes.findByCodeIgnoreCase("CAR").orElseThrow();
+        ParkingSlot slot = new ParkingSlot();
+        slot.setSlotCode("GROUP-CROSS");
+        slot.setVehicleTypeRef(motorbikeType);
+        slot.setAllowedVehicleType(motorbikeType.getCategory());
+        slot.setActive(true);
+
+        org.assertj.core.api.Assertions.assertThat(
+            parkingService.isSlotVehicleCompatible(slot, carType, carType.getCategory())).isFalse();
+        assertThatThrownBy(() -> parkingService.ensureSlotVehicleCompatible(slot, carType, carType.getCategory()))
+            .hasMessage("Ô GROUP-CROSS chỉ dành cho xe hai bánh.");
+    }
 
     @Test
     void rejectsAssigningMotorbikeToCarSlot() {

@@ -12,6 +12,9 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     boolean existsByParkingSession_Id(Long parkingSessionId);
     boolean existsBySubscriptionPayment_Id(Long subscriptionPaymentId);
 
+    Optional<PaymentTransaction> findByParkingSession_Id(Long parkingSessionId);
+    void deleteByParkingSession_IdAndStatus(Long parkingSessionId, PaymentStatus status);
+
     @EntityGraph(attributePaths = { "parkingSession", "subscriptionPayment", "collectedBy",
         "gateShiftAssignment", "reconciledBy" })
     List<PaymentTransaction> findTop200ByOrderByPaidAtDesc();

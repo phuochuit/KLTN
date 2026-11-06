@@ -2,13 +2,16 @@
 <p class="notice" th:if="${message}" th:text="${message}"></p>
 <div class="card help"><strong>Giá mặc định:</strong> lấy từ tài liệu khảo sát. Admin có thể điều chỉnh từng nhóm; thay đổi chỉ áp dụng cho giao dịch được tính sau thời điểm lưu.</div>
 <div class="price-grid"><form class="card price-form" method="post" th:action="@{/pricing}" th:each="p:${prices}">
-<input type="hidden" name="vehicleType" th:value="${p.vehicleType}"><h2 th:text="${p.vehicleType.displayName}"></h2>
-<label th:text="${p.vehicleType.car ? 'Giá 4 giờ đầu' : 'Giá lượt ban ngày'}"></label><input name="basePrice" type="number" min="0" required th:value="${p.basePrice}">
-<label>Giá lượt ban đêm</label><input name="nightPrice" type="number" min="0" required th:value="${p.nightPrice}" th:readonly="${p.vehicleType.car}">
-<label th:text="${p.vehicleType.car ? 'Tối thiểu mỗi đêm' : 'Giá mỗi chu kỳ qua đêm'}"></label><input name="overnightFee" type="number" min="0" required th:value="${p.overnightFee}">
+<input type="hidden" name="ruleId" th:value="${p.id}">
+<input type="hidden" name="vehicleType" th:value="${p.vehicleType}">
+<input type="hidden" name="vehicleTypeId" th:value="${p.vehicleTypeRef != null ? p.vehicleTypeRef.id : null}">
+<h2 th:text="${p.displayTitle}"></h2>
+<label th:text="${p.carCategory ? 'Giá cơ sở (giờ đầu)' : 'Giá lượt ban ngày'}"></label><input name="basePrice" type="number" min="0" required th:value="${p.basePrice}">
+<label>Giá lượt ban đêm</label><input name="nightPrice" type="number" min="0" required th:value="${p.nightPrice}" th:readonly="${p.carCategory}">
+<label th:text="${p.carCategory ? 'Tối thiểu mỗi đêm' : 'Giá mỗi chu kỳ qua đêm'}"></label><input name="overnightFee" type="number" min="0" required th:value="${p.overnightFee}">
 <label>Giá gói 1 ngày</label><input name="dailyPassPrice" type="number" min="0" required th:value="${p.dailyPassPrice}">
 <label>Giá gói 30 ngày</label><input name="monthlyPrice" type="number" min="0" required th:value="${p.monthlyPrice}">
-<div class="car-fields" th:if="${p.vehicleType.car}"><label>Số giờ đầu<input name="baseHours" type="number" min="1" th:value="${p.baseHours}"></label><label>Số giờ mỗi block thêm<input name="extraBlockHours" type="number" min="1" th:value="${p.extraBlockHours}"></label><label>Giá mỗi block thêm<input name="extraBlockPrice" type="number" min="0" th:value="${p.extraBlockPrice}"></label></div>
-<input th:unless="${p.vehicleType.car}" type="hidden" name="baseHours" value="0"><input th:unless="${p.vehicleType.car}" type="hidden" name="extraBlockHours" value="0"><input th:unless="${p.vehicleType.car}" type="hidden" name="extraBlockPrice" value="0">
+<div class="car-fields" th:if="${p.carCategory}"><label>Số giờ đầu<input name="baseHours" type="number" min="1" th:value="${p.baseHours}"></label><label>Số giờ mỗi block thêm<input name="extraBlockHours" type="number" min="1" th:value="${p.extraBlockHours}"></label><label>Giá mỗi block thêm<input name="extraBlockPrice" type="number" min="0" th:value="${p.extraBlockPrice}"></label></div>
+<input th:unless="${p.carCategory}" type="hidden" name="baseHours" value="0"><input th:unless="${p.carCategory}" type="hidden" name="extraBlockHours" value="0"><input th:unless="${p.carCategory}" type="hidden" name="extraBlockPrice" value="0">
 <button>Cập nhật giá</button></form></div>
 </main></body></html>

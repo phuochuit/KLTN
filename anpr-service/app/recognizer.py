@@ -20,6 +20,7 @@ MOTORCYCLE_CLASSES = {"motorcycle", "motorbike"}
 BICYCLE_CLASSES = {"bicycle", "bike"}
 VIETNAM_PLATE_PATTERN = re.compile(r"^\d{2}[A-Z]{1,2}\d{4,6}$")
 STANDARD_PLATE_WITH_EXTRA_LETTER = re.compile(r"^(\d{2})[A-Z]([A-Z]\d{6})$")
+STANDARD_PLATE_WITH_EXTRA_DIGIT = re.compile(r"^(\d{2})\d([A-Z]{1,2}\d{4,6})$")
 OCR_DIGIT_CONFUSIONS = str.maketrans({"O": "0", "Q": "0", "I": "1", "L": "1", "Z": "2", "S": "5", "G": "6", "B": "8"})
 OCR_LETTER_CONFUSIONS = str.maketrans({"0": "O", "1": "I", "2": "Z", "5": "S", "6": "G", "8": "B"})
 
@@ -53,6 +54,12 @@ def canonicalize_plate(value: str) -> str:
         if VIETNAM_PLATE_PATTERN.fullmatch(corrected):
             text = corrected
     match = STANDARD_PLATE_WITH_EXTRA_LETTER.fullmatch(text)
+    if match:
+        return "".join(match.groups())
+    # OCR đôi khi lấy một nét/đinh trên khung biển thành chữ số ngay sau mã
+    # tỉnh (ví dụ 594F241578). Chỉ bỏ đúng một chữ số ở vị trí vốn bắt buộc
+    # phải là sê-ri chữ và chỉ khi phần còn lại tạo thành biển hợp lệ.
+    match = STANDARD_PLATE_WITH_EXTRA_DIGIT.fullmatch(text)
     return "".join(match.groups()) if match else text
 
 
@@ -79,6 +86,26 @@ def plate_shape_is_plausible(value: str, aspect_ratio: float) -> bool:
     # four trailing digits. Seven-character readings indicate that OCR has
     # dropped part of one row (for example 59A1122 instead of 59A3/11122).
     return not (aspect_ratio <= 1.8 and len(text) < 8)
+
+
+def select_plate_candidate(votes: dict[str, list[float]]) -> tuple[str, float]:
+    """Balance OCR confidence with agreement across image variants.
+
+    A small agreement bonus lets several independent, moderately confident
+    readings beat one isolated mistake. It is deliberately capped so two weak
+    duplicate readings cannot replace one very clear result.
+    """
+    if not votes:
+        return "", 0.0
+
+    def score(value: str) -> tuple[float, float, int]:
+        confidences = votes[value]
+        strongest = max(confidences)
+        agreement_bonus = 0.12 * min(max(len(confidences) - 1, 0), 3)
+        return strongest + agreement_bonus, strongest, len(confidences)
+
+    selected = max(votes, key=score)
+    return selected, max(votes[selected])
 
 
 def vehicle_type_from_detections(detections: list[tuple[str, float]]) -> tuple[str, float]:
@@ -224,7 +251,7 @@ class AnprRecognizer:
                 vehicle_type,
                 vehicle_conf,
                 frame_index,
-                "YOLO chuyên dụng chưa phát hiện được biển số trong khung hình",
+                "Chưa tìm thấy biển số trong ảnh; vui lòng chụp lại hoặc nhập biển số.",
             )
 
         plate_conf, xyxy = max(plate_boxes, key=lambda item: item[0])
@@ -270,7 +297,7 @@ class AnprRecognizer:
         message = (
             "Nhận dạng thành công"
             if plate_text
-            else "Đã cắt biển số nhưng OCR chưa đọc được ký tự"
+            else "Biển số chưa rõ; vui lòng chụp lại hoặc nhập biển số."
         )
         return RecognitionResponse(
             plateText=plate_text,
@@ -409,18 +436,18 @@ class AnprRecognizer:
                 if quality > best_quality:
                     best_text, best_conf, best_quality = text, confidence, quality
 
-                # Dừng ngay khi đã có biển đúng cấu trúc và độ tin cậy tốt.
-                if confidence >= 0.80:
-                    break
-                # Hoặc khi hai biến thể độc lập cùng đọc ra một biển đủ rõ.
-                if (max(len(scores) for scores in votes.values()) >= 2
-                        and max(max(scores) for scores in votes.values()) >= 0.70):
+                # Một kết quả đơn lẻ có thể rất tự tin nhưng vẫn nhầm một chữ
+                # số. Chỉ dừng sớm khi hai biến thể cùng đọc ra một biển và ít
+                # nhất một lượt đủ rõ; các ca còn nghi ngờ tiếp tục bỏ phiếu.
+                if any((len(scores) >= 2 and max(scores) >= 0.80)
+                       or len(scores) >= 3
+                       for scores in votes.values()):
                     break
 
         if votes:
-            agreed_text = max(votes, key=lambda value: (len(votes[value]), max(votes[value])))
-            if len(votes[agreed_text]) >= 2:
-                return agreed_text, max(votes[agreed_text])
+            selected_text, selected_conf = select_plate_candidate(votes)
+            if selected_text:
+                return selected_text, selected_conf
         return best_text, best_conf
 
     @staticmethod
@@ -428,7 +455,14 @@ class AnprRecognizer:
         if crop is None or crop.size == 0:
             return None
         gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-        enlarged = cv2.resize(gray, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+        # EasyOCR scales its detector cost with the input area. A fixed 2x
+        # enlargement made already-large camera crops take several seconds.
+        # Keep the useful enlargement for small plates but cap the OCR width.
+        scale = min(2.0, 420 / max(1, gray.shape[1]))
+        interpolation = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_CUBIC
+        enlarged = cv2.resize(
+            gray, None, fx=scale, fy=scale, interpolation=interpolation
+        )
         return cv2.threshold(enlarged, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
     @classmethod

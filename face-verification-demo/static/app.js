@@ -8,8 +8,8 @@ const fields = ["cccd", "registration", "realtime"];
 
 const labels = {
   cccdVsRegistration: "CCCD ↔ Đăng ký",
-  realtimeVsRegistration: "Realtime ↔ Đăng ký",
-  realtimeVsCccd: "Realtime ↔ CCCD",
+  realtimeVsRegistration: "Ảnh tại cổng ↔ Đăng ký",
+  realtimeVsCccd: "Ảnh tại cổng ↔ CCCD",
 };
 
 const statuses = {
@@ -38,14 +38,14 @@ async function checkHealth() {
     const data = await response.json();
     if (data.modelsReady) {
       health.className = "health ready";
-      health.textContent = "● Mô hình đã sẵn sàng";
+      health.textContent = "● Chức năng đối chiếu đã sẵn sàng";
     } else {
       health.className = "health error";
-      health.textContent = "● Chưa tải mô hình";
+      health.textContent = "● Chức năng đối chiếu chưa sẵn sàng";
     }
   } catch {
     health.className = "health error";
-    health.textContent = "● Không kết nối được API";
+    health.textContent = "● Không kết nối được hệ thống";
   }
 }
 
@@ -55,7 +55,7 @@ function renderQuality(quality) {
       ? `<div class="warning">⚠ ${item.warnings.join(" · ")}</div>`
       : "<div>✓ Chất lượng cơ bản đạt</div>";
     document.querySelector(`#quality-${key}`).innerHTML =
-      `${warning}<div>Sáng: ${item.brightness} · Nét: ${item.sharpness} · Face: ${(item.detectionScore * 100).toFixed(1)}%</div>`;
+      `${warning}<div>Độ sáng: ${item.brightness} · Độ nét: ${item.sharpness} · Khuôn mặt: ${item.detectionScore >= 0.7 ? "rõ" : "cần chụp lại"}</div>`;
   }
 }
 
@@ -78,16 +78,26 @@ function renderResult(data) {
       <small>${statuses[value.status]}</small>
     </div>
   `).join("");
-  document.querySelector("#threshold-note").textContent =
-    `Ngưỡng demo: khớp ≥ ${data.thresholds.match}; cần xem xét từ ${data.thresholds.review} đến dưới ${data.thresholds.match}. ` +
-    "Điểm là cosine similarity, không phải phần trăm xác suất. " +
-    (data.livenessChecked
-      ? `Liveness: ${data.liveness.decision} (${data.liveness.confidence.toFixed(3)}).`
-      : "Liveness: chưa kiểm tra (không có video).");
+  const livenessLabels = {
+    LIVE: "Có dấu hiệu người thật",
+    SPOOF: "Nghi ngờ ảnh chụp lại",
+    REVIEW: "Cần nhân viên kiểm tra",
+  };
+  const livenessReasons = {
+    ok: "Hình ảnh có chuyển động phù hợp",
+    static_scene: "Hình ảnh gần như không thay đổi",
+    insufficient_motion: "Chuyển động chưa đủ rõ",
+    excessive_motion: "Camera rung hoặc chuyển động quá nhiều",
+    insufficient_frames: "Video chưa đủ hình ảnh",
+    not_provided: "Chưa cung cấp video",
+  };
+  document.querySelector("#threshold-note").textContent = data.livenessChecked
+    ? `Kiểm tra người thật: ${livenessLabels[data.liveness.decision] || "Cần kiểm tra"}.`
+    : "Chưa kiểm tra người thật vì chưa có video.";
   const livenessStatus = document.querySelector("#liveness-status");
   if (livenessStatus) {
     livenessStatus.textContent = data.livenessChecked
-      ? `Liveness ${data.liveness.decision} · Tin cậy ${(data.liveness.confidence * 100).toFixed(1)}% · ${data.liveness.reason}`
+      ? `${livenessLabels[data.liveness.decision] || "Cần kiểm tra"} · ${livenessReasons[data.liveness.reason] || "Vui lòng kiểm tra lại"}`
       : "";
   }
   renderQuality(data.quality);

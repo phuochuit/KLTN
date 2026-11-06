@@ -15,7 +15,9 @@ public sealed record OfflineOperation(
     [property: JsonPropertyName("request")] ParkingRequest Request,
     [property: JsonPropertyName("createdAt")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("lastAttemptAt")] DateTimeOffset? LastAttemptAt = null,
-    [property: JsonPropertyName("lastError")] string? LastError = null);
+    [property: JsonPropertyName("lastError")] string? LastError = null,
+    [property: JsonPropertyName("attemptCount")] int AttemptCount = 0,
+    [property: JsonPropertyName("status")] string Status = "PENDING");
 
 public sealed class OfflineOutboxStore
 {
@@ -72,7 +74,7 @@ public sealed class OfflineOutboxStore
         finally { _gate.Release(); }
     }
 
-    public async Task RecordFailureAsync(string operationId, string message)
+    public async Task RecordFailureAsync(string operationId, string message, bool isFatal = false)
     {
         await _gate.WaitAsync();
         try
@@ -81,10 +83,16 @@ public sealed class OfflineOutboxStore
             int index = items.FindIndex(item => string.Equals(item.OperationId, operationId,
                 StringComparison.OrdinalIgnoreCase));
             if (index >= 0)
+            {
+                int newAttempts = items[index].AttemptCount + 1;
+                string newStatus = (isFatal || newAttempts >= 5) ? "DEAD_LETTER" : "PENDING";
                 items[index] = items[index] with {
                     LastAttemptAt = DateTimeOffset.UtcNow,
-                    LastError = Truncate(message, 500)
+                    LastError = Truncate(message, 500),
+                    AttemptCount = newAttempts,
+                    Status = newStatus
                 };
+            }
             await WriteUnsafeAsync(items);
         }
         finally { _gate.Release(); }

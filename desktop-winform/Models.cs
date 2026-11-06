@@ -99,6 +99,15 @@ public record ResidentLookupResponse(
     [property: JsonPropertyName("authorizedMembers")] List<AuthorizedMemberResponse> AuthorizedMembers,
     [property: JsonPropertyName("guestEntryFaceAvailable")] bool GuestEntryFaceAvailable);
 
+public record QualityWarning(
+    [property: JsonPropertyName("code")] string? Code = null,
+    [property: JsonPropertyName("message")] string? Message = null);
+
+public record QualityInfo(
+    [property: JsonPropertyName("status")] string? Status = null,
+    [property: JsonPropertyName("version")] string? Version = null,
+    [property: JsonPropertyName("warnings")] List<QualityWarning>? Warnings = null);
+
 public record FaceVerificationResponse(
     [property: JsonPropertyName("decision")] string Decision,
     [property: JsonPropertyName("similarity")] double Similarity,
@@ -109,7 +118,8 @@ public record FaceVerificationResponse(
     [property: JsonPropertyName("requestId")] string? RequestId = null,
     [property: JsonPropertyName("evidenceId")] string? EvidenceId = null,
     [property: JsonPropertyName("processedAt")] DateTimeOffset? ProcessedAt = null,
-    [property: JsonPropertyName("modelVersion")] string? ModelVersion = null);
+    [property: JsonPropertyName("modelVersion")] string? ModelVersion = null,
+    [property: JsonPropertyName("quality")] QualityInfo? Quality = null);
 
 public record ParkingSlotResponse(
     [property: JsonPropertyName("id")] long Id,
@@ -130,7 +140,38 @@ public record ParkingSlotResponse(
     [property: JsonPropertyName("borrowNotes")] string? BorrowNotes,
     [property: JsonPropertyName("overdue")] bool Overdue,
     [property: JsonPropertyName("status")] string Status,
-    [property: JsonPropertyName("statusDescription")] string? StatusDescription);
+    [property: JsonPropertyName("statusDescription")] string? StatusDescription,
+    [property: JsonPropertyName("locationLabel")] string? LocationLabel = null,
+    [property: JsonPropertyName("vehicleTypeName")] string? VehicleTypeName = null,
+    [property: JsonPropertyName("capacityUnits")] int? CapacityUnits = null,
+    [property: JsonPropertyName("floorId")] long? FloorId = null,
+    [property: JsonPropertyName("zoneId")] long? ZoneId = null,
+    [property: JsonPropertyName("active")] bool Active = true);
+
+public record ParkingZoneDto(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("floorId")] long? FloorId,
+    [property: JsonPropertyName("floorName")] string? FloorName,
+    [property: JsonPropertyName("basement")] bool Basement,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("codePrefix")] string CodePrefix,
+    [property: JsonPropertyName("vehicleTypeId")] long? VehicleTypeId,
+    [property: JsonPropertyName("vehicleTypeCode")] string? VehicleTypeCode,
+    [property: JsonPropertyName("vehicleTypeName")] string? VehicleTypeName,
+    [property: JsonPropertyName("capacityUnits")] int CapacityUnits,
+    [property: JsonPropertyName("side")] string? Side,
+    [property: JsonPropertyName("active")] bool Active,
+    [property: JsonPropertyName("activeSlotCount")] int ActiveSlotCount,
+    [property: JsonPropertyName("occupiedSlotCodes")] List<string>? OccupiedSlotCodes);
+
+public record VehicleTypeDto(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("code")] string Code,
+    [property: JsonPropertyName("displayName")] string DisplayName,
+    [property: JsonPropertyName("category")] string Category,
+    [property: JsonPropertyName("capacityUnits")] int CapacityUnits,
+    [property: JsonPropertyName("hasPricingRule")] bool HasPricingRule,
+    [property: JsonPropertyName("active")] bool Active);
 
 public record SlotAssignRequest([property: JsonPropertyName("vehicleId")] long? VehicleId);
 public record SlotBorrowRequest(
@@ -174,7 +215,8 @@ public record AnprResponse(
     [property: JsonPropertyName("requestId")] string? RequestId = null,
     [property: JsonPropertyName("evidenceId")] string? EvidenceId = null,
     [property: JsonPropertyName("processedAt")] DateTimeOffset? ProcessedAt = null,
-    [property: JsonPropertyName("modelVersion")] string? ModelVersion = null);
+    [property: JsonPropertyName("modelVersion")] string? ModelVersion = null,
+    [property: JsonPropertyName("quality")] QualityInfo? Quality = null);
 
 public record EvidenceComparisonResponse(
     [property: JsonPropertyName("sessionId")] long SessionId,

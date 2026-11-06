@@ -197,6 +197,7 @@ public sealed class ParkingApiClient : IDisposable
         {
             foreach (OfflineOperation item in await _outbox.ReadAsync())
             {
+                if (item.Status == "DEAD_LETTER") continue;
                 string path = item.Type == OfflineOperationType.Entry
                     ? "/api/parking/entry" : "/api/parking/exit-confirm";
                 try
@@ -206,14 +207,14 @@ public sealed class ParkingApiClient : IDisposable
                 }
                 catch (Exception ex) when (IsConnectivityFailure(ex))
                 {
-                    await _outbox.RecordFailureAsync(item.OperationId, ex.Message);
+                    await _outbox.RecordFailureAsync(item.OperationId, ex.Message, isFatal: false);
                     break;
                 }
                 catch (DesktopAuthenticationException) { throw; }
                 catch (Exception ex)
                 {
-                    await _outbox.RecordFailureAsync(item.OperationId, ex.Message);
-                    break;
+                    await _outbox.RecordFailureAsync(item.OperationId, ex.Message, isFatal: true);
+                    continue;
                 }
             }
             return (await _outbox.ReadAsync()).Count;
@@ -247,6 +248,27 @@ public sealed class ParkingApiClient : IDisposable
         using var response = await SendProtectedAsync("/api/parking/slots", HttpMethod.Get, retrySafeRead: true);
         return await ApiResponseReader.ReadAsync<List<ParkingSlotResponse>>(response, _json,
             "Hệ thống", "tải sơ đồ bãi xe");
+    }
+
+    public async Task<ParkingSlotResponse> GetSlotDetailAsync(long slotId)
+    {
+        using var response = await SendProtectedAsync($"/api/parking/slots/{slotId}", HttpMethod.Get, retrySafeRead: true);
+        return await ApiResponseReader.ReadAsync<ParkingSlotResponse>(response, _json,
+            "Spring Web", "lấy chi tiết vị trí đỗ");
+    }
+
+    public async Task<List<ParkingZoneDto>> GetZonesAsync()
+    {
+        using var response = await SendProtectedAsync("/api/parking/zones", HttpMethod.Get, retrySafeRead: true);
+        return await ApiResponseReader.ReadAsync<List<ParkingZoneDto>>(response, _json,
+            "Spring Web", "tải danh sách khu vực");
+    }
+
+    public async Task<List<VehicleTypeDto>> GetVehicleTypesAsync()
+    {
+        using var response = await SendProtectedAsync("/api/parking/vehicle-types", HttpMethod.Get, retrySafeRead: true);
+        return await ApiResponseReader.ReadAsync<List<VehicleTypeDto>>(response, _json,
+            "Spring Web", "tải danh mục loại xe");
     }
 
     public async Task AssignSlotAsync(long slotId, long? vehicleId)

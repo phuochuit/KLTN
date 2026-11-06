@@ -7,6 +7,7 @@ from app.recognizer import (
     normalize_plate,
     plate_format_score,
     plate_shape_is_plausible,
+    select_plate_candidate,
     vehicle_type_from_detections,
     vehicle_type_near_plate,
 )
@@ -24,6 +25,10 @@ def test_canonicalize_plate_keeps_standard_plate_unchanged():
     assert canonicalize_plate("59F241578") == "59F241578"
 
 
+def test_canonicalize_plate_removes_inserted_digit_before_series():
+    assert canonicalize_plate("594F241578") == "59F241578"
+
+
 def test_canonicalize_plate_corrects_position_safe_ocr_confusions():
     assert canonicalize_plate("3OF55775") == "30F55775"
     assert canonicalize_plate("30F55Z75") == "30F55275"
@@ -31,6 +36,22 @@ def test_canonicalize_plate_corrects_position_safe_ocr_confusions():
 
 def test_canonicalize_plate_does_not_guess_between_numeric_digits():
     assert canonicalize_plate("30F55275") == "30F55275"
+
+
+def test_plate_vote_agreement_can_beat_one_isolated_high_confidence_error():
+    votes = {
+        "59F241528": [0.901],
+        "59F241578": [0.513, 0.661, 0.679],
+    }
+    assert select_plate_candidate(votes) == ("59F241578", 0.679)
+
+
+def test_weak_duplicate_votes_do_not_replace_one_clear_reading():
+    votes = {
+        "30F55775": [0.988],
+        "80FH55775": [0.625, 0.625],
+    }
+    assert select_plate_candidate(votes) == ("30F55775", 0.988)
 
 
 def test_vehicle_type_prefers_highest_confidence():

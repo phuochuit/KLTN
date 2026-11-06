@@ -21,7 +21,7 @@ public sealed class GateStationSettings
         if (BarrierAutoCloseSeconds is < 1 or > 120)
             throw new ArgumentException("Thời gian tự đóng barrier phải từ 1 đến 120 giây.");
         if (!string.Equals(BarrierDriver, "SIMULATOR", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException("Driver barrier chưa được hỗ trợ. Hiện tại hãy chọn Mô phỏng.");
+            throw new ArgumentException("Thiết bị điều khiển thanh chắn này chưa được hỗ trợ. Hiện tại hãy chọn Mô phỏng.");
     }
 
     public GateStationSettings Copy() => new()
@@ -51,6 +51,6 @@ public sealed class GateStationSettings
             return;
         }
         if (!IsNetworkSource(source))
-            throw new ArgumentException($"{label} phải là chỉ số USB hoặc địa chỉ RTSP/HTTP hợp lệ.");
+            throw new ArgumentException($"{label} phải là chỉ số camera USB hoặc địa chỉ camera mạng hợp lệ.");
     }
 }

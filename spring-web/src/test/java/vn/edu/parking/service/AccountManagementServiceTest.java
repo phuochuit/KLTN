@@ -96,6 +96,19 @@ class AccountManagementServiceTest {
         verify(sessions, never()).revokeAllForAccount(staff.getId());
     }
 
+    @Test
+    void temporaryPasswordMeetsComplexityAndLengthRequirements() {
+        for (int i = 0; i < 50; i++) {
+            String pwd = AccountManagementService.newTemporaryPassword();
+            assertEquals(12, pwd.length(), "Password length must be exactly 12");
+            assertTrue(pwd.matches(".*[A-Z].*"), "Must contain at least one uppercase letter");
+            assertTrue(pwd.matches(".*[a-z].*"), "Must contain at least one lowercase letter");
+            assertTrue(pwd.matches(".*[0-9].*"), "Must contain at least one digit");
+            assertFalse(pwd.contains("0") || pwd.contains("O") || pwd.contains("1") || pwd.contains("l") || pwd.contains("I"),
+                "Must not contain ambiguous characters (0, O, 1, l, I)");
+        }
+    }
+
     private SystemAccount account(String username, AccountRole role, boolean enabled) {
         var account = new SystemAccount(username, encoder.encode("synthetic password"), role, false);
         account.setEnabled(enabled);
