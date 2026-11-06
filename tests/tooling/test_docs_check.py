@@ -23,12 +23,13 @@ class DocsCheckTests(unittest.TestCase):
         return path
 
     def test_local_only_and_secrets_blocked(self):
-        for path in ['AGENTS.md', '.opencode/skills/a.md', '.artifacts/a', 'tasks/a',
+        for path in ['.opencode/skills/a.md', '.artifacts/a', 'tasks/a',
                      '.cache/a', '.codegraph/a', 'a.pem', 'a.key', '.env.local', 'a/.env']:
             self.assertTrue(check.blocked(path), path)
 
     def test_source_and_examples_allowed(self):
-        for path in ['docs/README.md', 'scripts/test.ps1', '.env.local.example',
+        for path in ['AGENTS.md', '.opencode/skills/parking-anpr/SKILL.md',
+                     'docs/README.md', 'scripts/test.ps1', '.env.local.example',
                      'spring-web/src/main/resources/application.properties']:
             self.assertFalse(check.blocked(path), path)
 

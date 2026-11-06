@@ -68,6 +68,7 @@ public class SecurityConfig {
                 .requestMatchers("/pricing/**").hasAnyAuthority("PRICING_MANAGE", "ROLE_MANAGEMENT")
                 .requestMatchers("/api/admin/**").hasAnyAuthority("SLOT_MANAGE", "PRICING_MANAGE", "ROLE_MANAGEMENT")
                 .requestMatchers("/").hasAnyAuthority("DASHBOARD_VIEW", "ROLE_MANAGEMENT")
+                .requestMatchers("/", "/api/dashboard/overview").hasAnyAuthority("DASHBOARD_VIEW", "ROLE_MANAGEMENT")
                 .requestMatchers("/h2-console/**").permitAll()
                 .anyRequest().denyAll())
             .formLogin(login -> login.loginPage("/login").permitAll()

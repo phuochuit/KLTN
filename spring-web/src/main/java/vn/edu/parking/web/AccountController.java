@@ -5,6 +5,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -33,7 +35,10 @@ public class AccountController {
             model.addAttribute("error", "Mật khẩu hiện tại không chính xác.");
             return "account-password";
         } catch (IllegalArgumentException ex) {
-            model.addAttribute("error", "Mật khẩu mới phải dài từ 12 đến 72 byte UTF-8.");
+            model.addAttribute("error", "Mật khẩu mới phải có ít nhất 12 đơn vị UTF-16 và tối đa 72 byte UTF-8.");
+            return "account-password";
+        } catch (DataAccessException | TransactionException ex) {
+            model.addAttribute("error", "Không thể xác nhận kết quả đổi mật khẩu. Hãy thử đăng nhập lại trước khi gửi lại.");
             return "account-password";
         }
         SecurityContextHolder.clearContext();

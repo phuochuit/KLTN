@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>LumiPark — reversed</title>
+  <path d="M15 15v29a5 5 0 0 0 5 5h12" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+  <path d="M30 49V15h10a10 10 0 0 1 0 20H30" stroke="#D5EF8C" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="47" cy="48" r="3" fill="#FFFFFF"/>
+</svg>

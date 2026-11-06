@@ -171,3 +171,8 @@ Từ root chạy trực tiếp từng suite: `mvn test` trong `spring-web` (cầ
 | Nhận dạng sai/chậm | Ảnh rõ/đủ sáng, kiểm plate manual theo evidence; CPU/video có thể chậm. UI warning thresholds khác model thresholds; chưa có SLA/accuracy result. Không suy từ AI type ra quyền/charging. |
 
 Không có verified backup/restore, live offline queue/resync, production datasource/TLS/retention/security deployment trong đợt này; source có outbox/payment/shift không đóng các gaps đó. Xem [security](../security/overview.md), [NV07](../requirements/nv07-exceptions-recovery.md) và [testing strategy](../testing/strategy.md) trước đưa hệ thống vào vận hành thật.
+
+
+## LumiPark login frontend build
+
+Giao diện Thymeleaf dùng CSS nguồn trong `spring-web/src/main/frontend/styles/`, Tailwind CSS v4 và Lucide từ lockfile của `spring-web/package-lock.json`. Sau khi môi trường Node 22+ và dependencies đã được chuẩn bị, chạy `npm run build` trong `spring-web`; `npm test` chạy kiểm tra frontend. Maven cũng gọi cùng build ở phase `process-classes`. CSS/icon sinh ra nằm dưới `spring-web/target/classes/static/`, không commit generated output. Việc chuẩn bị dependencies cần quyền riêng; runner không tự cài. Đây là hướng dẫn build, không phải chứng nhận E2E hay kết quả chạy mới.

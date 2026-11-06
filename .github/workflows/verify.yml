@@ -35,7 +35,7 @@ jobs:
           $files = @(git ls-files)
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $blocked = @($files | Where-Object {
-            $_ -match '^(AGENTS\.md$|\.opencode/|\.codegraph/|tasks/|\.cache/|\.artifacts/)' -or
+            ($_ -match '^(\.opencode/|\.codegraph/|tasks/|\.cache/|\.artifacts/)' -and $_ -ne '.opencode/skills/parking-anpr/SKILL.md') -or
             $_ -match '\.(pem|key|pfx|p12)$' -or
             ($_ -match '(^|/)\.env($|\.)' -and $_ -notmatch '\.example$')
           })
@@ -50,6 +50,21 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Set up Node for Spring frontend
+        if: matrix.suite == 'spring'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.21.0'
+
+      - name: Prepare and test Spring frontend
+        if: matrix.suite == 'spring'
+        working-directory: spring-web
+        run: |
+          npm ci --cache ../.cache/npm --no-fund --no-audit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          exit $LASTEXITCODE
 
       - name: Set up .NET 8
         if: matrix.suite == 'desktop'

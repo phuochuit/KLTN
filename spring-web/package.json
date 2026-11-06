@@ -1,0 +1,19 @@
+{
+  "name": "lumipark-web-ui",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node src/main/frontend/build.mjs",
+    "test": "node --test src/test/frontend/*.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/cli": "4.3.3",
+    "lucide-static": "1.61.0",
+    "tailwindcss": "4.3.3"
+  }
+}

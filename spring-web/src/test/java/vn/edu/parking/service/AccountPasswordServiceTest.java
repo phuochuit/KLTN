@@ -52,6 +52,25 @@ class AccountPasswordServiceTest {
             () -> service.changeOwnPassword("manager", "old synthetic password", "short"));
     }
 
+    @Test
+    void enforcesUtf16AndUtf8BoundariesWithoutChangingThePasswordPolicy() {
+        var account = account("old synthetic password");
+        when(accounts.lockByUsername("manager")).thenReturn(Optional.of(account));
+
+        assertThrows(IllegalArgumentException.class,
+            () -> service.changeOwnPassword("manager", "old synthetic password", "a".repeat(11)));
+
+        String twelveUnits = "a".repeat(12);
+        service.changeOwnPassword("manager", "old synthetic password", twelveUnits);
+        assertTrue(encoder.matches(twelveUnits, account.getPasswordHash()));
+
+        String exactlySeventyTwoUtf8Bytes = "é".repeat(36);
+        service.changeOwnPassword("manager", twelveUnits, exactlySeventyTwoUtf8Bytes);
+        assertTrue(encoder.matches(exactlySeventyTwoUtf8Bytes, account.getPasswordHash()));
+        assertThrows(IllegalArgumentException.class,
+            () -> service.changeOwnPassword("manager", exactlySeventyTwoUtf8Bytes, "é".repeat(37)));
+    }
+
     private SystemAccount account(String password) {
         return new SystemAccount("manager", encoder.encode(password), AccountRole.MANAGEMENT, false);
     }

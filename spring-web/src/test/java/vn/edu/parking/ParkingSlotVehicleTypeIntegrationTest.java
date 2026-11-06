@@ -100,4 +100,20 @@ class ParkingSlotVehicleTypeIntegrationTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Ô A04 chỉ dành cho ô tô.");
     }
+
+    @Test
+    void rejectsDispatchingSessionThatIsNoLongerOpen() {
+        var slot = slots.findBySlotCodeIgnoreCase("A05").orElseThrow();
+        ParkingSession session = new ParkingSession();
+        session.setEntryPlate("59Z999998");
+        session.setDetectedVehicleType(VehicleType.CAR);
+        session.setEntryTime(LocalDateTime.now().minusHours(1));
+        session.setExitTime(LocalDateTime.now());
+        session.setStatus(SessionStatus.COMPLETED);
+        Long sessionId = sessions.save(session).getId();
+
+        assertThatThrownBy(() -> parkingService.dispatchSessionToSlot(slot.getId(), sessionId))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("Chỉ có thể điều phối lượt xe đang mở.");
+    }
 }

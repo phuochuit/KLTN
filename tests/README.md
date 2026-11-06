@@ -31,7 +31,7 @@ Report ở `.artifacts/test-runs/<run-id>/`: XML/TRX, combined stdout/stderr, to
 
 Cache/temp tái tạo ở `.cache/`; mỗi lượt có report/temp riêng, không tái sử dụng hoặc tự xóa report cũ. Không đưa local config, credentials, operational media, `.cache/` hoặc `.artifacts/` vào Git. Giữ native `target/`, `bin/`, `obj/` của từng module.
 
-**Ranh giới Spring main:** test resource đặt H2 driver/dialect và JWT off; từng integration class khai báo in-memory URL/create-drop, DesktopJwtIntegrationTest bật JWT bằng synthetic keys. ParkingFlowIntegrationTest còn tắt evidence và dùng fixed `target/test-uploads`/`target/test-private`; các class khác cũng có media defaults/relative paths. Runner tách TEMP/TMP/java.io.tmpdir nhưng không sửa các paths này; per-class/JVM media isolation của feature branch chưa có trên main. Phải xác nhận effective test datasource/media và không dùng operational storage trước khi được phép chạy; đừng copy create-drop tới DB thật. Không có Flyway dependency/migration test suite trên main.
+**Ranh giới Spring trong PR:** test resources đặt H2 driver/dialect và JWT off, nhưng không tự bảo đảm mọi class có URL/media cô lập. `LoginTestIsolation` cấp H2 in-memory/create-drop và media root riêng cho các lớp đã đăng ký, gồm ParkingFlow và DailyPackageValidity; dynamic properties ghi đè cả các annotation path cũ của ParkingFlow. Demo account bootstrap bị tắt trong fixture này; DesktopJwtIntegrationTest có synthetic keys riêng. Các class khác vẫn cần kiểm annotation/config hiệu lực trước khi chạy. Runner chỉ tách TEMP/TMP/java.io.tmpdir, không biến môi trường thật thành test DB. Không copy create-drop sang DB thật hoặc coi source isolation là bằng chứng live E2E. Không có Flyway dependency/migration suite trên main đã tích hợp.
 
 ## GitHub Actions
 
@@ -83,3 +83,12 @@ Chỉ kết luận PASS sau khi kiểm exit code và XML mới trong `$reports`:
 Vị trí được duyệt: `tests/api/`, `tests/e2e/web/`, `tests/e2e/desktop/`, fixtures synthetic ở `tests/fixtures/`; chỉ tạo suite/helper khi có implementation thật.
 
 Trước live run phải xác nhận URL, DB/schema/media test độc lập, tài khoản synthetic/quyền, credential channel và seed/cleanup. Không tự dùng datasource hiện tại, reset DB, mở camera hoặc gọi mutation route. Spring thật + ANPR giả cần ghi nhãn như vậy, không full E2E. Web harness và Windows UI Automation chưa chọn; Playwright không test WinForms. Desktop outbox tests hiện có không thay cho client↔Spring network test; HTTP doubles của feature branch chỉ là lịch sử và cũng không live network proof.
+
+## Package-policy integration regression coverage
+
+The approved Web integration adds/extends Spring coverage in `DailyPackageValidityIntegrationTest` and `ParkingFlowIntegrationTest` for inclusive DAILY validity, fixed 30-day MONTHLY validity, ACTIVE-only activation, legacy `PER_VISIT` rejection for new purchases, and optional package activation in the combined registration POST. Root owns execution; these tests are **not yet reported as run** by this handoff. Focused execution should include both classes plus `CsvExportIntegrationTest` (upstream CSV preservation) and frontend model/asset checks for cards, pricing, and registration. Use the existing isolated test runner and fresh report directory; do not infer PASS from test source.
+
+
+## Final review LumiPark Web
+
+[Kết quả và giới hạn](../docs/review/web-final-review-integration.md) ghi số liệu mới nhất theo từng lớp, không gộp các lượt trùng thành test mới. Không lấy report H2/mock thành live E2E. Legacy `login.mjs`/`management-core.mjs` hiện bắt buộc ownership của listener đúng process tree LoginBrowserHarnessTest; thiếu/stop/sai marker thì từ chối trước browser. Chạy regression guard độc lập từ root: `node --test tests/e2e/web/isolated-harness.test.mjs` (không khởi động ứng dụng hoặc mutation nghiệp vụ). Các helper opt-in không thuộc default frontend test glob; những API browser ngoài quyền hiện hành không được sử dụng chỉ vì có trong source lịch sử.

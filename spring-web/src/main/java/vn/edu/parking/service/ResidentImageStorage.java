@@ -15,9 +15,15 @@ import java.nio.file.*;
 import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ResidentImageStorage {
+    private static final Logger log = LoggerFactory.getLogger(ResidentImageStorage.class);
     private static final int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
     private static final int MAX_DIMENSION = 8192;
     private static final long MAX_PIXELS = 40_000_000L;
@@ -96,6 +102,37 @@ public class ResidentImageStorage {
             return PRIVATE_PREFIX + filename;
         } catch (IllegalArgumentException ex) { throw ex; }
         catch (Exception ex) { throw new IllegalStateException("Không thể lưu ảnh khuôn mặt: " + ex.getMessage(), ex); }
+    }
+
+    /** Saves a new immutable image and removes it only after a known database rollback. */
+    public String saveForTransaction(MultipartFile upload, String capturedDataUrl) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("Ảnh hồ sơ phải được lưu trong transaction nghiệp vụ");
+        }
+        AtomicReference<String> savedReference = new AtomicReference<>();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_ROLLED_BACK || savedReference.get() == null) return;
+                try {
+                    deleteNewPrivateReference(savedReference.get());
+                } catch (IOException | RuntimeException ex) {
+                    log.warn("Could not remove a newly staged resident image after transaction rollback");
+                }
+            }
+        });
+        String reference = save(upload, capturedDataUrl);
+        if (reference != null) savedReference.set(reference);
+        return reference;
+    }
+
+    private void deleteNewPrivateReference(String reference) throws IOException {
+        if (reference == null || !reference.startsWith(PRIVATE_PREFIX)) return;
+        String filename = reference.substring(PRIVATE_PREFIX.length());
+        Path file = safePath(filename);
+        if (Files.isSymbolicLink(file)) return;
+        Files.deleteIfExists(file);
     }
 
     public String saveCaptured(String capturedDataUrl) { return save(null, capturedDataUrl); }

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>LumiPark</title>
+  <defs><linearGradient id="p" x1="8" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse"><stop stop-color="#50DAEC"/><stop offset=".48" stop-color="#4286F5"/><stop offset="1" stop-color="#8852EC"/></linearGradient></defs>
+  <path d="M8 8h29c13 0 21 8 21 20s-8 20-21 20H27V34h10c5 0 7-2 7-6s-2-6-7-6H8ZM8 28h14v26l-14 6Zm20 25V42h5v9Z" fill="url(#p)"/>
+</svg>

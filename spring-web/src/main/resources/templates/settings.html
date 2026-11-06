@@ -1,4 +1,117 @@
-<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hạn mức phương tiện</title><link rel="stylesheet" th:href="@{/css/app.css}"></head><body><header th:replace="~{fragments :: header}"></header><main><h1>Hạn mức phương tiện</h1><p class="notice" th:if="${message}" th:text="${message}"></p>
-<div class="card help">Đây là giới hạn mặc định cho mỗi hộ. Admin có thể đặt hạn mức riêng từng hộ tại trang <strong>Hộ gia đình</strong>. Giá trị 0 nghĩa là không cho đăng ký nhóm xe đó.</div>
-<form class="card toolbar" method="post" th:action="@{/settings}"><label>Số xe hai bánh tối đa/hộ<input name="defaultMaxTwoWheelers" type="number" min="0" required th:value="${policy.defaultMaxTwoWheelers}"></label><label>Số ô tô tối đa/hộ<input name="defaultMaxCars" type="number" min="0" required th:value="${policy.defaultMaxCars}"></label><button>Lưu hạn mức</button></form>
-</main></body></html>
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hạn mức phương tiện · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <link rel="stylesheet" th:href="@{/css/management-core.css}">
+  <script defer th:src="@{/js/management-core.js}"></script>
+</head>
+<body class="dashboard-page management-page settings-page" th:with="activePage='settings'">
+<a href="#settingsMain" class="skip-link">Đến nội dung chính</a>
+<div class="dashboard-shell">
+  <aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside>
+  <div class="dashboard-workspace">
+    <header class="dashboard-topbar">
+      <div class="topbar-location"><button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng" aria-haspopup="dialog"><img th:src="@{/images/lucide/menu.svg}" alt=""></button><span>Không gian quản trị / <strong>Hạn mức</strong></span></div>
+      <a class="account-link" th:href="@{/account/password}"><span class="account-avatar" aria-hidden="true"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span></a>
+    </header>
+    <main id="settingsMain" tabindex="-1">
+      <noscript><details class="noscript-navigation"><summary>Mở điều hướng</summary><div th:replace="~{dashboard-shell :: navigation}"></div></details></noscript>
+      <section class="page-heading settings-heading">
+        <div class="settings-heading-copy">
+          <p class="eyebrow"><span class="settings-signal" aria-hidden="true"></span>LUMIPARK / CẤU HÌNH</p>
+          <h1>Hạn mức <span>phương tiện</span></h1>
+          <p class="page-description">Thiết lập số phương tiện tối đa theo từng nhóm; áp dụng mặc định khi hộ chưa đặt mức riêng.</p>
+        </div>
+      </section>
+      <div class="management-notice" th:if="${message}" role="status">
+        <img th:src="@{/images/lucide/circle-check.svg}" alt="">
+        <span th:text="${message}">Đã cập nhật hạn mức xe mặc định</span>
+      </div>
+      <div class="settings-layout">
+        <section class="glass-card settings-form-panel" aria-labelledby="limitTitle">
+          <div class="settings-panel-heading">
+            <div>
+              <p class="eyebrow">CẤU HÌNH CHUNG</p>
+              <h2 id="limitTitle">Hạn mức mặc định</h2>
+              <p>Mỗi giá trị được tính riêng theo nhóm xe trên một hộ gia đình.</p>
+            </div>
+            <span class="settings-panel-mark" aria-hidden="true"><span></span><span></span></span>
+          </div>
+          <form method="post" th:action="@{/settings}" class="settings-form" id="limitForm">
+            <div class="settings-quota-grid">
+              <section class="settings-quota settings-quota-two-wheelers" aria-labelledby="twoWheelersTitle">
+                <div class="settings-quota-heading">
+                  <span class="settings-quota-icon"><img th:src="@{/images/lucide/bike.svg}" alt=""></span>
+                  <div><p class="settings-quota-kind">XE HAI BÁNH</p><h3 id="twoWheelersTitle">Xe hai bánh</h3></div>
+                  <span class="settings-quota-index" aria-hidden="true">01</span>
+                </div>
+                <label for="twoWheelerLimit">Hạn mức tối đa</label>
+                <div class="settings-number-field">
+                  <input id="twoWheelerLimit" name="defaultMaxTwoWheelers" type="number" min="0" step="1" required aria-describedby="twoWheelersHelp" th:value="${policy.defaultMaxTwoWheelers}">
+                  <span class="settings-number-unit">xe <small>/ hộ</small></span>
+                </div>
+                <p id="twoWheelersHelp" class="settings-quota-help">Số xe hai bánh tối đa được đăng ký cho mỗi hộ.</p>
+              </section>
+              <section class="settings-quota settings-quota-cars" aria-labelledby="carsTitle">
+                <div class="settings-quota-heading">
+                  <span class="settings-quota-icon"><img th:src="@{/images/lucide/car-front.svg}" alt=""></span>
+                  <div><p class="settings-quota-kind">Ô TÔ</p><h3 id="carsTitle">Ô tô</h3></div>
+                  <span class="settings-quota-index" aria-hidden="true">02</span>
+                </div>
+                <label for="carLimit">Hạn mức tối đa</label>
+                <div class="settings-number-field">
+                  <input id="carLimit" name="defaultMaxCars" type="number" min="0" step="1" required aria-describedby="carsHelp" th:value="${policy.defaultMaxCars}">
+                  <span class="settings-number-unit">xe <small>/ hộ</small></span>
+                </div>
+                <p id="carsHelp" class="settings-quota-help">Số ô tô tối đa được đăng ký cho mỗi hộ.</p>
+              </section>
+            </div>
+            <div class="settings-save-state">
+              <div class="settings-saved-values">
+                <span class="settings-state-icon" aria-hidden="true"><img th:src="@{/images/lucide/circle-check.svg}" alt=""></span>
+                <div><span class="settings-state-label">GIÁ TRỊ ĐÃ LƯU</span><p id="limitSaved" th:text="${policy.defaultMaxTwoWheelers + ' xe hai bánh / hộ · ' + policy.defaultMaxCars + ' ô tô / hộ'}">2 xe hai bánh / hộ · 1 ô tô / hộ</p></div>
+              </div>
+              <div class="settings-draft-state" id="limitDraftState" hidden>
+                <span id="limitDraft" data-state="saved" role="status" aria-live="polite">Không có thay đổi chưa lưu</span>
+                <p id="limitDraftValues" hidden></p>
+              </div>
+            </div>
+            <div class="settings-form-actions">
+              <p id="limitActionHint" class="settings-action-hint" hidden>Thay đổi ít nhất một hạn mức để bật thao tác lưu và khôi phục.</p>
+              <div class="settings-action-buttons">
+                <button class="primary-button settings-save-button" id="saveLimitButton" type="submit" aria-describedby="limitActionHint">
+                  <span>Lưu thay đổi</span><img th:src="@{/images/lucide/arrow-right.svg}" alt="">
+                </button>
+                <button class="secondary-button settings-reset-button" id="resetLimitButton" type="button" aria-describedby="limitActionHint" hidden>
+                  <img th:src="@{/images/lucide/refresh-cw.svg}" alt=""><span>Khôi phục giá trị đã tải</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+        <aside class="glass-card settings-rules" aria-labelledby="settingsRulesTitle">
+          <div class="settings-rules-heading">
+            <span class="settings-rules-icon"><img th:src="@{/images/lucide/circle-help.svg}" alt=""></span>
+            <div><p class="eyebrow">QUY TẮC ÁP DỤNG</p><h2 id="settingsRulesTitle">Hạn mức ảnh hưởng thế nào?</h2></div>
+          </div>
+          <ul class="settings-rule-list">
+            <li><span class="settings-rule-mark">MẶC ĐỊNH</span><div><strong>Dùng khi hộ chưa đặt mức riêng</strong><p>Mỗi hộ có thể ghi đè riêng cho xe hai bánh hoặc ô tô.</p></div></li>
+            <li><span class="settings-rule-mark settings-rule-zero">0</span><div><strong>Chặn đăng ký mới</strong><p>Giới hạn bằng 0 không cho đăng ký thêm phương tiện của nhóm đó.</p></div></li>
+            <li><span class="settings-rule-mark settings-rule-existing">ĐÃ CÓ</span><div><strong>Không xóa xe hiện hữu</strong><p>Giảm hạn mức không xóa hoặc vô hiệu hóa xe đã có.</p></div></li>
+          </ul>
+          <div class="settings-household-link">
+            <p>Cần đặt mức riêng cho một hộ?</p>
+            <a th:if="${#sets.contains(currentAuthorities,'RESIDENT_MANAGE') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}" th:href="@{/households}">
+              <span>Đi đến hộ gia đình</span><img th:src="@{/images/lucide/arrow-right.svg}" alt="">
+            </a>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+<dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị"><button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button><div th:replace="~{dashboard-shell :: navigation}"></div></dialog>
+</body></html>

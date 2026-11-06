@@ -2,30 +2,39 @@ package vn.edu.parking.web;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import vn.edu.parking.domain.*;
 import vn.edu.parking.repository.*;
 import vn.edu.parking.service.PlateNormalizer;
 import vn.edu.parking.service.ResidentImageStorage;
 import vn.edu.parking.service.ParkingService;
-import vn.edu.parking.service.PaymentTransactionService;
 import vn.edu.parking.service.SecurityAuditService;
 import vn.edu.parking.service.SlotManagementService;
 import vn.edu.parking.service.UiOptionService;
+import vn.edu.parking.service.ManagementCoreWriteService;
+import vn.edu.parking.service.CardManagementWriteService;
 import vn.edu.parking.web.dto.*;
 
 import java.math.BigDecimal;
+import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpHeaders;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +45,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Controller
 public class AdminController {
+    private static final Comparator<ParkingSlotResponse> SLOT_CODE_NATURAL_ORDER =
+        Comparator.comparing(ParkingSlotResponse::slotCode, AdminController::compareNaturalSlotCodes)
+            .thenComparing(ParkingSlotResponse::slotCode, String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(ParkingSlotResponse::slotCode)
+            .thenComparing(ParkingSlotResponse::id);
+
     private final VehicleRepository vehicles;
     private final ParkingCardRepository cards;
     private final PricingRuleRepository prices;
@@ -47,23 +62,57 @@ public class AdminController {
     private final ResidentImageStorage imageStorage;
     private final ParkingSlotRepository slots;
     private final ParkingService parkingService;
-    private final PaymentTransactionService paymentTransactions;
     private final SecurityAuditService audit;
     private final ParkingFloorRepository floors;
     private final ParkingZoneRepository zones;
     private final VehicleTypeRepository vehicleTypes;
     private final UiOptionService uiOptionService;
     private final SlotManagementService slotManagementService;
+    private final ManagementCoreWriteService managementWrites;
+    private final CardManagementWriteService cardWrites;
+
+    private static int compareNaturalSlotCodes(String left, String right) {
+        int leftIndex = 0;
+        int rightIndex = 0;
+        while (leftIndex < left.length() && rightIndex < right.length()) {
+            char leftChar = left.charAt(leftIndex);
+            char rightChar = right.charAt(rightIndex);
+            if (Character.isDigit(leftChar) && Character.isDigit(rightChar)) {
+                int leftEnd = leftIndex;
+                int rightEnd = rightIndex;
+                while (leftEnd < left.length() && Character.isDigit(left.charAt(leftEnd))) leftEnd++;
+                while (rightEnd < right.length() && Character.isDigit(right.charAt(rightEnd))) rightEnd++;
+                int leftSignificant = leftIndex;
+                int rightSignificant = rightIndex;
+                while (leftSignificant < leftEnd - 1 && left.charAt(leftSignificant) == '0') leftSignificant++;
+                while (rightSignificant < rightEnd - 1 && right.charAt(rightSignificant) == '0') rightSignificant++;
+                int lengthOrder = Integer.compare(leftEnd - leftSignificant, rightEnd - rightSignificant);
+                if (lengthOrder != 0) return lengthOrder;
+                int digitOrder = left.regionMatches(leftSignificant, right, rightSignificant,
+                    leftEnd - leftSignificant) ? 0 : left.substring(leftSignificant, leftEnd)
+                        .compareTo(right.substring(rightSignificant, rightEnd));
+                if (digitOrder != 0) return digitOrder;
+                leftIndex = leftEnd;
+                rightIndex = rightEnd;
+                continue;
+            }
+            int characterOrder = Character.compare(Character.toUpperCase(leftChar), Character.toUpperCase(rightChar));
+            if (characterOrder != 0) return characterOrder;
+            leftIndex++;
+            rightIndex++;
+        }
+        return Integer.compare(left.length() - leftIndex, right.length() - rightIndex);
+    }
 
     public AdminController(VehicleRepository vehicles, ParkingCardRepository cards,
             PricingRuleRepository prices, ParkingSessionRepository sessions,
             SubscriptionPaymentRepository payments, HouseholdRepository households,
             FamilyMemberRepository members, ParkingPolicyRepository policies,
             ResidentImageStorage imageStorage, ParkingSlotRepository slots,
-            ParkingService parkingService, PaymentTransactionService paymentTransactions,
-            SecurityAuditService audit, ParkingFloorRepository floors,
+            ParkingService parkingService, SecurityAuditService audit, ParkingFloorRepository floors,
             ParkingZoneRepository zones, VehicleTypeRepository vehicleTypes,
-            UiOptionService uiOptionService, SlotManagementService slotManagementService) {
+            UiOptionService uiOptionService, SlotManagementService slotManagementService,
+            ManagementCoreWriteService managementWrites, CardManagementWriteService cardWrites) {
         this.vehicles = vehicles;
         this.cards = cards;
         this.prices = prices;
@@ -75,13 +124,14 @@ public class AdminController {
         this.imageStorage = imageStorage;
         this.slots = slots;
         this.parkingService = parkingService;
-        this.paymentTransactions = paymentTransactions;
         this.audit = audit;
         this.floors = floors;
         this.zones = zones;
         this.vehicleTypes = vehicleTypes;
         this.uiOptionService = uiOptionService;
         this.slotManagementService = slotManagementService;
+        this.managementWrites = managementWrites;
+        this.cardWrites = cardWrites;
     }
 
     @GetMapping("/")
@@ -112,13 +162,33 @@ public class AdminController {
     }
 
     @GetMapping("/vehicles")
-    String vehicles(Model model) {
-        model.addAttribute("vehicles", vehicles.findAll());
+    String vehicles(Model model, @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "0") String page, @RequestParam(required = false) Long vehicleId) {
+        String searchQuery = q == null ? "" : q.trim().substring(0, Math.min(q.trim().length(), 80));
+        String searchPattern = literalContainsPattern(searchQuery);
+        int pageNumber = parsePageNumber(page);
+        Sort vehicleSort = Sort.by(Sort.Order.asc("plateNumber"), Sort.Order.asc("id"));
+        Page<Vehicle> vehiclePage = vehicles.searchManagement(searchPattern, PageRequest.of(pageNumber, 10, vehicleSort));
+        int availablePage = lastPage(vehiclePage, pageNumber);
+        if (availablePage != pageNumber) {
+            pageNumber = availablePage;
+            vehiclePage = vehicles.searchManagement(searchPattern, PageRequest.of(pageNumber, 10, vehicleSort));
+        }
+        Vehicle selectedVehicle = vehicleId == null ? null : vehicles.findById(vehicleId).orElse(null);
         model.addAttribute("types", VehicleType.values());
         model.addAttribute("fuelTypes", FuelType.values());
         model.addAttribute("households", households.findAll());
         model.addAttribute("members", members.findAllByOrderByFullNameAsc());
         model.addAttribute("policy", getPolicy());
+        model.addAttribute("vehiclePage", vehiclePage);
+        model.addAttribute("vehicles", vehiclePage.getContent());
+        model.addAttribute("searchQuery", searchQuery);
+        model.addAttribute("pageNumber", pageNumber);
+        model.addAttribute("pageSize", 10);
+        model.addAttribute("selectedVehicle", selectedVehicle);
+        model.addAttribute("selectedVehicleQuota", selectedVehicle == null || selectedVehicle.getHousehold() == null
+                ? null : managementWrites.previewVehicleQuota(selectedVehicle.getHousehold().getId(),
+                        selectedVehicle.getVehicleType(), selectedVehicle.getId()));
         return "vehicles";
     }
 
@@ -129,6 +199,10 @@ public class AdminController {
         model.addAttribute("packageTypes", List.of(PassType.DAILY, PassType.MONTHLY));
         model.addAttribute("paymentMethods", PaymentMethod.values());
         model.addAttribute("today", LocalDate.now());
+        model.addAttribute("dailyPrices", prices.findAll().stream()
+            .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getDailyPassPrice)));
+        model.addAttribute("monthlyPrices", prices.findAll().stream()
+            .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getMonthlyPrice)));
         model.addAttribute("policy", getPolicy());
         return "registrations";
     }
@@ -165,86 +239,34 @@ public class AdminController {
             @RequestParam(defaultValue = "1") int packageDurationDays,
             @RequestParam(required = false) PaymentMethod paymentMethod,
             @RequestParam(required = false) String paymentReference,
-            RedirectAttributes redirect) {
-        String normalizedCitizenId = citizenId.replaceAll("\\D", "");
-        if (normalizedCitizenId.length() != 12)
-            throw new IllegalArgumentException("Số CCCD phải gồm đúng 12 chữ số");
-        String plate = PlateNormalizer.normalize(plateNumber);
-        if (plate.length() < 5)
-            throw new IllegalArgumentException("Biển số không hợp lệ");
+            RedirectAttributes redirect,
+            Authentication authentication) {
+        boolean canManageCards = authentication.getAuthorities().stream()
+                .anyMatch(authority -> Set.of("CARD_MANAGE", "ROLE_MANAGEMENT")
+                        .contains(authority.getAuthority()));
+        Vehicle vehicle = managementWrites.saveRegistration(
+                new ManagementCoreWriteService.HouseholdInput(householdCode, apartmentNumber, buildingName,
+                        contactPhone, maxTwoWheelers, maxCars),
+                new ManagementCoreWriteService.MemberInput(null, null, fullName, citizenId, oldCitizenId,
+                        dateOfBirth, gender, relationshipToHead, phone, email, permanentAddress,
+                        cccdIssueDate, cccdIssuePlace, cccdQrRaw, registrationFaceImage,
+                        registrationFaceCapture),
+                new ManagementCoreWriteService.VehicleInput(null, null, null, null, plateNumber, vehicleType,
+                        fuelType, registrationNumber, brand, modelName, color, manufactureYear, chassisNumber,
+                        engineNumber, seatCount, cylinderCapacityCc, registrationImage, null));
 
-        Household household = households.findByHouseholdCodeIgnoreCase(householdCode.trim()).orElseGet(Household::new);
-        household.setHouseholdCode(householdCode.trim().toUpperCase());
-        household.setApartmentNumber(requireText(apartmentNumber, "Căn hộ/phòng").toUpperCase());
-        household.setBuildingName(buildingName.trim());
-        household.setContactPhone(contactPhone.trim());
-        household.setMaxTwoWheelers(normalizeOverride(maxTwoWheelers));
-        household.setMaxCars(normalizeOverride(maxCars));
-        household.setActive(true);
-        household = households.save(household);
-
-        FamilyMember member = members.findByCitizenId(normalizedCitizenId).orElseGet(FamilyMember::new);
-        member.setHousehold(household);
-        member.setFullName(requireText(fullName, "Họ tên"));
-        member.setCitizenId(normalizedCitizenId);
-        member.setOldCitizenId(oldCitizenId.replaceAll("\\D", ""));
-        member.setDateOfBirth(dateOfBirth);
-        member.setGender(gender.trim());
-        member.setRelationshipToHead(relationshipToHead.trim());
-        member.setPhone(phone.trim());
-        member.setEmail(email.trim());
-        member.setPermanentAddress(permanentAddress.trim());
-        member.setCccdIssueDate(cccdIssueDate);
-        member.setCccdIssuePlace(cccdIssuePlace.trim());
-        member.setCccdQrRaw(cccdQrRaw.trim());
-        member.setActive(true);
-        String savedFace = imageStorage.save(registrationFaceImage, registrationFaceCapture);
-        if (savedFace != null)
-            member.setRegistrationFaceImagePath(savedFace);
-        if (member.getRegistrationFaceImagePath() == null || member.getRegistrationFaceImagePath().isBlank())
-            throw new IllegalArgumentException("Cần chụp hoặc tải ảnh khuôn mặt đăng ký");
-        member = members.save(member);
-
-        Vehicle vehicle = vehicles.findByPlateNumberIgnoreCase(plate).orElseGet(Vehicle::new);
-        enforceVehicleLimit(vehicle, household, vehicleType);
-        vehicle.setPlateNumber(plate);
-        vehicle.setHousehold(household);
-        vehicle.setRegisteredOwner(member);
-        vehicle.setOwnerName(member.getFullName());
-        vehicle.setOwnerPhone(member.getPhone());
-        vehicle.setApartmentNumber(household.getApartmentNumber());
-        vehicle.setVehicleType(vehicleType);
-        vehicle.setFuelType(fuelType);
-        vehicle.setRegistrationNumber(requireText(registrationNumber, "Số đăng ký xe"));
-        vehicle.setBrand(requireText(brand, "Hãng xe"));
-        vehicle.setModelName(requireText(modelName, "Dòng xe"));
-        vehicle.setColor(requireText(color, "Màu xe"));
-        vehicle.setManufactureYear(manufactureYear);
-        vehicle.setChassisNumber(requireText(chassisNumber, "Số khung"));
-        vehicle.setEngineNumber(requireText(engineNumber, "Số máy"));
-        vehicle.setSeatCount(seatCount);
-        vehicle.setCylinderCapacityCc(cylinderCapacityCc);
-        String savedRegImage = imageStorage.save(registrationImage, "");
-        if (savedRegImage != null)
-            vehicle.setRegistrationImagePath(savedRegImage);
-        if (vehicle.getRegistrationImagePath() == null || vehicle.getRegistrationImagePath().isBlank())
-            throw new IllegalArgumentException("Ảnh giấy đăng ký xe không được để trống");
-        vehicle.setAuthorizedMembers(new LinkedHashSet<>(List.of(member)));
-        vehicle.setActive(true);
-        vehicle = vehicles.save(vehicle);
-
-        if (passType == null) {
-            redirect.addFlashAttribute("message", "Đã tạo hồ sơ hộ, cư dân và xe " + plate
-                + ". Chưa mua gói nên các lượt gửi xe sẽ tính theo giá khách vãng lai.");
-            return "redirect:/cards?vehicleId=" + vehicle.getId();
+        if (passType != null) {
+            CardManagementWriteService.SaveResult activation = cardWrites.saveCard(vehicle.getId(), CardStatus.ACTIVE,
+                    passType, packageStartDate, packageDurationDays, paymentMethod, paymentReference);
+            redirect.addFlashAttribute("message", "Đã lưu hồ sơ và kích hoạt " + passType.getDisplayName()
+                    + " đến " + activation.validUntil() + ". Đã thu " + activation.amount()
+                    + " đ. Biên nhận: " + activation.receiptNumber());
+        } else {
+            redirect.addFlashAttribute("message",
+                    "Đã lưu hồ sơ hộ, cư dân và xe " + vehicle.getPlateNumber() + ".");
         }
-        PackageActivation activation = activatePackage(vehicle, passType, packageStartDate,
-            packageDurationDays, paymentMethod, paymentReference);
-        redirect.addFlashAttribute("message", "Đã tạo hồ sơ và kích hoạt "
-            + passType.getDisplayName() + " đến " + activation.until()
-            + ". Đã thu " + activation.amount() + " đ. Biên nhận: "
-            + activation.transaction().getReceiptNumber());
-        return "redirect:/cards?vehicleId=" + vehicle.getId();
+        String destination = canManageCards ? "/cards" : "/vehicles";
+        return "redirect:" + destination + "?vehicleId=" + vehicle.getId();
     }
 
     @PostMapping("/vehicles")
@@ -267,72 +289,13 @@ public class AdminController {
             @RequestParam(required = false) MultipartFile registrationImage,
             @RequestParam(required = false, defaultValue = "") String registrationImagePath,
             RedirectAttributes redirect) {
-        String plate = PlateNormalizer.normalize(plateNumber);
-        if (plate.length() < 5)
-            throw new IllegalArgumentException("Biển số không hợp lệ");
-        Household household = households.findById(householdId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hộ gia đình"));
-        FamilyMember owner = members.findById(registeredOwnerId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy chủ đăng ký"));
-        if (!owner.getHousehold().getId().equals(householdId)) {
-            throw new IllegalArgumentException("Chủ đăng ký không thuộc hộ gia đình đã chọn");
-        }
-        Vehicle vehicle = vehicleId == null ? vehicles.findByPlateNumberIgnoreCase(plate).orElseGet(Vehicle::new)
-                : vehicles.findById(vehicleId)
-                        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phương tiện cần cập nhật"));
-        vehicles.findByPlateNumberIgnoreCase(plate)
-                .filter(other -> vehicle.getId() == null || !other.getId().equals(vehicle.getId()))
-                .ifPresent(other -> {
-                    throw new IllegalArgumentException("Biển số đã thuộc một phương tiện khác");
-                });
-        enforceVehicleLimit(vehicle, household, vehicleType);
-        vehicle.setPlateNumber(plate);
-        vehicle.setHousehold(household);
-        vehicle.setRegisteredOwner(owner);
-        vehicle.setOwnerName(owner.getFullName());
-        vehicle.setOwnerPhone(owner.getPhone());
-        vehicle.setApartmentNumber(household.getApartmentNumber());
-        vehicle.setVehicleType(vehicleType);
-        vehicle.setRegistrationNumber(requireText(registrationNumber, "Số giấy đăng ký xe"));
-        vehicle.setBrand(requireText(brand, "Hãng xe"));
-        vehicle.setModelName(requireText(modelName, "Dòng xe"));
-        vehicle.setColor(requireText(color, "Màu xe"));
-        vehicle.setManufactureYear(manufactureYear);
-        vehicle.setChassisNumber(requireText(chassisNumber, "Số khung"));
-        vehicle.setEngineNumber(requireText(engineNumber, "Số máy"));
-        vehicle.setSeatCount(seatCount);
-        vehicle.setCylinderCapacityCc(cylinderCapacityCc);
-        vehicle.setFuelType(fuelType);
-        
-        String savedRegImage = imageStorage.save(registrationImage, "");
-        if (savedRegImage != null) {
-            vehicle.setRegistrationImagePath(savedRegImage);
-        } else if (vehicle.getRegistrationImagePath() == null || vehicle.getRegistrationImagePath().isBlank()) {
-            vehicle.setRegistrationImagePath(requireText(registrationImagePath, "Ảnh giấy đăng ký xe"));
-        }
-        
-        LinkedHashSet<FamilyMember> authorized = new LinkedHashSet<>();
-        authorized.add(owner);
-        if (authorizedMemberIds != null) {
-            for (FamilyMember member : members.findAllById(authorizedMemberIds)) {
-                if (!member.getHousehold().getId().equals(householdId)) {
-                    throw new IllegalArgumentException("Người được phép sử dụng phải thuộc cùng hộ gia đình");
-                }
-                if (member.isActive())
-                    authorized.add(member);
-            }
-        }
-        vehicle.setAuthorizedMembers(authorized);
-        vehicle.setActive(true);
-        Vehicle savedVehicle = vehicles.save(vehicle);
-        sessions.findFirstByEntryPlateIgnoreCaseAndStatusOrderByEntryTimeDesc(plate, SessionStatus.OPEN)
-                .ifPresent(openSession -> {
-                    openSession.setVehicle(savedVehicle);
-                    openSession.setDetectedVehicleType(savedVehicle.getVehicleType());
-                    sessions.save(openSession);
-                });
+        Vehicle savedVehicle = managementWrites.saveVehicle(new ManagementCoreWriteService.VehicleInput(
+                vehicleId, householdId, registeredOwnerId, authorizedMemberIds, plateNumber, vehicleType,
+                fuelType, registrationNumber, brand, modelName, color, manufactureYear, chassisNumber,
+                engineNumber, seatCount, cylinderCapacityCc, registrationImage, registrationImagePath));
         redirect.addFlashAttribute("message",
-                "Đã lưu xe " + plate + " và " + authorized.size() + " người được phép sử dụng");
+                "Đã lưu xe " + savedVehicle.getPlateNumber() + " và "
+                        + savedVehicle.getAuthorizedMembers().size() + " người được phép sử dụng");
         return "redirect:/vehicles";
     }
 
@@ -356,17 +319,129 @@ public class AdminController {
         data.put("engineNumber", v.getEngineNumber());
         data.put("seatCount", v.getSeatCount());
         data.put("cylinderCapacityCc", v.getCylinderCapacityCc());
-        data.put("registrationImagePath", v.getRegistrationImagePath());
+        data.put("registrationImageAvailable", v.getRegistrationImagePath() != null
+                && !v.getRegistrationImagePath().isBlank());
         data.put("authorizedMemberIds", v.getAuthorizedMembers().stream().map(FamilyMember::getId).toList());
         return data;
     }
 
+    @GetMapping("/admin-data/vehicles/households/{householdId}/quota-preview")
+    @ResponseBody
+    Map<String, Object> vehicleQuotaPreview(@PathVariable Long householdId, @RequestParam VehicleType vehicleType,
+            @RequestParam(required = false) Long vehicleId) {
+        ManagementCoreWriteService.VehicleQuotaPreview preview = managementWrites.previewVehicleQuota(
+                householdId, vehicleType, vehicleId);
+        return Map.of("activeCount", preview.activeCount(), "limit", preview.limit(),
+                "householdSpecific", preview.householdSpecific());
+    }
+
     @GetMapping("/households")
-    String households(Model model) {
-        model.addAttribute("households", households.findAll());
-        model.addAttribute("members", members.findAllByOrderByFullNameAsc());
-        model.addAttribute("policy", getPolicy());
+    String households(Model model,
+            @RequestParam(defaultValue = "households") String mode,
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "0") String page,
+            @RequestParam(defaultValue = "0") String residentPage,
+            @RequestParam(required = false) Long householdId,
+            @RequestParam(required = false) Long memberId) {
+        String selectedMode = "residents".equals(mode) ? "residents" : "households";
+        String searchQuery = q == null ? "" : q.trim().substring(0, Math.min(q.trim().length(), 80));
+        String searchPattern = literalContainsPattern(searchQuery);
+        int pageNumber = parsePageNumber(page);
+        Sort householdSort = Sort.by(Sort.Order.asc("householdCode"), Sort.Order.asc("id"));
+        PageRequest householdRequest = PageRequest.of(pageNumber, 10, householdSort);
+        Page<Household> householdPage = selectedMode.equals("households")
+                ? households.searchManagement(searchPattern, householdRequest)
+                : households.searchManagement("%%", PageRequest.of(0, 10, householdSort));
+        if (selectedMode.equals("households")) {
+            int availablePage = lastPage(householdPage, pageNumber);
+            if (availablePage != pageNumber) {
+                pageNumber = availablePage;
+                householdPage = households.searchManagement(searchPattern,
+                        PageRequest.of(pageNumber, 10, householdSort));
+            }
+        }
+
+        int residentPageNumber = parsePageNumber(residentPage);
+        Sort residentSort = Sort.by(Sort.Order.asc("fullName"), Sort.Order.asc("id"));
+        PageRequest residentRequest = PageRequest.of(residentPageNumber, 10, residentSort);
+        Page<FamilyMember> memberPage = selectedMode.equals("residents")
+                ? members.searchManagement(searchPattern, PageRequest.of(pageNumber, 10, residentSort))
+                : Page.empty(PageRequest.of(0, 10, residentSort));
+        if (selectedMode.equals("residents")) {
+            int availablePage = lastPage(memberPage, pageNumber);
+            if (availablePage != pageNumber) {
+                pageNumber = availablePage;
+                memberPage = members.searchManagement(searchPattern, PageRequest.of(pageNumber, 10, residentSort));
+            }
+        }
+
+        Household selectedHousehold = selectedMode.equals("households") && householdId != null
+                ? households.findById(householdId).orElse(null) : null;
+        Page<FamilyMember> householdResidents = selectedHousehold == null
+                ? Page.empty(residentRequest)
+                : members.findByHouseholdId(selectedHousehold.getId(), residentRequest);
+        if (selectedHousehold != null) {
+            int availablePage = lastPage(householdResidents, residentPageNumber);
+            if (availablePage != residentPageNumber) {
+                residentPageNumber = availablePage;
+                householdResidents = members.findByHouseholdId(selectedHousehold.getId(),
+                        PageRequest.of(residentPageNumber, 10, residentSort));
+            }
+        }
+
+        FamilyMember selectedMember = selectedMode.equals("residents") && memberId != null
+                ? members.findWithHouseholdById(memberId).orElse(null) : null;
+        ParkingPolicy policy = getPolicy();
+        List<Vehicle> activeHouseholdVehicles = selectedHousehold == null ? List.of()
+                : vehicles.findByHouseholdIdAndActiveTrue(selectedHousehold.getId());
+        long activeTwoWheelerCount = activeHouseholdVehicles.stream()
+                .filter(vehicle -> vehicle.getVehicleType().isTwoWheeler()).count();
+        long activeCarCount = activeHouseholdVehicles.stream()
+                .filter(vehicle -> vehicle.getVehicleType().isCar()).count();
+        int effectiveMaxTwoWheelers = selectedHousehold == null ? 0
+                : selectedHousehold.getMaxTwoWheelers() == null
+                        ? policy.getDefaultMaxTwoWheelers() : selectedHousehold.getMaxTwoWheelers();
+        int effectiveMaxCars = selectedHousehold == null ? 0
+                : selectedHousehold.getMaxCars() == null
+                        ? policy.getDefaultMaxCars() : selectedHousehold.getMaxCars();
+        List<Household> householdOptions = new java.util.ArrayList<>(householdPage.getContent());
+        if (selectedHousehold != null && householdOptions.stream()
+                .noneMatch(option -> option.getId().equals(selectedHousehold.getId()))) {
+            householdOptions.add(selectedHousehold);
+        }
+        if (selectedMember != null && householdOptions.stream()
+                .noneMatch(option -> option.getId().equals(selectedMember.getHousehold().getId()))) {
+            householdOptions.add(selectedMember.getHousehold());
+        }
+        model.addAttribute("mode", selectedMode);
+        model.addAttribute("searchQuery", searchQuery);
+        model.addAttribute("pageNumber", pageNumber);
+        model.addAttribute("pageSize", 10);
+        model.addAttribute("householdPage", householdPage);
+        model.addAttribute("memberPage", memberPage);
+        model.addAttribute("householdResidents", householdResidents);
+        model.addAttribute("residentPageNumber", residentPageNumber);
+        model.addAttribute("selectedHousehold", selectedHousehold);
+        model.addAttribute("selectedMember", selectedMember);
+        model.addAttribute("householdOptions", householdOptions);
+        model.addAttribute("activeTwoWheelerCount", activeTwoWheelerCount);
+        model.addAttribute("activeCarCount", activeCarCount);
+        model.addAttribute("effectiveMaxTwoWheelers", effectiveMaxTwoWheelers);
+        model.addAttribute("effectiveMaxCars", effectiveMaxCars);
+        model.addAttribute("households", householdPage.getContent());
+        model.addAttribute("members", selectedMode.equals("residents")
+                ? memberPage.getContent() : householdResidents.getContent());
+        model.addAttribute("policy", policy);
         return "households";
+    }
+
+    private static String literalContainsPattern(String query) {
+        String escaped = query.toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        return "%" + escaped + "%";
+    }
+
+    private static int lastPage(Page<?> result, int requestedPage) {
+        return result.getTotalPages() == 0 ? 0 : Math.min(requestedPage, result.getTotalPages() - 1);
     }
 
     @PostMapping("/households")
@@ -377,16 +452,8 @@ public class AdminController {
             @RequestParam(required = false) Integer maxTwoWheelers,
             @RequestParam(required = false) Integer maxCars,
             RedirectAttributes redirect) {
-        Household household = households.findByHouseholdCodeIgnoreCase(householdCode.trim())
-                .orElseGet(Household::new);
-        household.setHouseholdCode(householdCode.trim().toUpperCase());
-        household.setApartmentNumber(apartmentNumber.trim().toUpperCase());
-        household.setBuildingName(buildingName.trim());
-        household.setContactPhone(contactPhone.trim());
-        household.setMaxTwoWheelers(normalizeOverride(maxTwoWheelers));
-        household.setMaxCars(normalizeOverride(maxCars));
-        household.setActive(true);
-        households.save(household);
+        Household household = managementWrites.saveHousehold(new ManagementCoreWriteService.HouseholdInput(
+                householdCode, apartmentNumber, buildingName, contactPhone, maxTwoWheelers, maxCars));
         redirect.addFlashAttribute("message", "Đã lưu hộ " + household.getHouseholdCode());
         return "redirect:/households";
     }
@@ -409,62 +476,10 @@ public class AdminController {
             @RequestParam(required = false) MultipartFile registrationFaceImage,
             @RequestParam(required = false, defaultValue = "") String registrationFaceCapture,
             RedirectAttributes redirect) {
-        Household household = households.findById(householdId)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy hộ gia đình"));
-        String normalizedCitizenId = citizenId.replaceAll("\\D", "");
-        FamilyMember member = memberId == null
-                ? (normalizedCitizenId.isBlank() ? new FamilyMember()
-                        : members.findByCitizenId(normalizedCitizenId).orElseGet(FamilyMember::new))
-                : members.findById(memberId)
-                        .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thành viên cần cập nhật"));
-        Long currentMemberId = member.getId();
-        if (!normalizedCitizenId.isBlank()) {
-            members.findByCitizenId(normalizedCitizenId)
-                    .filter(other -> currentMemberId == null || !other.getId().equals(currentMemberId))
-                    .ifPresent(other -> {
-                        throw new IllegalArgumentException("Số CCCD đã thuộc một thành viên khác");
-                    });
-        }
-        member.setHousehold(household);
-        member.setFullName(fullName.trim());
-        member.setCitizenId(normalizedCitizenId.isBlank() ? null : normalizedCitizenId);
-        member.setDateOfBirth(dateOfBirth);
-        member.setGender(gender.trim());
-        member.setRelationshipToHead(relationshipToHead.trim());
-        member.setPhone(phone.trim());
-        member.setEmail(email.trim());
-        member.setPermanentAddress(permanentAddress.trim());
-        member.setCccdIssueDate(cccdIssueDate);
-        member.setCccdIssuePlace(cccdIssuePlace.trim());
-        member.setOldCitizenId(oldCitizenId.replaceAll("\\D", ""));
-        member.setCccdQrRaw(cccdQrRaw.trim());
-        String savedImage = imageStorage.save(registrationFaceImage, registrationFaceCapture);
-        if (savedImage != null)
-            member.setRegistrationFaceImagePath(savedImage);
-        if (member.getRegistrationFaceImagePath() == null || member.getRegistrationFaceImagePath().isBlank())
-            throw new IllegalArgumentException("Cần chụp hoặc tải lên ảnh khuôn mặt đăng ký");
-        member.setActive(true);
-        FamilyMember savedMember = members.save(member);
-        // 1. Cập nhật thông tin cho các xe do thành viên này làm chủ
-        List<Vehicle> ownedVehicles = vehicles.findByRegisteredOwnerId(savedMember.getId());
-        for (Vehicle vehicle : ownedVehicles) {
-            vehicle.setHousehold(household);
-            vehicle.setOwnerName(savedMember.getFullName());
-            vehicle.setOwnerPhone(savedMember.getPhone());
-            vehicle.setApartmentNumber(household.getApartmentNumber());
-            vehicle.getAuthorizedMembers().add(savedMember);
-            vehicles.save(vehicle);
-        }
-
-        // 2. Gỡ quyền sử dụng ở những xe không còn chung hộ gia đình
-        List<Vehicle> authorizedVehicles = vehicles.findByAuthorizedMembers_Id(savedMember.getId());
-        for (Vehicle vehicle : authorizedVehicles) {
-            if (vehicle.getHousehold() == null
-                    || !vehicle.getHousehold().getId().equals(savedMember.getHousehold().getId())) {
-                vehicle.getAuthorizedMembers().removeIf(item -> item.getId().equals(savedMember.getId()));
-                vehicles.save(vehicle);
-            }
-        }
+        FamilyMember savedMember = managementWrites.saveMember(new ManagementCoreWriteService.MemberInput(
+                memberId, householdId, fullName, citizenId, oldCitizenId, dateOfBirth, gender,
+                relationshipToHead, phone, email, permanentAddress, cccdIssueDate, cccdIssuePlace,
+                cccdQrRaw, registrationFaceImage, registrationFaceCapture));
         redirect.addFlashAttribute("message", "Đã lưu thành viên " + savedMember.getFullName());
         return "redirect:/households";
     }
@@ -529,7 +544,9 @@ public class AdminController {
     @GetMapping("/slots")
     String slots(Model model,
                  @RequestParam(required = false) String floor,
-                 @RequestParam(required = false) String zone) {
+                 @RequestParam(required = false) String zone,
+                 @RequestParam(required = false) String status,
+                 @RequestParam(required = false) String q) {
         List<ParkingSlot> allSlots = new ArrayList<>(slots.findByActiveTrueOrderBySlotCodeAsc());
         allSlots.sort(SlotCodeComparator.SLOT_COMPARATOR);
 
@@ -562,19 +579,37 @@ public class AdminController {
         String effectiveZone = zone != null && zoneNames.stream().anyMatch(name -> name.equalsIgnoreCase(zone))
                 ? zone : "";
 
+        String selectedStatus = switch (status == null ? "" : status.trim().toUpperCase(Locale.ROOT)) {
+            case "AVAILABLE", "RESERVED_EMPTY", "OCCUPIED_VALID", "OCCUPIED_BORROWED",
+                    "RESERVED_BORROWED", "OCCUPIED_MISMATCH", "OVERDUE_ALERT", "BLOCKED" ->
+                status.trim().toUpperCase(Locale.ROOT);
+            default -> "";
+        };
+        String searchQuery = q == null ? "" : q.trim().substring(0, Math.min(q.trim().length(), 80));
+        String normalizedQuery = searchQuery.toLowerCase(Locale.ROOT);
+
         List<ParkingSlotResponse> slotResponses = allSlots.stream()
             .filter(s -> effectiveFloor.isBlank() || effectiveFloor.equalsIgnoreCase(s.getFloor()))
             .filter(s -> effectiveZone.isBlank() || effectiveZone.equalsIgnoreCase(s.getZoneName()))
             .map(parkingService::toSlotResponse)
+            .filter(s -> selectedStatus.isBlank() || selectedStatus.equals(s.status()))
+            .filter(s -> normalizedQuery.isBlank()
+                || (s.slotCode() + " " + s.assignedPlate() + " " + s.occupiedPlate() + " " + s.borrowedPlate())
+                    .toLowerCase(Locale.ROOT).contains(normalizedQuery))
+            .sorted(SLOT_CODE_NATURAL_ORDER)
             .toList();
 
-        long totalSlots = allSlots.size();
-        long availableCount = allSlots.stream().filter(s -> s.getCurrentSession() == null && s.getAssignedVehicle() == null && s.getStatusOverride() != SlotStatusOverride.BLOCKED).count();
-        long occupiedCount = allSlots.stream().filter(s -> s.getCurrentSession() != null).count();
-        long reservedCount = allSlots.stream().filter(s -> s.getAssignedVehicle() != null).count();
-        long borrowedCount = allSlots.stream().filter(s -> s.getBorrowedPlate() != null && !s.getBorrowedPlate().isBlank()).count();
-        long blockedCount = allSlots.stream().filter(s -> s.getStatusOverride() == SlotStatusOverride.BLOCKED).count();
-        long overdueCount = allSlots.stream().filter(s -> s.isOverdue(LocalDateTime.now())).count();
+        Set<Long> visibleSlotIds = slotResponses.stream().map(ParkingSlotResponse::id).collect(Collectors.toSet());
+        List<ParkingSlot> visibleSlots = allSlots.stream().filter(s -> visibleSlotIds.contains(s.getId())).toList();
+        long totalSlots = visibleSlots.size();
+        long availableCount = slotResponses.stream().filter(s -> "AVAILABLE".equals(s.status())).count();
+        long occupiedCount = slotResponses.stream().filter(s -> s.status().startsWith("OCCUPIED_") || "OVERDUE_ALERT".equals(s.status())).count();
+        long reservedCount = visibleSlots.stream().filter(s -> s.getAssignedVehicle() != null).count();
+        long borrowedCount = visibleSlots.stream().filter(s -> s.getBorrowedPlate() != null && !s.getBorrowedPlate().isBlank()).count();
+        long mismatchCount = slotResponses.stream().filter(s -> "OCCUPIED_MISMATCH".equals(s.status())).count();
+        long blockedCount = slotResponses.stream().filter(s -> "BLOCKED".equals(s.status())).count();
+        long overdueCount = slotResponses.stream().filter(s -> "OVERDUE_ALERT".equals(s.status())).count();
+        long attentionCount = mismatchCount + blockedCount + overdueCount;
 
         Set<Long> assignedVehicleIds = allSlots.stream()
             .filter(s -> s.getAssignedVehicle() != null)
@@ -593,17 +628,34 @@ public class AdminController {
         model.addAttribute("zones", zoneNames);
         model.addAttribute("selectedFloor", effectiveFloor);
         model.addAttribute("selectedZone", effectiveZone);
+        model.addAttribute("floors", floors);
+        model.addAttribute("zones", zones);
+        model.addAttribute("selectedFloor", floor == null ? "" : floor);
+        model.addAttribute("selectedZone", zone == null ? "" : zone);
+        model.addAttribute("selectedStatus", selectedStatus);
+        model.addAttribute("searchQuery", searchQuery);
+        model.addAttribute("lastUpdated", LocalDateTime.now());
+        model.addAttribute("activePage", "slots");
         model.addAttribute("totalSlots", totalSlots);
+        model.addAttribute("allSlotCount", allSlots.size());
         model.addAttribute("availableCount", availableCount);
         model.addAttribute("occupiedCount", occupiedCount);
         model.addAttribute("reservedCount", reservedCount);
         model.addAttribute("borrowedCount", borrowedCount);
         model.addAttribute("blockedCount", blockedCount);
         model.addAttribute("overdueCount", overdueCount);
+        model.addAttribute("mismatchCount", mismatchCount);
+        model.addAttribute("attentionCount", attentionCount);
         model.addAttribute("vehicles", vehicles.findAll());
         model.addAttribute("unassignedVehicles", unassignedVehicles);
-        model.addAttribute("unassignedSessions", unassignedSessions);
-        model.addAttribute("activeVehicleTypes", vehicleTypes.findByActiveTrueOrderByDisplayNameAsc());
+        model.addAttribute("floors", floorNames);
+        model.addAttribute("zones", zoneNames);
+        model.addAttribute("selectedFloor", effectiveFloor);
+        model.addAttribute("selectedZone", effectiveZone);
+        model.addAttribute("selectedStatus", selectedStatus);
+        model.addAttribute("searchQuery", searchQuery);
+        model.addAttribute("lastUpdated", LocalDateTime.now());
+        model.addAttribute("activePage", "slots");
         return "slots";
     }
 
@@ -832,10 +884,7 @@ public class AdminController {
         if (defaultMaxTwoWheelers < 0 || defaultMaxCars < 0) {
             throw new IllegalArgumentException("Hạn mức xe không được âm");
         }
-        ParkingPolicy policy = getPolicy();
-        policy.setDefaultMaxTwoWheelers(defaultMaxTwoWheelers);
-        policy.setDefaultMaxCars(defaultMaxCars);
-        policies.save(policy);
+        managementWrites.savePolicy(defaultMaxTwoWheelers, defaultMaxCars);
         redirect.addFlashAttribute("message", "Đã cập nhật hạn mức xe mặc định");
         return "redirect:/settings";
     }
@@ -845,7 +894,11 @@ public class AdminController {
         model.addAttribute("cards", cards.findAll().stream()
             .filter(card -> card.getPassType() != PassType.PER_VISIT).toList());
         model.addAttribute("vehicles", vehicles.findAll());
-        model.addAttribute("statuses", CardStatus.values());
+        model.addAttribute("dailyPrices", prices.findAll().stream()
+            .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getDailyPassPrice)));
+        model.addAttribute("monthlyPrices", prices.findAll().stream()
+            .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getMonthlyPrice)));
+        model.addAttribute("statuses", List.of(CardStatus.ACTIVE));
         model.addAttribute("passTypes", List.of(PassType.DAILY, PassType.MONTHLY));
         model.addAttribute("paymentMethods", PaymentMethod.values());
         model.addAttribute("today", LocalDate.now());
@@ -855,7 +908,6 @@ public class AdminController {
     }
 
     @PostMapping("/cards")
-    @Transactional
     String saveCard(@RequestParam Long vehicleId,
             @RequestParam CardStatus status,
             @RequestParam PassType passType,
@@ -864,66 +916,16 @@ public class AdminController {
             @RequestParam(required = false) PaymentMethod paymentMethod,
             @RequestParam(required = false) String paymentReference,
             RedirectAttributes redirect) {
-        Vehicle vehicle = vehicles.findById(vehicleId).orElseThrow();
-        if (status != CardStatus.ACTIVE)
-            throw new IllegalArgumentException("Gói mới hoặc gia hạn phải ở trạng thái hoạt động");
-        PackageActivation activation = activatePackage(vehicle, passType, startDate, durationDays,
-            paymentMethod, paymentReference);
+        if (status != CardStatus.ACTIVE) throw new IllegalArgumentException("Chỉ được kích hoạt gói ở trạng thái hoạt động");
+        if (passType == PassType.MONTHLY) durationDays = 30;
+        if (durationDays < 1 || durationDays > 366) throw new IllegalArgumentException("Số ngày của gói phải từ 1 đến 366");
+        CardManagementWriteService.SaveResult result = cardWrites.saveCard(
+            vehicleId, status, passType, startDate, durationDays, paymentMethod, paymentReference);
         redirect.addFlashAttribute("message", "Đã kích hoạt " + passType.getDisplayName()
-            + " đến " + activation.until() + ". Đã thu " + activation.amount()
-            + " đ. Biên nhận: " + activation.transaction().getReceiptNumber());
+            + " đến " + result.validUntil() + ". Đã thu " + result.amount()
+            + " đ. Biên nhận: " + result.receiptNumber());
         return "redirect:/cards";
     }
-
-    private PackageActivation activatePackage(Vehicle vehicle, PassType passType,
-            LocalDate requestedStart, int requestedDays, PaymentMethod paymentMethod,
-            String paymentReference) {
-        if (passType == null || passType == PassType.PER_VISIT)
-            throw new IllegalArgumentException("Chỉ hỗ trợ gói theo ngày hoặc gói 30 ngày");
-        int days = passType == PassType.MONTHLY ? 30 : requestedDays;
-        if (days < 1 || days > 366)
-            throw new IllegalArgumentException("Số ngày của gói phải từ 1 đến 366");
-
-        LocalDate from = requestedStart == null ? LocalDate.now() : requestedStart;
-        LocalDate until = from.plusDays(days - 1L);
-        PricingRule price = prices.findByVehicleType(vehicle.getVehicleType())
-            .orElseThrow(() -> new IllegalStateException(
-                "Chưa cấu hình bảng giá cho " + vehicle.getVehicleType().getDisplayName()));
-        BigDecimal amount = passType == PassType.MONTHLY
-            ? price.getMonthlyPrice()
-            : price.getDailyPassPrice().multiply(BigDecimal.valueOf(days));
-        if (amount.signum() <= 0)
-            throw new IllegalStateException("Chưa cấu hình giá cho " + passType.getDisplayName()
-                + " của " + vehicle.getVehicleType().getDisplayName());
-
-        ParkingCard card = cards.findByVehicleId(vehicle.getId()).orElseGet(ParkingCard::new);
-        card.setCardCode(PlateNormalizer.normalize(vehicle.getPlateNumber()));
-        card.setVehicle(vehicle);
-        card.setStatus(CardStatus.ACTIVE);
-        card.setPassType(passType);
-        card.setValidFrom(from);
-        card.setValidUntil(until);
-        card.setSubscriptionFee(amount);
-        card = cards.save(card);
-
-        SubscriptionPayment payment = new SubscriptionPayment();
-        payment.setParkingCard(card);
-        payment.setPeriodStart(from);
-        payment.setPeriodEnd(until);
-        payment.setAmount(amount);
-        payment.setPaidAt(LocalDateTime.now());
-        payment.setPendingPayment(true);
-        payment = payments.save(payment);
-        PaymentTransaction transaction = paymentTransactions.recordSubscription(
-            payment, paymentMethod, paymentReference);
-        payment.setPendingPayment(false);
-        payment.setPaymentTransaction(transaction);
-        payments.save(payment);
-        return new PackageActivation(transaction, until, amount);
-    }
-
-    private record PackageActivation(PaymentTransaction transaction, LocalDate until,
-            BigDecimal amount) { }
 
     @GetMapping("/pricing")
     String pricing(Model model) {
@@ -986,9 +988,99 @@ public class AdminController {
     }
 
     @GetMapping("/sessions")
-    String sessions(Model model) {
-        model.addAttribute("sessions", sessions.findAllByOrderByEntryTimeDesc());
+    String sessions(Model model, @RequestParam(required = false) SessionStatus status,
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "") String from,
+            @RequestParam(defaultValue = "") String to,
+            @RequestParam(defaultValue = "newest") String sort,
+            @RequestParam(defaultValue = "0") String page,
+            @RequestParam(defaultValue = "10") String size) {
+        String searchQuery = q.trim().substring(0, Math.min(q.trim().length(), 80));
+        String selectedFrom = from.trim();
+        String selectedTo = to.trim();
+        String escapedQuery = searchQuery.toLowerCase(Locale.ROOT)
+            .replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        String searchPattern = escapedQuery.isBlank() ? "" : "%" + escapedQuery + "%";
+        String selectedSort = "oldest".equals(sort) ? "oldest" : "newest";
+        int pageNumber = parsePageNumber(page);
+        int pageSize = parsePageSize(size);
+        Sort.Direction direction = "oldest".equals(selectedSort) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Sort historySort = Sort.by(direction, "entryTime").and(Sort.by(direction, "id"));
+        LocalDateTime fromTime = null;
+        LocalDateTime toExclusive = null;
+        String dateRangeError = null;
+        try {
+            LocalDate fromDate = selectedFrom.isBlank() ? null : LocalDate.parse(selectedFrom);
+            LocalDate toDate = selectedTo.isBlank() ? null : LocalDate.parse(selectedTo);
+            if ((fromDate != null && (fromDate.getYear() < 1000 || fromDate.getYear() > 9999))
+                    || (toDate != null && (toDate.getYear() < 1000 || toDate.getYear() > 9999))
+                    || (fromDate != null && toDate != null && fromDate.isAfter(toDate))) {
+                dateRangeError = "Khoảng ngày không hợp lệ. Hãy chọn ngày từ 01/01/1000 đến 31/12/9999 và ngày bắt đầu không sau ngày kết thúc.";
+            } else {
+                fromTime = fromDate == null ? null : fromDate.atStartOfDay();
+                toExclusive = toDate == null || toDate.equals(LocalDate.of(9999, 12, 31))
+                    ? null : toDate.plusDays(1).atStartOfDay();
+            }
+        } catch (DateTimeException exception) {
+            dateRangeError = "Khoảng ngày không hợp lệ. Hãy nhập ngày theo định dạng hợp lệ.";
+        }
+        Page<ParkingSession> sessionPage = dateRangeError == null
+            ? sessions.findHistoryPage(status, searchPattern, fromTime, toExclusive,
+                PageRequest.of(pageNumber, pageSize, historySort))
+            : Page.empty(PageRequest.of(0, pageSize, historySort));
+        if (dateRangeError != null) pageNumber = 0;
+        if (sessionPage.getTotalPages() == 0) {
+            if (pageNumber > 0) {
+                pageNumber = 0;
+                if (dateRangeError == null) {
+                    sessionPage = sessions.findHistoryPage(status, searchPattern, fromTime, toExclusive,
+                        PageRequest.of(pageNumber, pageSize, historySort));
+                }
+            }
+        } else if (pageNumber >= sessionPage.getTotalPages()) {
+            pageNumber = sessionPage.getTotalPages() - 1;
+            sessionPage = sessions.findHistoryPage(status, searchPattern, fromTime, toExclusive,
+                PageRequest.of(pageNumber, pageSize, historySort));
+        }
+
+        model.addAttribute("sessions", sessionPage.getContent());
+        model.addAttribute("sessionPage", sessionPage);
+        Set<Long> plateMismatchSessionIds = sessionPage.getContent().stream()
+            .filter(session -> session.getExitPlate() != null && !session.getExitPlate().isBlank()
+                && session.getEntryPlate() != null && !session.getEntryPlate().isBlank()
+                && !PlateNormalizer.normalize(session.getEntryPlate())
+                    .equals(PlateNormalizer.normalize(session.getExitPlate())))
+            .map(ParkingSession::getId).collect(Collectors.toSet());
+        model.addAttribute("plateMismatchSessionIds", plateMismatchSessionIds);
+        model.addAttribute("selectedStatus", status == null ? "" : status.name());
+        model.addAttribute("searchQuery", searchQuery);
+        model.addAttribute("selectedFrom", selectedFrom);
+        model.addAttribute("selectedTo", selectedTo);
+        model.addAttribute("dateRangeError", dateRangeError);
+        model.addAttribute("selectedSort", selectedSort);
+        model.addAttribute("pageSize", pageSize);
+        model.addAttribute("pageNumber", pageNumber);
+        model.addAttribute("firstResult", sessionPage.hasContent() ? (long) pageNumber * pageSize + 1 : 0);
+        model.addAttribute("lastResult", (long) pageNumber * pageSize + sessionPage.getNumberOfElements());
+        model.addAttribute("activePage", "sessions");
         return "sessions";
+    }
+
+    private static int parsePageNumber(String value) {
+        try {
+            return Math.max(0, Math.min(Integer.parseInt(value), 10_000));
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    private static int parsePageSize(String value) {
+        try {
+            int requested = Integer.parseInt(value);
+            return Set.of(10, 20, 50).contains(requested) ? requested : 10;
+        } catch (NumberFormatException ex) {
+            return 10;
+        }
     }
 
     @GetMapping("/api/parking/revenue/monthly")
@@ -1097,72 +1189,55 @@ public class AdminController {
             toTime = fromTime.plusMonths(1);
             periodLabel = "thang_" + LocalDate.now().getMonthValue() + "_" + LocalDate.now().getYear();
         }
-
-        var sessionList = sessions
-                .findByStatusAndExitTimeBetween(SessionStatus.COMPLETED, fromTime, toTime).stream()
-                .sorted((a, b) -> b.getExitTime().compareTo(a.getExitTime()))
-                .toList();
+        var sessionList = sessions.findByStatusAndExitTimeBetween(SessionStatus.COMPLETED, fromTime, toTime).stream()
+                .sorted((a, b) -> b.getExitTime().compareTo(a.getExitTime())).toList();
         var paymentList = payments.findByPaidAtBetween(fromTime, toTime).stream()
-                .sorted((a, b) -> b.getPaidAt().compareTo(a.getPaidAt()))
-                .toList();
-
-        StringBuilder csv = new StringBuilder(CsvUtils.UTF_8_BOM);
-        csv.append("Mã giao dịch / Phiên,Phân loại doanh thu,Biển số xe,Thời gian bắt đầu / Vào,Thời gian kết thúc / Ra / Thu,Thời lượng / Kỳ hạn,Số tiền (VNĐ),Trạng thái,Phương thức / Loại xe\r\n");
-
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
-        BigDecimal totalVisit = BigDecimal.ZERO;
-
-        for (ParkingSession s : sessionList) {
-            BigDecimal fee = s.getFee() != null ? s.getFee() : BigDecimal.ZERO;
-            totalVisit = totalVisit.add(fee);
+                .sorted((a, b) -> b.getPaidAt().compareTo(a.getPaidAt())).toList();
+        StringBuilder csv = new StringBuilder(CsvUtils.UTF_8_BOM)
+                .append("Mã giao dịch / Phiên,Phân loại doanh thu,Biển số xe,Thời gian bắt đầu / Vào,Thời gian kết thúc / Ra / Thu,Thời lượng / Kỳ hạn,Số tiền (VNĐ),Trạng thái,Phương thức / Loại xe\r\n");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        BigDecimal visitTotal = BigDecimal.ZERO;
+        for (ParkingSession session : sessionList) {
+            BigDecimal amount = session.getFee() == null ? BigDecimal.ZERO : session.getFee();
+            visitTotal = visitTotal.add(amount);
             String duration = "";
-            if (s.getEntryTime() != null && s.getExitTime() != null) {
-                long minutes = java.time.Duration.between(s.getEntryTime(), s.getExitTime()).toMinutes();
-                duration = (minutes / 60) + "h " + (minutes % 60) + "m";
+            if (session.getEntryTime() != null && session.getExitTime() != null) {
+                long minutes = java.time.Duration.between(session.getEntryTime(), session.getExitTime()).toMinutes();
+                duration = minutes / 60 + "h " + minutes % 60 + "m";
             }
-            csv.append(CsvUtils.escape(s.getId())).append(",")
-               .append("Vé lượt").append(",")
-               .append(CsvUtils.escape(s.getEntryPlate())).append(",")
-               .append(CsvUtils.escape(s.getEntryTime() != null ? s.getEntryTime().format(dtf) : "")).append(",")
-               .append(CsvUtils.escape(s.getExitTime() != null ? s.getExitTime().format(dtf) : "")).append(",")
-               .append(CsvUtils.escape(duration)).append(",")
-               .append(fee.toPlainString()).append(",")
-               .append(CsvUtils.escape(s.getStatus().getDisplayName())).append(",")
-               .append(CsvUtils.escape(s.getDetectedVehicleType() != null ? s.getDetectedVehicleType().name() : "")).append("\r\n");
+            csv.append(CsvUtils.escape(session.getId())).append(",Vé lượt,")
+                .append(CsvUtils.escape(session.getEntryPlate())).append(",")
+                .append(CsvUtils.escape(session.getEntryTime() == null ? "" : session.getEntryTime().format(formatter))).append(",")
+                .append(CsvUtils.escape(session.getExitTime() == null ? "" : session.getExitTime().format(formatter))).append(",")
+                .append(CsvUtils.escape(duration)).append(",").append(amount.toPlainString()).append(",")
+                .append(CsvUtils.escape(session.getStatus().getDisplayName())).append(",")
+                .append(CsvUtils.escape(session.getDetectedVehicleType() == null
+                        ? "" : session.getDetectedVehicleType().name())).append("\r\n");
         }
-
-        BigDecimal totalSub = BigDecimal.ZERO;
-        for (SubscriptionPayment p : paymentList) {
-            BigDecimal amount = p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO;
-            totalSub = totalSub.add(amount);
-            String plate = (p.getParkingCard() != null && p.getParkingCard().getVehicle() != null)
-                ? p.getParkingCard().getVehicle().getPlateNumber()
-                : (p.getParkingCard() != null ? p.getParkingCard().getCardCode() : "");
-            String period = (p.getPeriodStart() != null ? p.getPeriodStart().toString() : "") + " -> " +
-                            (p.getPeriodEnd() != null ? p.getPeriodEnd().toString() : "");
-            csv.append(CsvUtils.escape(p.getId())).append(",")
-               .append("Vé tháng cư dân").append(",")
-               .append(CsvUtils.escape(plate)).append(",")
-               .append(CsvUtils.escape(p.getPaidAt() != null ? p.getPaidAt().format(dtf) : "")).append(",")
-               .append(CsvUtils.escape(p.getPeriodEnd() != null ? p.getPeriodEnd().toString() : "")).append(",")
-               .append(CsvUtils.escape(period)).append(",")
-               .append(amount.toPlainString()).append(",")
-               .append("Đã thanh toán").append(",")
-               .append(CsvUtils.escape("Gói tháng thẻ " + (p.getParkingCard() != null ? p.getParkingCard().getCardCode() : ""))).append("\r\n");
+        BigDecimal packageTotal = BigDecimal.ZERO;
+        for (SubscriptionPayment payment : paymentList) {
+            BigDecimal amount = payment.getAmount() == null ? BigDecimal.ZERO : payment.getAmount();
+            packageTotal = packageTotal.add(amount);
+            String plate = payment.getParkingCard() != null && payment.getParkingCard().getVehicle() != null
+                    ? payment.getParkingCard().getVehicle().getPlateNumber()
+                    : payment.getParkingCard() == null ? "" : payment.getParkingCard().getCardCode();
+            String period = (payment.getPeriodStart() == null ? "" : payment.getPeriodStart().toString()) + " -> "
+                    + (payment.getPeriodEnd() == null ? "" : payment.getPeriodEnd().toString());
+            csv.append(CsvUtils.escape(payment.getId())).append(",Gói cư dân,")
+                .append(CsvUtils.escape(plate)).append(",")
+                .append(CsvUtils.escape(payment.getPaidAt() == null ? "" : payment.getPaidAt().format(formatter))).append(",")
+                .append(CsvUtils.escape(payment.getPeriodEnd() == null ? "" : payment.getPeriodEnd().toString())).append(",")
+                .append(CsvUtils.escape(period)).append(",").append(amount.toPlainString()).append(",Đã ghi nhận,")
+                .append(CsvUtils.escape("Gói thẻ " + (payment.getParkingCard() == null ? "" : payment.getParkingCard().getCardCode())))
+                .append("\r\n");
         }
-
-        BigDecimal grandTotal = totalVisit.add(totalSub);
-        csv.append("TỔNG CỘNG,Tất cả nguồn,,,,,")
-           .append(grandTotal.toPlainString())
-           .append(",,Vé lượt: ").append(totalVisit.toPlainString())
-           .append(" | Vé tháng: ").append(totalSub.toPlainString())
-           .append("\r\n");
-
-        byte[] bytes = csv.toString().getBytes(StandardCharsets.UTF_8);
+        BigDecimal grandTotal = visitTotal.add(packageTotal);
+        csv.append("TỔNG CỘNG,Tất cả nguồn,,,,,").append(grandTotal.toPlainString()).append(",,Vé lượt: ")
+            .append(visitTotal.toPlainString()).append(" | Gói: ").append(packageTotal.toPlainString()).append("\r\n");
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"doanh_thu_" + periodLabel + ".csv\"")
                 .header(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
-                .body(bytes);
+                .body(csv.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     @GetMapping("/api/parking/revenue/monthly/{year}/{month}")
@@ -1216,11 +1291,7 @@ public class AdminController {
     }
 
     private ParkingPolicy getPolicy() {
-        return policies.findById(1L).orElseGet(() -> policies.save(new ParkingPolicy()));
-    }
-
-    private Integer normalizeOverride(Integer value) {
-        return value == null || value < 0 ? null : value;
+        return policies.findById(1L).orElseGet(ParkingPolicy::new);
     }
 
     private String requireText(String value, String fieldName) {
@@ -1230,20 +1301,4 @@ public class AdminController {
         return value.trim();
     }
 
-    private void enforceVehicleLimit(Vehicle vehicle, Household household, VehicleType requestedType) {
-        ParkingPolicy policy = getPolicy();
-        int limit = requestedType.isCar()
-                ? (household.getMaxCars() == null ? policy.getDefaultMaxCars() : household.getMaxCars())
-                : (household.getMaxTwoWheelers() == null ? policy.getDefaultMaxTwoWheelers()
-                        : household.getMaxTwoWheelers());
-        long current = vehicles.findByHouseholdIdAndActiveTrue(household.getId()).stream()
-                .filter(item -> item.getId() == null || vehicle.getId() == null
-                        || !item.getId().equals(vehicle.getId()))
-                .filter(item -> item.getVehicleType().isCar() == requestedType.isCar())
-                .count();
-        if (current >= limit) {
-            throw new IllegalArgumentException("Hộ " + household.getHouseholdCode()
-                    + " đã đạt hạn mức " + limit + (requestedType.isCar() ? " ô tô" : " xe hai bánh"));
-        }
-    }
 }

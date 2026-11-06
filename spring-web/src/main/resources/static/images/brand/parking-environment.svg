@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" fill="none">
+  <title>LumiPark — architectural arrival scene</title>
+  <defs>
+    <linearGradient id="haze" x1="600" y1="90" x2="600" y2="680" gradientUnits="userSpaceOnUse"><stop stop-color="#CCE3FC" stop-opacity="0"/><stop offset=".48" stop-color="#C8DDF8" stop-opacity=".7"/><stop offset="1" stop-color="#C7D4F5" stop-opacity="0"/></linearGradient>
+    <linearGradient id="pavement" x1="600" y1="390" x2="600" y2="680" gradientUnits="userSpaceOnUse"><stop stop-color="#8FAAD0"/><stop offset=".65" stop-color="#BECFEC"/><stop offset="1" stop-color="#D5DCF8" stop-opacity="0"/></linearGradient>
+    <linearGradient id="roof" x1="400" y1="240" x2="1000" y2="370" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF"/><stop offset=".45" stop-color="#ECF4FF"/><stop offset="1" stop-color="#B2BFE9"/></linearGradient>
+    <linearGradient id="fascia" x1="420" y1="270" x2="1020" y2="400" gradientUnits="userSpaceOnUse"><stop stop-color="#B5CAE8"/><stop offset=".4" stop-color="#F8FAFF"/><stop offset="1" stop-color="#96A9D7"/></linearGradient>
+    <linearGradient id="wall" x1="700" y1="320" x2="950" y2="500" gradientUnits="userSpaceOnUse"><stop stop-color="#E7F0FF"/><stop offset=".5" stop-color="#C4D5EE"/><stop offset="1" stop-color="#A0B7DF"/></linearGradient>
+    <linearGradient id="windows" x1="400" y1="300" x2="700" y2="500" gradientUnits="userSpaceOnUse"><stop stop-color="#638EB6"/><stop offset=".45" stop-color="#ADCDE0"/><stop offset="1" stop-color="#6D8AB8"/></linearGradient>
+    <linearGradient id="silver" x1="250" y1="420" x2="500" y2="560" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF"/><stop offset=".3" stop-color="#E8F0FC"/><stop offset=".65" stop-color="#9AAFD0"/><stop offset=".85" stop-color="#E6EEFA"/><stop offset="1" stop-color="#8E9EBB"/></linearGradient>
+    <linearGradient id="screen" x1="200" y1="290" x2="250" y2="470" gradientUnits="userSpaceOnUse"><stop stop-color="#3C70BC"/><stop offset="1" stop-color="#4E4A98"/></linearGradient>
+    <linearGradient id="carGlass" x1="300" y1="410" x2="440" y2="470" gradientUnits="userSpaceOnUse"><stop stop-color="#6384AA"/><stop offset=".5" stop-color="#B8D4E7"/><stop offset="1" stop-color="#47628C"/></linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="18"/></filter>
+    <filter id="glow"><feGaussianBlur stdDeviation="4"/></filter>
+    <g id="tree"><path d="M0-8v75m0-48L-14 3M0 10 13-6" stroke="#698C87" stroke-width="5" stroke-linecap="round"/><path d="M-29-11c-14-20-2-37 8-39-2-23 31-34 43-13 24-2 33 25 19 38 13 22-7 44-25 39C0 31-25 18-29-11Z" fill="#6EAA97"/><path d="M-27-20c-9-15 1-29 10-30-2-22 25-29 34-12 13-2 22 9 20 22-15-8-22 15-35 11-10 12-24 16-29 9Z" fill="#A8D2BA"/></g>
+  </defs>
+  <ellipse cx="640" cy="380" rx="530" ry="270" fill="url(#haze)"/>
+  <g opacity=".5" fill="#CEDDF2">
+    <path d="M145 225h60v208h-60zM215 170h75v260h-75zM305 206h60v212h-60zM830 136h57v239h-57zM900 95h78v301h-78zM994 160h64v250h-64z"/>
+    <g stroke="#EAF2FD" stroke-width="3"><path d="M231 191v210m20-210v210m20-210v210M918 116v260m20-260v260m20-260v260M840 160v193m20-193v193"/></g>
+  </g>
+  <path d="M0 484 580 345l620 156v179H0Z" fill="url(#pavement)"/>
+  <path d="m0 616 440-174m760 121L721 450" stroke="#F6F9FF" stroke-width="3" opacity=".6"/>
+  <path d="m184 680 364-229m204 229L621 451" stroke="white" stroke-width="5" opacity=".65"/>
+  <path d="m548 565-26 31 24-4 16 34 20-3-18-34 25-4Z" fill="white" opacity=".85"/>
+  <ellipse cx="667" cy="486" rx="356" ry="48" fill="#425C8C" opacity=".38" filter="url(#soft)"/>
+  <path d="m365 310 256-82 353 112v158L621 407l-256 77Z" fill="url(#wall)"/>
+  <path d="m384 325 231-66v146l-231 66Z" fill="url(#windows)"/>
+  <path d="m395 330 209-60v10l-209 60Z" fill="#E8F5FF" opacity=".75"/>
+  <g stroke="#F3F8FF" stroke-width="6"><path d="M406 320v144m51-158v142m51-157v142m51-157v142"/></g>
+  <path d="m428 326 57-16-57 130Zm78-24 20-6-20 130Z" fill="white" opacity=".22"/>
+  <path d="m340 291 273-98 413 119c26 8 21 34 0 39L633 245 340 336Z" fill="url(#roof)"/>
+  <path d="m340 313 293-91 400 116v24L633 248l-293 90Z" fill="url(#fascia)"/>
+  <path d="m340 313 293-91 400 116" stroke="white" stroke-width="4"/>
+  <path d="m350 335 282-87 391 112" stroke="#A3B5F4" stroke-width="3"/>
+  <path d="m354 341 277-85 390 111" stroke="#F4E5CC" stroke-width="5" filter="url(#glow)"/>
+  <path d="m354 341 277-85 390 111" stroke="#FFF5DC" stroke-width="2"/>
+  <path d="m350 338 15-5v163l-15 5Zm290-85 16 5v160l-16-4Zm365 106 16 5v162l-16-5Z" fill="#EFF5FF"/>
+  <path d="m656 422 349 99v9l-349-99Z" fill="#829FC7"/>
+  <path d="m671 295 291 83v96l-291-83Z" fill="#AEC5E8" opacity=".35"/>
+  <path d="M781 345v48m0-39 16 4c19 5 19 28 0 23l-16-5" stroke="#F6FAFF" stroke-width="7" stroke-linecap="round"/>
+  <path d="m772 411 57 16" stroke="#E8F6FF" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(1022 396)"><use href="#tree"/><path d="m-45 71 48-14 52 15-48 14Z" fill="#FAFCFF"/><path d="M-45 71v25l52 15V86Z" fill="#DBE6F5"/><path d="m7 86 48-14v25l-48 14Z" fill="#AFBFDD"/></g>
+  <g transform="translate(326 379) scale(.8)"><ellipse cy="76" rx="43" ry="12" fill="#728DAF" opacity=".25"/><use href="#tree"/><path d="m-34 63 34-10 36 10-35 10Z" fill="#EAF4FA"/><path d="M-34 63v20l35 10V73Z" fill="#B7CEDD"/><path d="m1 73 35-10v20L1 93Z" fill="#88A7C5"/></g>
+  <g transform="translate(235 284)">
+    <path d="m-24 16 47-14 8 5v171l-48 14-8-4Z" fill="#B5C6E4"/>
+    <path d="m-24 16 47-14v171l-47 14Z" fill="#ECF5FF"/>
+    <path d="m-19 24 36-11v143l-36 11Z" fill="url(#screen)"/>
+    <path d="M-7 51v43m0-35 10-3c17-5 17 20 0 25l-10 3" stroke="#ECFAFF" stroke-width="6" stroke-linecap="round"/>
+    <path d="m-7 125 17-5m-7-5 9 4-9 10" stroke="#9DE4FF" stroke-width="3" stroke-linecap="round"/>
+    <path d="M0 184v32" stroke="#9FB2D3" stroke-width="9"/>
+  </g>
+  <g transform="translate(661 443)"><path d="m0 0 17-5 17 6-17 5Z" fill="#F9FCFF"/><path d="M0 0v86l17 5V6Z" fill="#EAF1FD"/><path d="m17 6 17-5v85l-17 5Z" fill="#A6B9DE"/><path d="m4 18 9 3v24l-9-3Z" fill="#4874CD"/><path d="m5 60 7 2v12l-7-2Z" fill="#647DAF"/></g>
+  <path d="m461 406 199 60 4-12-199-60Z" fill="#FAFCFF"/>
+  <path d="m479 411 19 6 4-12-19-6Zm45 14 19 6 4-12-19-6Zm45 13 19 6 4-12-19-6Zm45 14 19 6 4-12-19-6Z" fill="#8C8BD9"/>
+  <ellipse cx="428" cy="550" rx="143" ry="25" fill="#425C87" opacity=".34" filter="url(#soft)"/>
+  <g>
+    <title>Silver SUV approaching the gate, rear three-quarter view</title>
+    <ellipse cx="324" cy="524" rx="11" ry="20" transform="rotate(-20 324 524)" fill="#2D3F5C"/>
+    <ellipse cx="428" cy="548" rx="15" ry="23" transform="rotate(22 428 548)" fill="#2D3F5C"/>
+    <ellipse cx="529" cy="502" rx="13" ry="21" transform="rotate(22 529 502)" fill="#2D3F5C"/>
+    <path d="M303 484q0-12 17-25l25-32q5-6 14-9l70-24q10-3 20 3l39 25 23 28 27 10q16 7 18 21l-2 22-10 5q1-32-18-28-19 5-22 40l-59 27q1-32-19-27-20 6-22 37l-91-31Z" fill="url(#silver)" stroke="#8299B8" stroke-width="1.5"/>
+    <path d="m352 428 80-27 41 25-78 30Z" fill="#DCE9F7" stroke="#99AFC9" stroke-width="2"/>
+    <path d="m324 461 27-29 43 28 1 33-71-29Z" fill="url(#carGlass)" stroke="#EAF4FF" stroke-width="3"/>
+    <path d="m404 460 72-29 21 26-89 38Z" fill="url(#carGlass)" stroke="#EAF4FF" stroke-width="3"/>
+    <path d="m445 445 10 30" stroke="#BCD0E4" stroke-width="5"/>
+    <path d="m329 460 23-24 33 22-48 8Z" fill="#D8F0FC" opacity=".35"/>
+    <path d="m305 481 95 38 145-60" stroke="#F8FCFF" stroke-width="4"/>
+    <path d="m407 503 4 38m62-65 5 36" stroke="#829BBE" stroke-width="1.5"/>
+    <path d="m418 505 10-4m55-25 9-4" stroke="#5E779A" stroke-width="3" stroke-linecap="round"/>
+    <path d="m312 493 27 11m32 12 21 8" stroke="#DA5077" stroke-width="5" stroke-linecap="round"/>
+    <path d="m341 513 21 8v9l-21-8Z" fill="#EAF4FC" stroke="#8DA4BF"/>
+    <path d="m310 520 87 33m56-23 48-21" stroke="#617A9C" stroke-width="5" stroke-linecap="round"/>
+    <ellipse cx="428" cy="548" rx="8" ry="15" transform="rotate(22 428 548)" fill="#A9C3DA"/>
+    <ellipse cx="529" cy="502" rx="7" ry="13" transform="rotate(22 529 502)" fill="#A9C3DA"/>
+    <path d="m494 457 13-5 7 6-15 6Z" fill="#8CA6C7"/>
+  </g>
+  <path d="m785 554 223 63m-658-42-95 50" stroke="white" stroke-width="6" opacity=".15" filter="url(#glow)"/>
+  <path d="m134 520 72-21 63 18-74 22Z" fill="#F5FAFF"/><path d="m134 520 61 19v26l-61-19Z" fill="#D1E0F0"/><path d="m195 539 74-22v26l-74 22Z" fill="#AABFDD"/>
+  <g fill="#B5D5C6"><ellipse cx="171" cy="510" rx="19" ry="13"/><ellipse cx="201" cy="505" rx="23" ry="17"/><ellipse cx="231" cy="511" rx="18" ry="12"/></g>
+</svg>

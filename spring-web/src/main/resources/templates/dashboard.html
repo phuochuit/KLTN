@@ -1,237 +1,85 @@
-<!DOCTYPE html><html lang="vi" xmlns:th="http://www.thymeleaf.org"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dashboard</title><link rel="stylesheet" th:href="@{/css/app.css}"><style>
-.filter-card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:20px; }
-.filter-row { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
-.filter-row label { display:flex; flex-direction:column; gap:4px; font-weight:600; font-size:13px; color:var(--navy); }
-.filter-row select,.filter-row input { padding:8px 10px; border:1px solid #bac7d7; border-radius:6px; font-size:13px; }
-.filter-row button { background:var(--blue); color:#fff; border:0; padding:9px 16px; border-radius:6px; font-weight:600; cursor:pointer; }
-.stats-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
-.stats-item .label { font-size:12px; color:#687588; font-weight:600; }
-.stats-item .value { font-size:22px; font-weight:700; color:var(--blue); margin-top:2px; }
-.stats-item .value.green { color:var(--green); }
-.revenue-row { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:12px; }
-.revenue-item { background:#f8fafc; border-radius:8px; padding:12px; }
-.revenue-item .label { font-size:12px; color:#687588; font-weight:600; }
-.revenue-item .value { font-size:20px; font-weight:700; color:var(--blue); margin-top:2px; }
-.revenue-item .value.green { color:var(--green); }
-.chart { display:flex; align-items:flex-end; gap:6px; height:200px; padding:16px 8px 28px; border-bottom:2px solid var(--border); }
-.chart-bar-wrapper { flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; cursor:pointer; }
-.chart-bar { width:100%; max-width:46px; background:linear-gradient(180deg,var(--blue),#5ba3d9); border-radius:5px 5px 0 0; transition:all .2s; min-height:3px; position:relative; }
-.chart-bar:hover { background:linear-gradient(180deg,#235c91,var(--blue)); }
-.chart-bar.active { background:linear-gradient(180deg,var(--navy),var(--blue)); }
-.chart-bar-label { position:absolute; top:-20px; left:50%; transform:translateX(-50%); font-size:10px; font-weight:600; color:var(--navy); white-space:nowrap; }
-.chart-month { margin-top:6px; font-size:11px; color:#687588; font-weight:600; }
-.chart-month.active { color:var(--navy); }
-.tooltip { position:fixed; background:var(--navy); color:#fff; padding:8px 12px; border-radius:6px; font-size:12px; pointer-events:none; z-index:1000; display:none; white-space:nowrap; }
-.detail-panel { margin-top:20px; display:none; }
-.detail-panel.show { display:block; }
-.detail-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-.detail-title { font-size:16px; font-weight:700; color:var(--navy); }
-.detail-total { font-size:20px; font-weight:700; color:var(--green); }
-</style></head><body>
-<header th:replace="~{fragments :: header}"></header><main><h1>Dashboard vận hành</h1>
-
-<div class="filter-card">
-  <div class="filter-row">
-    <label>Loại
-      <select id="filterType" onchange="onFilterTypeChange()">
-        <option value="month">Theo tháng</option>
-        <option value="year">Theo năm</option>
-        <option value="range">Theo khoảng ngày</option>
-      </select>
-    </label>
-    <label id="labelMonth">Tháng
-      <select id="filterMonth"></select>
-    </label>
-    <label id="labelYear">Năm
-      <select id="filterYear"></select>
-    </label>
-    <label id="labelFrom" style="display:none">Từ ngày
-      <input type="date" id="filterFrom" />
-    </label>
-    <label id="labelTo" style="display:none">Đến ngày
-      <input type="date" id="filterTo" />
-    </label>
-    <button onclick="applyFilter()">Áp dụng</button>
-    <button type="button" onclick="exportRevenueCsv()" style="background:#0284c7;color:white;border:none;margin-left:8px;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:600;">📥 Xuất CSV Doanh thu</button>
-  </div>
-  <div class="stats-grid">
-    <div class="stats-item"><div class="label">Hộ gia đình</div><div class="value" id="statHouseholds" th:text="${householdCount}">0</div></div>
-    <div class="stats-item"><div class="label">Xe đăng ký</div><div class="value" id="statVehicles" th:text="${vehicleCount}">0</div></div>
-    <div class="stats-item"><div class="label">Xe trong bãi</div><div class="value" id="statOpen" th:text="${openCount}">0</div></div>
-    <div class="stats-item"><div class="label">Doanh thu hôm nay</div><div class="value" id="statToday">0 đ</div></div>
-    <div class="stats-item"><div class="label">Doanh thu tháng</div><div class="value" id="statMonth">0 đ</div></div>
-  </div>
-  <div class="revenue-row">
-    <div class="revenue-item"><div class="label">Vé lượt</div><div class="value" id="sumVisit">0 đ</div></div>
-    <div class="revenue-item"><div class="label">Gói tháng</div><div class="value" id="sumSubscription">0 đ</div></div>
-    <div class="revenue-item"><div class="label">Tổng doanh thu</div><div class="value green" id="sumTotal">0 đ</div></div>
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tổng quan · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <script th:src="@{/js/dashboard.js}" type="module"></script>
+</head>
+<body class="dashboard-page dashboard-home">
+<a href="#overview" class="skip-link">Đến nội dung chính</a>
+<div class="dashboard-shell">
+  <aside class="sidebar" aria-label="Điều hướng quản trị">
+    <div th:replace="~{dashboard-shell :: navigation}"></div>
+  </aside>
+  <div class="dashboard-workspace">
+    <header class="dashboard-topbar">
+      <div class="topbar-location"><button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng" aria-haspopup="dialog"><img th:src="@{/images/lucide/menu.svg}" alt=""></button><span>Không gian quản trị <span aria-hidden="true">/</span> <strong>Tổng quan</strong></span></div>
+      <a class="account-link" th:href="@{/account/password}"><span class="account-avatar" aria-hidden="true"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span></a>
+    </header>
+    <main id="overview" tabindex="-1">
+      <noscript><style>.icon-button.mobile-menu{display:none}</style><details class="noscript-navigation"><summary>Mở điều hướng</summary><div th:replace="~{dashboard-shell :: navigation}"></div></details></noscript>
+       <section class="page-heading"><div><p class="eyebrow">LUMIPARK / OVERVIEW</p><h1>Tổng quan vận hành</h1><p class="page-description">Số liệu hiện tại và doanh thu theo kỳ.</p></div><div class="snapshot-actions"><span class="snapshot-label" id="snapshotTime">Số liệu tại lúc tải trang</span><button type="button" class="secondary-button" id="refreshOverview">Làm mới tổng quan</button></div></section>
+      <p id="overviewStatus" class="feedback" role="status"></p>
+      <section class="kpi-grid" aria-label="Tổng quan hiện tại">
+        <article class="glass-card kpi kpi-featured"><div class="kpi-label"><span>Xe trong bãi</span><img th:src="@{/images/lucide/car-front.svg}" alt=""></div><p class="kpi-value" id="currentOpen" th:text="${openCount}">0</p><p class="kpi-note">Lượt xe đang mở</p><a class="kpi-link" th:if="${#sets.contains(currentAuthorities,'HISTORY_VIEW') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}" th:href="@{/sessions(status='OPEN')}">Xem xe trong bãi ↗</a></article>
+        <article class="glass-card kpi"><div class="kpi-label"><span>Xe đăng ký</span><img th:src="@{/images/lucide/scan-line.svg}" alt=""></div><p class="kpi-value" id="currentVehicles" th:text="${vehicleCount}">0</p><p class="kpi-note">Phương tiện trong hệ thống</p><a class="kpi-link" th:if="${#sets.contains(currentAuthorities,'VEHICLE_MANAGE') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}" th:href="@{/vehicles}">Xem phương tiện ↗</a></article>
+        <article class="glass-card kpi"><div class="kpi-label"><span>Hộ gia đình</span><img th:src="@{/images/lucide/house.svg}" alt=""></div><p class="kpi-value" id="currentHouseholds" th:text="${householdCount}">0</p><p class="kpi-note">Hồ sơ đã ghi nhận</p><a class="kpi-link" th:if="${#sets.contains(currentAuthorities,'RESIDENT_MANAGE') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}" th:href="@{/households}">Xem hồ sơ hộ ↗</a></article>
+        <article class="glass-card kpi"><div class="kpi-label"><span>Doanh thu hôm nay</span><img th:src="@{/images/lucide/wallet.svg}" alt=""></div><p class="kpi-value money" id="currentToday" th:text="${#numbers.formatDecimal(todayRevenue,0,'POINT',0,'COMMA') + ' đ'}">0 đ</p><p class="kpi-note">Tháng này: <strong id="currentMonth" th:text="${#numbers.formatDecimal(monthRevenue,0,'POINT',0,'COMMA') + ' đ'}">0 đ</strong></p><button type="button" class="kpi-link" id="showToday">Xem giao dịch hôm nay ↓</button></article>
+      </section>
+       <section class="glass-card analysis-controls" aria-labelledby="analysisTitle">
+          <div class="panel-heading"><div><p class="eyebrow">KỲ BÁO CÁO</p><h2 id="analysisTitle">Doanh thu theo kỳ</h2></div><button type="button" class="text-button" id="resetPeriod">Về tháng hiện tại</button></div>
+        <form id="revenueFilter" class="filter-form">
+          <label>Thống kê theo<select id="filterType" name="type"><option value="month">Tháng</option><option value="year">Năm</option><option value="range">Khoảng ngày</option></select></label>
+          <label id="monthField">Tháng<select id="filterMonth" name="month"></select></label>
+          <label id="yearField">Năm<select id="filterYear" name="year"></select></label>
+          <label id="fromField" hidden>Từ ngày<input type="date" id="filterFrom" name="from"></label>
+           <label id="toField" hidden>Đến ngày<input type="date" id="filterTo" name="to"></label>
+           <button type="submit" class="primary-button">Áp dụng kỳ</button>
+           <a id="exportRevenueCsv" class="secondary-button" th:if="${#sets.contains(currentAuthorities,'DASHBOARD_VIEW') or #sets.contains(currentAuthorities,'HISTORY_VIEW') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}" th:href="@{/revenue/export-csv}">Xuất CSV kỳ đang chọn</a>
+         </form>
+           <p id="filterStatus" class="feedback" role="status">Đang tải kỳ doanh thu…</p>
+      </section>
+      <div class="bento-grid">
+        <section class="glass-card trend-panel" aria-labelledby="trendTitle">
+           <div class="panel-heading"><div><p class="eyebrow">XU HƯỚNG GẦN ĐÂY</p><h2 id="trendTitle">Doanh thu theo tháng</h2><p class="muted">Đơn vị: đồng</p></div><div class="trend-actions"><label class="sr-only" for="trendWindow">Số tháng hiển thị</label><select id="trendWindow"><option value="6">6 tháng</option><option value="12">12 tháng</option></select><button type="button" class="text-button" id="retryTrend">Tải lại</button></div></div>
+          <div class="chart-legend"><span><i class="swatch visit"></i>Vé lượt</span><span><i class="swatch subscription"></i>Gói tháng</span></div>
+          <p id="trendStatus" role="status" class="muted">Đang tải biểu đồ…</p>
+          <div id="revenueChart" class="revenue-chart" aria-label="Doanh thu 12 tháng"></div>
+            <p class="chart-hint">Chọn tháng để xem cơ cấu và giao dịch.</p>
+          <a class="text-button drilldown-link" href="#transactionsTitle" id="viewPeriodTransactions">Xem giao dịch kỳ đang chọn ↓</a>
+          <details class="chart-data"><summary>Xem bảng dữ liệu biểu đồ</summary><div class="table-scroll" tabindex="0" role="region" aria-label="Dữ liệu doanh thu 12 tháng"><table><thead><tr><th>Tháng</th><th>Vé lượt</th><th>Gói tháng</th><th>Tổng</th></tr></thead><tbody id="chartDataBody"></tbody></table></div></details>
+        </section>
+        <section class="glass-card composition-panel" aria-labelledby="compositionTitle">
+          <div class="panel-heading"><div><p class="eyebrow">THEO KỲ ĐANG CHỌN</p><h2 id="compositionTitle">Cơ cấu doanh thu</h2></div></div>
+          <p class="period-label" id="compositionPeriod">Đang tải…</p>
+          <div id="composition" class="composition"><div class="donut" id="revenueDonut"><div><span class="muted">Tổng doanh thu</span><strong id="compositionTotal">—</strong></div></div></div>
+          <div class="composition-legend"><div><span><i class="swatch visit"></i>Vé lượt</span><strong id="visitAmount">—</strong><span class="muted" id="visitPercent">—</span></div><div><span><i class="swatch subscription"></i>Gói tháng</span><strong id="subscriptionAmount">—</strong><span class="muted" id="subscriptionPercent">—</span></div></div>
+           <p class="composition-note" id="compositionNote"></p>
+        </section>
+        <section class="glass-card transactions-panel" aria-labelledby="transactionsTitle">
+           <div class="panel-heading"><div><p class="eyebrow">TRA CỨU DOANH THU</p><h2 id="transactionsTitle">Giao dịch trong kỳ</h2></div><strong class="period-total" id="periodTotal">—</strong></div>
+           <p class="muted" id="transactionsScope">Tổng doanh thu trong kỳ; bộ lọc bảng chỉ thay đổi các dòng bên dưới.</p>
+          <form id="transactionFilter" class="filter-form transaction-filter">
+            <label class="search-field">Biển số / mã thẻ<input id="transactionSearch" name="q" type="search" maxlength="80" placeholder="Tìm trong kỳ đã chọn" autocomplete="off"></label>
+             <label>Loại doanh thu<select id="transactionSource" name="source"><option value="ALL">Tất cả loại</option><option value="VISIT">Vé lượt</option><option value="SUBSCRIPTION">Gói tháng</option></select></label>
+            <label>Sắp xếp<select id="transactionSort" name="sort"><option value="newest">Mới nhất trước</option><option value="oldest">Cũ nhất trước</option></select></label>
+            <button type="submit" class="primary-button">Tìm giao dịch</button>
+          </form>
+           <div class="transaction-feedback"><p id="transactionStatus" class="feedback" role="status">Đang tải giao dịch…</p><button type="button" id="retryTransactions" class="text-button" hidden>Thử lại</button><button type="button" id="clearTransactionFilters" class="text-button" hidden>Xóa bộ lọc</button></div>
+           <div id="periodResults" hidden><div class="detail-heading"><h3 id="detailTitle">Giao dịch</h3><span class="muted" id="transactionCount"></span></div><p class="table-hint">Cuộn ngang để xem thêm cột.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Chi tiết giao dịch theo kỳ"><table><thead><tr><th>Thời gian</th><th>Loại giao dịch</th><th>Biển số / Thẻ</th><th>Số tiền</th></tr></thead><tbody id="detailBody"></tbody></table></div></div>
+           <nav class="pagination" aria-label="Phân trang giao dịch"><p id="pageRange" role="status">Chưa có kết quả</p><div class="page-buttons"><button type="button" id="previousPage" class="secondary-button" disabled>← Trước</button><div id="pageNumbers" class="page-numbers" aria-label="Chọn trang giao dịch"></div><button type="button" id="nextPage" class="secondary-button" disabled>Sau →</button></div></nav>
+        </section>
+        <section class="glass-card sessions-panel" aria-labelledby="sessionsTitle">
+          <div class="panel-heading"><div><p class="eyebrow">HOẠT ĐỘNG GẦN ĐÂY</p><h2 id="sessionsTitle">Lượt xe mới nhất</h2></div><a class="text-button" th:if="${#sets.contains(currentAuthorities,'HISTORY_VIEW') or #sets.contains(currentAuthorities,'ROLE_MANAGEMENT')}" th:href="@{/sessions}">Xem lịch sử <span aria-hidden="true">↗</span></a></div>
+           <p class="table-hint">Cuộn ngang để xem thêm cột.</p><div class="table-scroll" tabindex="0" role="region" aria-label="Lượt xe gần đây"><table><thead><tr><th>Biển số</th><th>Vào bãi</th><th>Ra bãi</th><th>Trạng thái</th><th>Phí lượt</th></tr></thead><tbody id="recentSessionsBody"><tr th:each="s:${recentSessions}"><td class="plate" th:text="${s.entryPlate}"></td><td th:text="${#temporals.format(s.entryTime,'dd/MM/yyyy HH:mm')}"></td><td th:text="${s.exitTime == null ? '—' : #temporals.format(s.exitTime,'dd/MM/yyyy HH:mm')}"></td><td><span class="status-badge" th:classappend="${s.status.name() == 'OPEN' ? 'is-open' : ''}" th:text="${s.status.displayName}"></span></td><td th:text="${#numbers.formatDecimal(s.fee,0,'POINT',0,'COMMA') + ' đ'}"></td></tr><tr th:if="${#lists.isEmpty(recentSessions)}"><td colspan="5" class="empty-cell">Chưa có lượt xe. Hoạt động mới sẽ xuất hiện tại đây.</td></tr></tbody></table></div>
+        </section>
+      </div>
+       <p class="data-footnote">Doanh thu gồm phí lượt hoàn tất và thanh toán gói; không thay thế báo cáo đối soát.</p>
+      <noscript><p class="feedback">Bật JavaScript để xem biểu đồ và lọc doanh thu. Các chỉ số hiện tại và lượt xe gần đây vẫn hiển thị.</p></noscript>
+    </main>
   </div>
 </div>
-
-<div class="card detail-panel" id="detailPanel">
-  <div class="detail-header">
-    <span class="detail-title" id="detailTitle">Chi tiết giao dịch</span>
-    <span class="detail-total" id="detailTotal">0 đ</span>
-  </div>
-  <div class="table-scroll">
-    <table><thead><tr><th>Thời gian</th><th>Loại</th><th>Biển số / Thẻ</th><th>Số tiền</th></tr></thead>
-    <tbody id="detailBody"></tbody></table>
-  </div>
-</div>
-
-<div class="card chart-container">
-  <h2 style="margin-top:0">Doanh thu theo tháng (12 tháng gần nhất)</h2>
-  <div class="chart" id="revenueChart"></div>
-</div>
-
-<div class="card"><h2>Lượt xe gần đây</h2><div class="table-scroll"><table><thead><tr><th>ID</th><th>Biển số</th><th>Vào</th><th>Ra</th><th>Trạng thái</th><th>Phí lượt</th></tr></thead><tbody><tr th:each="s:${recentSessions}"><td th:text="${s.id}"></td><td th:text="${s.entryPlate}"></td><td th:text="${#temporals.format(s.entryTime,'dd/MM/yyyy HH:mm')}"></td><td th:text="${s.exitTime == null ? '-' : #temporals.format(s.exitTime,'dd/MM/yyyy HH:mm')}"></td><td th:text="${s.status.displayName}" th:class="${s.status.name() == 'OPEN' ? 'status-open' : 'status-completed'}"></td><td th:text="${#numbers.formatDecimal(s.fee,0,'COMMA',0,'POINT') + ' đ'}"></td></tr><tr th:if="${#lists.isEmpty(recentSessions)}"><td colspan="6" class="muted">Chưa có lượt xe.</td></tr></tbody></table></div></div>
-</main>
-<div class="tooltip" id="chartTooltip"></div>
-<script>
-function fmtNum(v) {
-  const n = Number(v);
-  return (isFinite(n) && !isNaN(n)) ? n : 0;
-}
-function fmtDate(d) {
-  if (!d) return '-';
-  try { return new Date(d).toLocaleString('vi-VN'); } catch(e) { return d; }
-}
-function fmtMoney(v) { return fmtNum(v).toLocaleString('vi-VN') + ' đ'; }
-
-(function() {
-  const typeSel = document.getElementById('filterType');
-  const labelMonth = document.getElementById('labelMonth');
-  const labelYear = document.getElementById('labelYear');
-  const labelFrom = document.getElementById('labelFrom');
-  const labelTo = document.getElementById('labelTo');
-  const monthSel = document.getElementById('filterMonth');
-  const yearSel = document.getElementById('filterYear');
-  const now = new Date();
-  for (let i = 1; i <= 12; i++) {
-    const opt = document.createElement('option');
-    opt.value = i; opt.textContent = 'Tháng ' + i;
-    monthSel.appendChild(opt);
-  }
-  monthSel.value = now.getMonth() + 1;
-  for (let y = now.getFullYear(); y >= now.getFullYear() - 5; y--) {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y;
-    yearSel.appendChild(opt);
-  }
-  yearSel.value = now.getFullYear();
-  document.getElementById('filterFrom').value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  document.getElementById('filterTo').value = now.toISOString().split('T')[0];
-  window.onFilterTypeChange = function() {
-    const t = typeSel.value;
-    labelMonth.style.display = t === 'month' ? '' : 'none';
-    labelYear.style.display = (t === 'month' || t === 'year') ? '' : 'none';
-    labelFrom.style.display = t === 'range' ? '' : 'none';
-    labelTo.style.display = t === 'range' ? '' : 'none';
-  };
-  window.exportRevenueCsv = function() {
-    const t = typeSel.value;
-    let url = '/api/parking/revenue/export-csv?type=' + t;
-    if (t === 'month') url += '&year=' + yearSel.value + '&month=' + monthSel.value;
-    else if (t === 'year') url += '&year=' + yearSel.value;
-    else if (t === 'range') url += '&from=' + document.getElementById('filterFrom').value + '&to=' + document.getElementById('filterTo').value;
-    window.location.href = url;
-  };
-  window.applyFilter = function() {
-    const t = typeSel.value;
-    let url = '/api/parking/revenue/filter?type=' + t;
-    if (t === 'month') url += '&year=' + yearSel.value + '&month=' + monthSel.value;
-    else if (t === 'year') url += '&year=' + yearSel.value;
-    else if (t === 'range') url += '&from=' + document.getElementById('filterFrom').value + '&to=' + document.getElementById('filterTo').value;
-    fetch(url).then(r => r.json()).then(data => {
-      document.getElementById('sumVisit').textContent = fmtMoney(data.visitRevenue);
-      document.getElementById('sumSubscription').textContent = fmtMoney(data.subscriptionRevenue);
-      document.getElementById('sumTotal').textContent = fmtMoney(data.totalRevenue);
-      renderStats(data);
-      const panel = document.getElementById('detailPanel');
-      panel.classList.add('show');
-      document.getElementById('detailTitle').textContent = data.label || 'Chi tiết giao dịch';
-      document.getElementById('detailTotal').textContent = fmtMoney(data.totalRevenue);
-      const rows = [];
-      (data.sessions || []).forEach(s => {
-        rows.push('<tr><td>' + fmtDate(s.exitTime) + '</td><td>Vé lượt</td><td>' + (s.entryPlate || '-') + '</td><td>' + fmtMoney(s.fee) + '</td></tr>');
-      });
-      (data.payments || []).forEach(p => {
-        rows.push('<tr><td>' + fmtDate(p.paidAt) + '</td><td>Gói tháng</td><td>' + (p.parkingCard ? p.parkingCard.cardCode : '-') + '</td><td>' + fmtMoney(p.amount) + '</td></tr>');
-      });
-      document.getElementById('detailBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="4" class="muted">Không có giao dịch.</td></tr>';
-    }).catch(e => console.error(e));
-  };
-  window.renderStats = function(stats) {
-    document.getElementById('statHouseholds').textContent = fmtNum(stats.householdCount);
-    document.getElementById('statVehicles').textContent = fmtNum(stats.vehicleCount);
-    document.getElementById('statOpen').textContent = fmtNum(stats.openCount);
-    document.getElementById('statToday').textContent = fmtMoney(stats.todayRevenue);
-    document.getElementById('statMonth').textContent = fmtMoney(stats.monthRevenue);
-  };
-  onFilterTypeChange();
-  applyFilter();
-})();
-
-(async function() {
-  const chart = document.getElementById('revenueChart');
-  const tooltip = document.getElementById('chartTooltip');
-  let monthlyData = [];
-  try {
-    const resp = await fetch('/api/parking/revenue/monthly');
-    monthlyData = await resp.json();
-  } catch (e) { console.error(e); }
-  if (!monthlyData.length) return;
-  const maxRevenue = Math.max(...monthlyData.map(d => fmtNum(d.totalRevenue)), 1);
-  monthlyData.forEach((d) => {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'chart-bar-wrapper';
-    const bar = document.createElement('div');
-    bar.className = 'chart-bar';
-    bar.style.height = Math.max((fmtNum(d.totalRevenue) / maxRevenue) * 100, 2) + '%';
-    const valueLabel = document.createElement('span');
-    valueLabel.className = 'chart-bar-label';
-    valueLabel.textContent = (fmtNum(d.totalRevenue) / 1000).toFixed(0) + 'k';
-    bar.appendChild(valueLabel);
-    const monthLabel = document.createElement('span');
-    monthLabel.className = 'chart-month';
-    monthLabel.textContent = d.month + '/' + String(d.year).slice(2);
-    wrapper.appendChild(bar);
-    wrapper.appendChild(monthLabel);
-    wrapper.addEventListener('mouseenter', (e) => {
-      tooltip.style.display = 'block';
-      tooltip.innerHTML = '<b>' + d.label + '</b><br>Vé lượt: ' + fmtMoney(d.visitRevenue) + '<br>Gói tháng: ' + fmtMoney(d.subscriptionRevenue) + '<br>Tổng: ' + fmtMoney(d.totalRevenue);
-    });
-    wrapper.addEventListener('mousemove', (e) => {
-      tooltip.style.left = (e.clientX + 12) + 'px';
-      tooltip.style.top = (e.clientY - 10) + 'px';
-    });
-    wrapper.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
-    wrapper.addEventListener('click', () => {
-      document.querySelectorAll('.chart-bar').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.chart-month').forEach(m => m.classList.remove('active'));
-      bar.classList.add('active');
-      monthLabel.classList.add('active');
-      fetch('/api/parking/revenue/filter?type=month&year=' + d.year + '&month=' + d.month).then(r => r.json()).then(data => {
-        renderStats(data);
-        document.getElementById('sumVisit').textContent = fmtMoney(data.visitRevenue);
-        document.getElementById('sumSubscription').textContent = fmtMoney(data.subscriptionRevenue);
-        document.getElementById('sumTotal').textContent = fmtMoney(data.totalRevenue);
-        const panel = document.getElementById('detailPanel');
-        panel.classList.add('show');
-        document.getElementById('detailTitle').textContent = 'Giao dịch tháng ' + d.month + '/' + d.year;
-        document.getElementById('detailTotal').textContent = fmtMoney(data.totalRevenue);
-        const rows = [];
-        (data.sessions || []).forEach(s => {
-          rows.push('<tr><td>' + fmtDate(s.exitTime) + '</td><td>Vé lượt</td><td>' + (s.entryPlate || '-') + '</td><td>' + fmtMoney(s.fee) + '</td></tr>');
-        });
-        (data.payments || []).forEach(p => {
-          rows.push('<tr><td>' + fmtDate(p.paidAt) + '</td><td>Gói tháng</td><td>' + (p.parkingCard ? p.parkingCard.cardCode : '-') + '</td><td>' + fmtMoney(p.amount) + '</td></tr>');
-        });
-        document.getElementById('detailBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="4" class="muted">Không có giao dịch trong tháng này.</td></tr>';
-      });
-    });
-    chart.appendChild(wrapper);
-  });
-})();
-</script>
+<dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị"><button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button><div th:replace="~{dashboard-shell :: navigation}"></div></dialog>
 </body></html>

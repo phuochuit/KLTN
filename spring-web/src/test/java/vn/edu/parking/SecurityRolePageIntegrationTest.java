@@ -1,11 +1,14 @@
 package vn.edu.parking;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import vn.edu.parking.repository.SecurityRoleRepository;
@@ -13,12 +16,15 @@ import vn.edu.parking.repository.SecurityRoleRepository;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -40,9 +46,34 @@ class SecurityRolePageIntegrationTest {
     void rendersFriendlyPermissionManagementPage() throws Exception {
         mvc.perform(get("/roles"))
             .andExpect(status().isOk())
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("Vai trò và quyền hạn")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Vai trò &amp; quyền hạn")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("Vận hành trạm gác")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("Tiền tố mã nhân viên")));
+    }
+
+    @Test
+    void roleDraftScopeIsStableForPrincipalAndRotatesWhenPrincipalChangesInSameSession() throws Exception {
+        var first = mvc.perform(get("/roles").with(user("scope-manager").roles("MANAGEMENT")))
+            .andExpect(status().isOk()).andReturn();
+        MockHttpSession session = (MockHttpSession) first.getRequest().getSession(false);
+        assertNotNull(session);
+        String initialScope = draftScope(first.getResponse().getContentAsString());
+
+        var samePrincipal = mvc.perform(get("/roles").session(session)
+                .with(user("scope-manager").roles("MANAGEMENT")))
+            .andExpect(status().isOk()).andReturn();
+        assertEquals(initialScope, draftScope(samePrincipal.getResponse().getContentAsString()));
+
+        var changedPrincipal = mvc.perform(get("/roles").session(session)
+                .with(user("different-manager").roles("MANAGEMENT")))
+            .andExpect(status().isOk()).andReturn();
+        assertNotEquals(initialScope, draftScope(changedPrincipal.getResponse().getContentAsString()));
+    }
+
+    private static String draftScope(String html) {
+        Matcher matcher = Pattern.compile("data-role-draft-scope=\"([^\"]+)\"").matcher(html);
+        if (!matcher.find()) throw new AssertionError("Role draft scope marker was not rendered.");
+        return matcher.group(1);
     }
 
     @Test

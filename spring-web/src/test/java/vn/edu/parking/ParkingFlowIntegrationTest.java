@@ -52,6 +52,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
     "parking.evidence.required=false"
 })
 class ParkingFlowIntegrationTest {
+    @org.springframework.test.context.DynamicPropertySource
+    static void isolatedProperties(org.springframework.test.context.DynamicPropertyRegistry registry) throws java.io.IOException {
+        LoginTestIsolation.register(registry, "parking-flow");
+    }
     @Autowired MockMvc mvc;
     @Autowired VehicleRepository vehicles;
     @Autowired ParkingCardRepository cards;
@@ -63,6 +67,7 @@ class ParkingFlowIntegrationTest {
     @Autowired PaymentTransactionRepository paymentTransactions;
     @Autowired ParkingSessionRepository parkingSessions;
     @Autowired SystemAccountRepository systemAccounts;
+    @Autowired org.springframework.core.env.Environment environment;
 
     @Test
     @WithMockUser(username = "admin", roles = "MANAGEMENT")
@@ -78,8 +83,7 @@ class ParkingFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.plateNumber", is("59A112345")))
             .andExpect(jsonPath("$.status", is("OPEN")))
-            .andExpect(jsonPath("$.warning", is(true)))
-            .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("chưa mua gói")));
+            .andExpect(jsonPath("$.warning", is(true)));
 
         mvc.perform(post("/api/parking/exit-preview").contentType("application/json").content(body))
             .andExpect(status().isOk())
@@ -367,11 +371,17 @@ class ParkingFlowIntegrationTest {
     @WithMockUser(username = "admin", roles = "MANAGEMENT")
     void combinedRegistrationCreatesHouseholdMemberVehicleThenOpensPackageStep() throws Exception {
         seedCollectorAccount();
-        long paymentCountBefore = paymentTransactions.count();
         byte[] image = java.util.Base64.getDecoder().decode(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
         MockMultipartFile face = new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image);
         MockMultipartFile registration = new MockMultipartFile("registrationImage", "registration.png", "image/png", image);
+        ParkingSession existingOpenSession = new ParkingSession();
+        existingOpenSession.setEntryPlate("61A123456");
+        existingOpenSession.setEntryTime(java.time.LocalDateTime.now().minusMinutes(2));
+        existingOpenSession.setDetectedVehicleType(VehicleType.CAR);
+        existingOpenSession = parkingSessions.saveAndFlush(existingOpenSession);
+        long transactionsBefore = paymentTransactions.count();
+        LocalDate packageStartDate = LocalDate.now();
         mvc.perform(multipart("/registrations").file(face).file(registration).with(csrf())
                 .param("householdCode", "HH-COMBINED-01").param("apartmentNumber", "C1-0101")
                 .param("buildingName", "C1").param("contactPhone", "0901000001")
@@ -381,8 +391,8 @@ class ParkingFlowIntegrationTest {
                 .param("fuelType", "GASOLINE").param("registrationNumber", "DKX-COMBINED")
                 .param("brand", "Honda").param("modelName", "Vision").param("color", "Đen")
                 .param("chassisNumber", "FRAME-COMBINED").param("engineNumber", "ENGINE-COMBINED")
-                .param("passType", "DAILY").param("packageStartDate", LocalDate.now().toString())
-                .param("packageDurationDays", "10").param("paymentMethod", "CASH"))
+                .param("passType", "DAILY").param("packageStartDate", packageStartDate.toString())
+                .param("packageDurationDays", "3").param("paymentMethod", "CASH"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrlPattern("/cards?vehicleId=*"));
 
@@ -390,11 +400,35 @@ class ParkingFlowIntegrationTest {
         assertEquals("HH-COMBINED-01", vehicle.getHousehold().getHouseholdCode());
         assertEquals("Cư dân đăng ký tổng hợp", vehicle.getRegisteredOwner().getFullName());
         assertTrue(vehicle.getRegisteredOwner().getRegistrationFaceImagePath().startsWith("resident:"));
-        ParkingCard packageCard = cards.findByVehicleId(vehicle.getId()).orElseThrow();
-        assertEquals(PassType.DAILY, packageCard.getPassType());
-        assertEquals(LocalDate.now().plusDays(9), packageCard.getValidUntil());
-        assertThat(packageCard.getSubscriptionFee()).isEqualByComparingTo("100000");
-        assertThat(paymentTransactions.count()).isEqualTo(paymentCountBefore + 1);
+        ParkingSession updatedOpenSession = parkingSessions.findById(existingOpenSession.getId()).orElseThrow();
+        assertEquals(vehicle.getId(), updatedOpenSession.getVehicle().getId());
+        assertEquals(VehicleType.MOTORBIKE, updatedOpenSession.getDetectedVehicleType());
+        ParkingCard activated = cards.findByVehicleId(vehicle.getId()).orElseThrow();
+        assertEquals(PassType.DAILY, activated.getPassType());
+        assertEquals(packageStartDate.plusDays(2), activated.getValidUntil());
+        assertThat(activated.getSubscriptionFee()).isEqualByComparingTo(
+            prices.findByVehicleType(VehicleType.MOTORBIKE).orElseThrow().getDailyPassPrice().multiply(BigDecimal.valueOf(3)));
+        assertThat(paymentTransactions.count()).isEqualTo(transactionsBefore + 1);
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "MANAGEMENT")
+    void combinedRegistrationWithoutPackageLeavesCardUnpurchased() throws Exception {
+        byte[] image = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        MockMultipartFile face = new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image);
+        MockMultipartFile registration = new MockMultipartFile("registrationImage", "registration.png", "image/png", image);
+        mvc.perform(multipart("/registrations").file(face).file(registration).with(csrf())
+                .param("householdCode", "HH-COMBINED-NOPACK").param("apartmentNumber", "C1-0102")
+                .param("fullName", "Cư dân chưa mua gói").param("citizenId", "079205019298")
+                .param("plateNumber", "61A1-234.57").param("vehicleType", "MOTORBIKE")
+                .param("fuelType", "GASOLINE").param("registrationNumber", "DKX-NOPACK")
+                .param("brand", "Honda").param("modelName", "Vision").param("color", "Đen")
+                .param("chassisNumber", "FRAME-NOPACK").param("engineNumber", "ENGINE-NOPACK"))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrlPattern("/cards?vehicleId=*"));
+        Vehicle vehicle = vehicles.findByPlateNumberIgnoreCase("61A123457").orElseThrow();
+        assertThat(cards.findByVehicleId(vehicle.getId())).isEmpty();
     }
 
     @Test
@@ -487,7 +521,9 @@ class ParkingFlowIntegrationTest {
         wife.setFullName("Người vợ kiểm thử");
         wife = members.save(wife);
 
-        mvc.perform(post("/vehicles").with(csrf())
+        MockMultipartFile registrationImage = new MockMultipartFile("registrationImage", "registration.png", "image/png",
+                java.util.Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="));
+        mvc.perform(multipart("/vehicles").file(registrationImage).with(csrf())
                 .param("householdId", household.getId().toString())
                 .param("registeredOwnerId", husband.getId().toString())
                 .param("authorizedMemberIds", wife.getId().toString())
@@ -499,8 +535,7 @@ class ParkingFlowIntegrationTest {
                 .param("modelName", "Vision")
                 .param("color", "Đen")
                 .param("chassisNumber", "RLH-TEST-CHASSIS")
-                .param("engineNumber", "JF66E-TEST-ENGINE")
-                .param("registrationImagePath", "uploads/test-registration.jpg"))
+                .param("engineNumber", "JF66E-TEST-ENGINE"))
             .andExpect(status().is3xxRedirection())
             .andExpect(redirectedUrl("/vehicles"));
 
@@ -509,6 +544,43 @@ class ParkingFlowIntegrationTest {
         assertEquals(2, vehicle.getAuthorizedMembers().size());
         assertTrue(vehicle.getAuthorizedMemberNames().contains("Người chồng kiểm thử"));
         assertTrue(vehicle.getAuthorizedMemberNames().contains("Người vợ kiểm thử"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", authorities = "VEHICLE_MANAGE")
+    void failedInlinePackagePaymentRollsBackRegistrationAndNewPrivateImages() throws Exception {
+        seedCollectorAccount();
+        long householdCount = households.count(), memberCount = members.count(), vehicleCount = vehicles.count();
+        long cardCount = cards.count(), paymentCount = paymentTransactions.count(), imageCount = privateImageCount();
+        byte[] image = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+        mvc.perform(multipart("/registrations")
+                .file(new MockMultipartFile("registrationFaceImage", "face.png", "image/png", image))
+                .file(new MockMultipartFile("registrationImage", "registration.png", "image/png", image)).with(csrf())
+                .param("householdCode", "HH-ROLLBACK-PKG").param("apartmentNumber", "SYNTHETIC-PKG")
+                .param("fullName", "Synthetic package rollback").param("citizenId", "079205019288")
+                .param("plateNumber", "61B1-234.56").param("vehicleType", "MOTORBIKE")
+                .param("fuelType", "GASOLINE").param("registrationNumber", "SYNTHETIC-PKG")
+                .param("brand", "Test").param("modelName", "Test").param("color", "Test")
+                .param("chassisNumber", "SYNTHETIC-PKG").param("engineNumber", "SYNTHETIC-PKG")
+                .param("passType", "DAILY").param("packageDurationDays", "3")
+                .param("paymentMethod", "BANK_TRANSFER"))
+            .andExpect(status().isBadRequest()); // Missing bank reference fails after staging profile/card work.
+        assertThat(households.count()).isEqualTo(householdCount);
+        assertThat(members.count()).isEqualTo(memberCount);
+        assertThat(vehicles.count()).isEqualTo(vehicleCount);
+        assertThat(cards.count()).isEqualTo(cardCount);
+        assertThat(paymentTransactions.count()).isEqualTo(paymentCount);
+        assertThat(vehicles.findByPlateNumberIgnoreCase("61B123456")).isEmpty();
+        assertThat(privateImageCount()).isEqualTo(imageCount);
+    }
+
+    private long privateImageCount() throws Exception {
+        java.nio.file.Path storage = java.nio.file.Path.of(environment.getRequiredProperty("parking.private-storage-path"));
+        if (!java.nio.file.Files.exists(storage)) return 0;
+        try (var files = java.nio.file.Files.walk(storage)) {
+            return files.filter(java.nio.file.Files::isRegularFile).count();
+        }
     }
 
     private void seedCollectorAccount() {

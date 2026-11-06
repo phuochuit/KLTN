@@ -46,3 +46,24 @@ deploy/secrets/*.pem
 deploy/secrets/*.key
 deploy/secrets/*.p12
 private-data/
+
+# Local engineering context and reproducible frontend dependencies/output.
+.opencode/
+.codegraph/
+tasks/
+backups/
+spring-web/node_modules/
+spring-web/src/main/resources/static/css/web-ui.css
+spring-web/src/main/resources/static/css/dashboard-ui.css
+spring-web/src/main/resources/static/css/security-roles.css
+spring-web/src/main/resources/static/css/account-management.css
+spring-web/src/main/resources/static/css/registration.css
+spring-web/src/main/resources/static/css/cards.css
+spring-web/src/main/resources/static/css/pricing.css
+spring-web/src/main/resources/static/css/payments.css
+spring-web/src/main/resources/static/images/lucide/
+
+# Local Python environments are never publication inputs.
+.venv/
+.venv.incompatible.*/
+.idea/

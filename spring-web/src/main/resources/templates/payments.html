@@ -1,39 +1,23 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Giao dịch và đối soát</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
-<body><header th:replace="~{fragments :: header}"></header><main>
-<h1>Giao dịch và đối soát</h1>
-<p class="notice" th:if="${message}" th:text="${message}"></p>
-<div class="stats-grid">
-  <div class="stats-item"><div class="label">Chờ đối soát</div><div class="value" th:text="${paidCount}">0</div></div>
-  <div class="stats-item"><div class="label">Số tiền chờ</div><div class="value" th:text="${#numbers.formatDecimal(paidAmount,0,'COMMA',0,'POINT') + ' đ'}">0 đ</div></div>
-</div>
-<div class="card">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-    <h2 style="margin:0;">Giao dịch gần đây</h2>
-    <div>
-      <a th:href="@{/payments/reports/reconciliation.csv}" class="btn btn-outline" style="background:#0284c7;color:white;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600;display:inline-block;">📥 Xuất CSV Đối soát (30 ngày)</a>
-    </div>
-  </div>
-  <table><thead><tr><th>Biên nhận</th><th>Loại</th><th>Hình thức</th><th>Số tiền</th><th>Trạng thái</th><th>Thời gian</th><th>Người thu</th><th>Đối soát</th></tr></thead>
-  <tbody>
-    <tr th:each="item:${transactions}">
-      <td><strong th:text="${item.receiptNumber}"></strong><div class="muted" th:text="${item.externalReference ?: '-'}"></div></td>
-      <td th:text="${item.paymentType.displayName}"></td>
-      <td th:text="${item.paymentMethod.displayName}"></td>
-      <td th:text="${#numbers.formatDecimal(item.amount,0,'COMMA',0,'POINT') + ' đ'}"></td>
-      <td th:text="${item.status.displayName}" th:class="${item.status.name() == 'RECONCILED' ? 'status-active' : 'status-open'}"></td>
-      <td th:text="${#temporals.format(item.paidAt,'dd/MM/yyyy HH:mm')}"></td>
-      <td th:text="${item.collectedBy.fullName ?: item.collectedBy.username}"></td>
-      <td>
-        <form th:if="${item.status.name() == 'PAID'}" method="post" th:action="@{/payments/{id}/reconcile(id=${item.id})}">
-          <input name="note" placeholder="Ghi chú đối soát" required maxlength="500">
-          <button class="btn btn-primary">Chốt đối soát</button>
-        </form>
-        <span th:if="${item.status.name() != 'PAID'}" class="muted" th:text="${item.reconciliationNote ?: 'Đã chốt'}"></span>
-      </td>
-    </tr>
-    <tr th:if="${#lists.isEmpty(transactions)}"><td colspan="8" class="muted">Chưa có giao dịch.</td></tr>
-  </tbody></table>
-</div>
-</main></body></html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Giao dịch &amp; đối soát · LumiPark</title><link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml"><link rel="stylesheet" th:href="@{/css/dashboard-ui.css}"><link rel="stylesheet" th:href="@{/css/payments.css}"><script type="module" defer th:src="@{/js/payments.mjs}"></script></head>
+<body class="dashboard-page payments-page" th:with="activePage='payments'">
+  <a class="skip-link" href="#paymentsMain">Đến nội dung chính</a>
+  <div class="dashboard-shell"><aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside><div class="dashboard-workspace">
+    <header class="dashboard-topbar"><div class="topbar-location"><button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng"><img th:src="@{/images/lucide/menu.svg}" alt=""></button><span>Vận hành <span aria-hidden="true">/</span> <strong>Giao dịch &amp; đối soát</strong></span></div><a class="account-link" th:href="@{/account/password}"><span class="account-avatar"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span></a></header>
+    <main id="paymentsMain" class="management-content" tabindex="-1">
+      <div class="page-heading"><div><p class="eyebrow">SỔ GIAO DỊCH</p><h1>Giao dịch &amp; đối soát</h1><p class="page-description">Tra cứu khoản thu đã ghi nhận và rà soát từng biên nhận.</p></div></div>
+      <div th:if="${message}" class="payments-feedback payments-success" role="status"><p th:text="${message}"></p></div>
+      <div id="paymentsFeedback" class="payments-feedback" role="status" aria-live="polite" tabindex="-1" hidden><p id="paymentsFeedbackMessage"></p><a id="paymentsReload" th:href="@{/payments}" hidden>Tải lại danh sách để kiểm tra</a></div>
+      <section class="payments-summary" aria-label="Tổng quan danh sách đã tải"><div class="glass-card payments-stat"><span>Chờ đối soát</span><strong th:text="${paidCount}">0</strong><small>Giao dịch đã thu trong danh sách</small></div><div class="glass-card payments-stat"><span>Số tiền chờ đối soát</span><strong th:text="${#numbers.formatDecimal(paidAmount,0,'COMMA',0,'POINT') + ' đ'}">0 đ</strong><small>Không phải tổng doanh thu</small></div><div class="glass-card payments-scope"><img th:src="@{/images/lucide/circle-help.svg}" alt=""><p>Tối đa 200 giao dịch mới nhất được tải. Đối soát tại đây là ghi nhận nội bộ, không xác nhận settlement từ nhà cung cấp.</p></div></section>
+      <section class="glass-card payments-ledger" aria-labelledby="paymentsListHeading"><header class="payments-heading"><div><p class="eyebrow">DANH SÁCH ĐÃ TẢI</p><h2 id="paymentsListHeading">Giao dịch gần đây</h2><p>Thông tin phản ánh dữ liệu khi tải trang; tải lại trước khi kiểm tra trạng thái mới.</p></div><a class="payments-refresh" th:href="@{/payments}"><img th:src="@{/images/lucide/refresh-cw.svg}" alt="">Tải lại</a></header>
+        <div class="payments-filters"><label for="paymentSearch">Tìm trong danh sách đã tải<input id="paymentSearch" type="search" placeholder="Biên nhận, mã tham chiếu…" autocomplete="off"></label><label for="paymentStatusFilter">Trạng thái<select id="paymentStatusFilter"><option value="">Tất cả trạng thái</option><option value="PAID">Đã thu</option><option value="RECONCILED">Đã đối soát</option></select></label><p id="paymentFilterCount" role="status" aria-live="polite"></p></div>
+        <p class="payments-scroll-hint" id="paymentsScrollHint">Cuộn ngang bảng để xem đủ thông tin và thao tác.</p><div class="table-scroll payments-table-scroll" role="region" aria-label="Giao dịch gần đây, cuộn ngang để xem đủ cột" aria-describedby="paymentsScrollHint" tabindex="0"><table class="payments-table"><caption class="sr-only">Danh sách giao dịch đã tải và thao tác đối soát</caption><thead><tr><th scope="col">Biên nhận &amp; tham chiếu</th><th scope="col">Loại</th><th scope="col">Hình thức</th><th scope="col">Số tiền</th><th scope="col">Trạng thái</th><th scope="col">Thời gian thu</th><th scope="col">Người thu</th><th scope="col">Đối soát</th></tr></thead><tbody>
+          <tr th:each="item:${transactions}" class="payment-row" th:attr="data-status=${item.status.name()}"><td><strong class="payment-receipt" th:text="${item.receiptNumber}"></strong><small th:text="${item.externalReference ?: 'Không có mã tham chiếu'}"></small></td><td th:text="${item.paymentType.displayName}"></td><td th:text="${item.paymentMethod.displayName}"></td><td class="payment-amount" th:text="${#numbers.formatDecimal(item.amount,0,'COMMA',0,'POINT') + ' đ'}"></td><td><span class="payment-status" th:classappend="${item.status.name() == 'RECONCILED' ? 'is-reconciled' : 'is-paid'}" th:text="${item.status.displayName}"></span></td><td th:text="${#temporals.format(item.paidAt,'dd/MM/yyyy HH:mm')}"></td><td th:text="${item.collectedBy.fullName ?: item.collectedBy.username}"></td><td><form th:if="${item.status.name() == 'PAID'}" class="payment-reconcile-form" method="post" th:action="@{/payments/{id}/reconcile(id=${item.id})}" th:attr="data-receipt=${item.receiptNumber},data-amount=${#numbers.formatDecimal(item.amount,0,'COMMA',0,'POINT')}"><label>Ghi chú đối soát<input name="note" required maxlength="500" placeholder="Nhập ghi chú" th:attr="aria-describedby=|paymentNoteHint-${item.id} paymentNoteError-${item.id}|"><small class="payment-note-hint" th:id="|paymentNoteHint-${item.id}|">Bắt buộc · tối đa 500 ký tự.</small><small class="payment-note-error" th:id="|paymentNoteError-${item.id}|" role="alert" hidden>Vui lòng nhập ghi chú đối soát.</small></label><button type="submit">Xem lại đối soát</button></form><span class="payment-note" th:if="${item.status.name() != 'PAID'}" th:text="${item.reconciliationNote ?: 'Đã chốt'}"></span></td></tr>
+        </tbody></table></div>
+        <p class="payments-empty" th:if="${#lists.isEmpty(transactions)}">Chưa có giao dịch được ghi nhận.</p><p id="paymentsNoResults" class="payments-empty" hidden>Không có giao dịch phù hợp trong danh sách đã tải.</p>
+      </section>
+    </main></div></div>
+  <dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị"><button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng</button><div th:replace="~{dashboard-shell :: navigation}"></div></dialog>
+  <dialog id="paymentReview" class="payment-review" aria-labelledby="paymentReviewTitle"><p class="eyebrow">XÁC NHẬN ĐỐI SOÁT</p><h2 id="paymentReviewTitle" tabindex="-1">Rà soát biên nhận</h2><dl><div><dt>Biên nhận</dt><dd id="paymentReviewReceipt"></dd></div><div><dt>Số tiền đã ghi nhận</dt><dd id="paymentReviewAmount"></dd></div><div><dt>Ghi chú đối soát</dt><dd id="paymentReviewNote"></dd></div></dl><p>Thao tác ghi nhận đối soát nội bộ; không xác nhận thanh toán bên ngoài.</p><div class="payment-review-actions"><button id="paymentCancel" type="button" class="payment-secondary">Quay lại chỉnh sửa</button><button id="paymentConfirm" type="button" class="payment-primary">Xác nhận đối soát</button></div></dialog>
+</body></html>

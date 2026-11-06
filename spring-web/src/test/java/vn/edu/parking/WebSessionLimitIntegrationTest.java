@@ -92,7 +92,7 @@ class WebSessionLimitIntegrationTest {
         mvc.perform(get("/").session(android)
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile"))
             .andExpect(status().isOk())
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("Dashboard vận hành")));
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Tổng quan vận hành")));
     }
 
     @Test

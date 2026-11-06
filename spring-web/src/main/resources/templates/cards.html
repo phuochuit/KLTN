@@ -1,28 +1,264 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Thẻ và gói gửi xe</title><link rel="stylesheet" th:href="@{/css/app.css}"></head>
-<body><header th:replace="~{fragments :: header}"></header><main>
-<h1>Thẻ và gói gửi xe</h1>
-<p class="notice" th:if="${message}" th:text="${message}"></p>
-<form class="card toolbar" method="post" th:action="@{/cards}">
-    <label>Xe đã đăng ký<select name="vehicleId" required><option th:each="v:${vehicles}" th:value="${v.id}" th:selected="${selectedVehicleId != null && selectedVehicleId == v.id}" th:text="${v.plateNumber + ' - ' + v.effectiveOwnerName + ' - ' + v.vehicleType.displayName}"></option></select></label>
-    <label>Gói gửi xe<select id="cardPassType" name="passType"><option th:each="p:${passTypes}" th:value="${p}" th:text="${p.displayName}"></option></select></label>
-    <label>Ngày bắt đầu<input name="startDate" type="date" th:value="${today}"></label>
-    <label>Số ngày<input id="cardDurationDays" name="durationDays" type="number" value="1" min="1" max="366"></label>
-    <input type="hidden" name="status" value="ACTIVE">
-    <label>Hình thức thu<select name="paymentMethod"><option th:each="m:${paymentMethods}" th:value="${m}" th:text="${m.displayName}"></option></select></label>
-    <label>Mã giao dịch ngoài<input name="paymentReference" maxlength="120" placeholder="Bắt buộc khi chuyển khoản/POS"></label>
-    <button>Tạo / gia hạn và thu tiền</button>
-</form>
-<div class="card help">Biển số xe được dùng làm mã nhận diện tự động, không cần nhập hoặc quẹt thẻ. <strong>Gói theo ngày</strong> thu giá một ngày × số ngày; <strong>Gói 30 ngày</strong> thu giá tháng. Các lượt ra trong thời hạn gói hợp lệ có phí 0 đ. Xe cư dân không mua gói được tính như khách vãng lai.</div>
-<h2>Danh sách thẻ</h2>
-<table><thead><tr><th>Mã nhận diện biển số</th><th>Biển số</th><th>Chủ xe</th><th>Hình thức</th><th>Hiệu lực</th><th>Giá gói</th><th>Trạng thái</th></tr></thead>
-<tbody><tr th:each="c:${cards}"><td><strong th:text="${c.cardCode}"></strong></td><td th:text="${c.vehicle?.plateNumber}"></td><td th:text="${c.vehicle?.effectiveOwnerName}"></td><td th:text="${c.passType.displayName}"></td><td th:text="${c.validFrom != null && c.validUntil != null ? (#temporals.format(c.validFrom,'dd/MM/yyyy') + ' - ' + #temporals.format(c.validUntil,'dd/MM/yyyy')) : 'Không giới hạn'}"></td><td th:text="${#numbers.formatDecimal(c.subscriptionFee,0,'COMMA',0,'POINT') + ' đ'}"></td><td th:text="${c.status.displayName}" th:class="${c.status.name() == 'ACTIVE' ? 'status-active' : 'status-blocked'}"></td></tr></tbody></table>
-<h2>Lịch sử thu tiền gói</h2>
-<table><thead><tr><th>Thời gian thu</th><th>Thẻ</th><th>Biển số</th><th>Kỳ hạn</th><th>Số tiền</th></tr></thead>
-<tbody><tr th:each="p:${payments}"><td th:text="${#temporals.format(p.paidAt,'dd/MM/yyyy HH:mm')}"></td><td th:text="${p.parkingCard.cardCode}"></td><td th:text="${p.parkingCard.vehicle.plateNumber}"></td><td th:text="${#temporals.format(p.periodStart,'dd/MM/yyyy') + ' - ' + #temporals.format(p.periodEnd,'dd/MM/yyyy')}"></td><td th:text="${#numbers.formatDecimal(p.amount,0,'COMMA',0,'POINT') + ' đ'}"></td></tr><tr th:if="${#lists.isEmpty(payments)}"><td colspan="5" class="muted">Chưa có giao dịch gói gửi xe.</td></tr></tbody></table>
-</main><script>
-const cardType=document.getElementById('cardPassType'),cardDays=document.getElementById('cardDurationDays');
-function syncCardPackage(){const monthly=cardType.value==='MONTHLY';cardDays.value=monthly?'30':(cardDays.value==='30'?'1':cardDays.value);cardDays.readOnly=monthly;}
-cardType.addEventListener('change',syncCardPackage);syncCardPackage();
-</script></body></html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thẻ &amp; gói gửi xe · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <link rel="stylesheet" th:href="@{/css/cards.css}">
+  <script type="module" defer th:src="@{/js/cards.mjs}"></script>
+</head>
+<body class="dashboard-page cards-page" th:with="activePage='cards'">
+  <a class="skip-link" href="#cardsMain">Đến nội dung chính</a>
+  <div class="dashboard-shell">
+    <aside class="sidebar" aria-label="Điều hướng quản trị">
+      <div th:replace="~{dashboard-shell :: navigation}"></div>
+    </aside>
+    <div class="dashboard-workspace">
+      <header class="dashboard-topbar">
+        <div class="topbar-location">
+          <button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng">
+            <img th:src="@{/images/lucide/menu.svg}" alt="">
+          </button>
+          <span>Hồ sơ <span aria-hidden="true">/</span> <strong>Thẻ &amp; gói</strong></span>
+        </div>
+        <a class="account-link" th:href="@{/account/password}">
+          <span class="account-avatar"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span>
+          <span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span>
+        </a>
+      </header>
+
+      <main id="cardsMain" class="management-content" tabindex="-1">
+        <div class="page-heading cards-heading">
+          <div>
+            <p class="eyebrow">HỒ SƠ PHƯƠNG TIỆN</p>
+            <h1>Thẻ và gói gửi xe</h1>
+            <p class="page-description">Tra cứu thẻ theo xe, sau đó chọn thao tác phù hợp với kỳ gửi.</p>
+          </div>
+          <div class="cards-heading-mark" aria-hidden="true">
+            <img th:src="@{/images/lucide/credit-card.svg}" alt="">
+          </div>
+        </div>
+
+        <div th:if="${message}" class="cards-feedback cards-feedback-success" role="status">
+          <img th:src="@{/images/lucide/circle-check.svg}" alt="">
+          <p th:text="${message}">Đã lưu thao tác.</p>
+        </div>
+        <div id="cardFeedback" class="cards-feedback" role="status" aria-live="polite" tabindex="-1" hidden>
+          <img id="cardFeedbackIcon" th:src="@{/images/lucide/circle-alert.svg}" alt="">
+          <div>
+            <p id="cardFeedbackMessage"></p>
+            <a id="reloadCardList" th:href="@{/cards}" hidden>Tải lại danh sách để kiểm tra trạng thái</a>
+          </div>
+        </div>
+
+        <section class="glass-card cards-directory" aria-labelledby="cardsDirectoryHeading">
+          <header class="cards-section-heading">
+            <div>
+              <p class="eyebrow">DANH MỤC HIỆN CÓ</p>
+              <h2 id="cardsDirectoryHeading">Thẻ đã ghi nhận</h2>
+              <p class="muted">Mã nhận diện được chuẩn hóa từ biển số; đây không phải mã thẻ vật lý.</p>
+            </div>
+            <a class="secondary-button cards-create-link" href="#cardEditor">
+              <img th:src="@{/images/lucide/plus.svg}" alt="">
+              Tạo thao tác
+            </a>
+          </header>
+
+          <p id="cardsTableHint" class="table-hint">Bảng có thể cuộn ngang để xem đủ cột.</p>
+          <div class="table-scroll cards-table-scroll" role="region" aria-label="Danh sách thẻ, cuộn ngang để xem đủ cột" aria-describedby="cardsTableHint" tabindex="0">
+            <table class="cards-table">
+              <caption class="sr-only">Thẻ, loại gói, thời hạn, giá gói và trạng thái theo xe</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Mã nhận diện</th>
+                  <th scope="col">Biển số</th>
+                  <th scope="col">Chủ xe</th>
+                  <th scope="col">Loại gói</th>
+                  <th scope="col">Hiệu lực</th>
+                  <th scope="col">Giá gói</th>
+                  <th scope="col">Trạng thái</th>
+                  <th scope="col">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr th:each="c:${cards}">
+                  <td><strong class="card-code" th:text="${c.cardCode}">59A112345</strong><small class="card-code-note">Từ biển số chuẩn hóa</small></td>
+                  <td class="card-plate" th:text="${c.vehicle?.plateNumber}">59A1-123.45</td>
+                  <td class="card-owner" th:text="${c.vehicle?.effectiveOwnerName}">Nguyễn Văn An</td>
+                  <td><span class="card-pass-badge" th:classappend="${c.passType.name() == 'MONTHLY' ? 'is-monthly' : 'is-daily'}" th:text="${c.passType.displayName}">Gói 30 ngày</span></td>
+                  <td class="card-validity">
+                    <span th:if="${c.validFrom != null && c.validUntil != null}" th:text="${#temporals.format(c.validFrom,'dd/MM/yyyy') + ' – ' + #temporals.format(c.validUntil,'dd/MM/yyyy')}">01/11/2026 – 30/11/2026</span>
+                    <span th:if="${c.validFrom == null || c.validUntil == null}">Chưa ghi nhận kỳ</span>
+                    <small>Tính cả ngày cuối</small>
+                  </td>
+                  <td class="card-price">
+                    <strong th:text="${#numbers.formatDecimal(c.subscriptionFee,0,'COMMA',0,'POINT') + ' đ'}">150.000 đ</strong>
+                  </td>
+                  <td><span class="card-status-badge" th:classappend="${c.status.name() == 'ACTIVE' ? 'is-active' : (c.status.name() == 'BLOCKED' ? 'is-blocked' : 'is-expired')}" th:text="${c.status.displayName}">Hoạt động</span></td>
+                  <td><a class="card-row-action" th:href="@{/cards(vehicleId=${c.vehicle.id})}">Chọn xe</a></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(cards)}">
+                  <td class="empty-cell" colspan="8">Chưa có thẻ nào được ghi nhận. Chọn một xe ở phần thao tác bên dưới để bắt đầu.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="cardEditor" class="glass-card cards-editor" aria-labelledby="cardEditorHeading">
+          <header class="cards-section-heading">
+            <div>
+              <p class="eyebrow">THAO TÁC THEO NGỮ CẢNH</p>
+              <h2 id="cardEditorHeading">Tạo hoặc cập nhật thẻ theo xe</h2>
+              <p class="muted">Rà soát trạng thái, kỳ và khoản thu trước khi xác nhận gửi.</p>
+            </div>
+            <span class="cards-step-mark" aria-hidden="true">02</span>
+          </header>
+
+          <form id="cardForm" class="cards-form" method="post" th:action="@{/cards}">
+            <div class="cards-form-fields">
+              <label class="cards-field cards-field-wide" for="cardVehicleId">
+                <span class="cards-field-label">Xe đã đăng ký <span class="cards-required">Bắt buộc</span></span>
+                <select id="cardVehicleId" name="vehicleId" required>
+                    <option th:each="v:${vehicles}" th:value="${v.id}" th:selected="${selectedVehicleId != null && selectedVehicleId == v.id}"
+                    th:attr="data-plate=${v.plateNumber},data-owner=${v.effectiveOwnerName},data-type=${v.vehicleType.displayName},data-daily-price=${dailyPrices[v.vehicleType.name()]},data-monthly-price=${monthlyPrices[v.vehicleType.name()]}"
+                    th:text="${v.plateNumber + ' · ' + v.effectiveOwnerName + ' · ' + v.vehicleType.displayName}">59A1-123.45 · Nguyễn Văn An · Xe máy</option>
+                  <option th:if="${#lists.isEmpty(vehicles)}" value="" disabled>Chưa có phương tiện đăng ký</option>
+                </select>
+                <small id="cardVehicleHint" class="cards-field-hint">Mỗi thao tác áp dụng cho xe đang chọn.</small>
+              </label>
+
+              <label class="cards-field" for="cardPassType">
+                <span class="cards-field-label">Hình thức <span class="cards-required">Bắt buộc</span></span>
+                <select id="cardPassType" name="passType" required>
+                    <option th:each="p:${passTypes}" th:value="${p}" th:text="${p.displayName}">Gói theo ngày</option>
+                </select>
+              </label>
+
+              <label class="cards-field" for="cardStatus">
+                <span class="cards-field-label">Trạng thái sẽ lưu <span class="cards-required">Bắt buộc</span></span>
+                <select id="cardStatus" name="status" required>
+                  <option th:each="s:${statuses}" th:value="${s}" th:text="${s.displayName}">Hoạt động</option>
+                </select>
+              </label>
+
+              <div id="monthlyFields" class="cards-monthly-fields cards-field-wide">
+                <label class="cards-field" for="cardStartDate">
+                  <span class="cards-field-label">Ngày bắt đầu <span id="startDateRequired" class="cards-required" hidden>Bắt buộc với gói</span></span>
+                  <input id="cardStartDate" name="startDate" type="date" th:value="${today}" aria-describedby="cardDateHint">
+                  <small id="cardDateHint" class="cards-field-hint">Kỳ kết thúc sau số ngày đã chọn, tính cả ngày cuối.</small>
+                </label>
+                <label class="cards-field" for="cardDurationDays">
+                  <span class="cards-field-label">Số ngày</span>
+                  <input id="cardDurationDays" name="durationDays" type="number" value="1" min="1" max="366" inputmode="numeric" aria-describedby="cardDurationHint">
+                  <small id="cardDurationHint" class="cards-field-hint">Gói ngày: 1–366 ngày. Gói tháng: cố định 30 ngày.</small>
+                </label>
+                <label class="cards-field" for="cardPaymentMethod">
+                  <span class="cards-field-label">Phương thức ghi nhận thu <span id="paymentMethodRequired" class="cards-required" hidden>Bắt buộc với gói</span></span>
+                  <select id="cardPaymentMethod" name="paymentMethod">
+                    <option th:each="m:${paymentMethods}" th:value="${m}" th:attr="data-requires-reference=${m.externalReferenceRequired}" th:text="${m.displayName}">Tiền mặt</option>
+                  </select>
+                </label>
+                <label class="cards-field" for="cardPaymentReference">
+                  <span class="cards-field-label">Mã giao dịch chuyển khoản / POS <span id="paymentReferenceRequired" class="cards-required" hidden>Bắt buộc</span></span>
+                  <input id="cardPaymentReference" name="paymentReference" maxlength="120" autocomplete="off" aria-describedby="cardReferenceHint" placeholder="Nhập mã giao dịch">
+                  <small id="cardReferenceHint" class="cards-field-hint">Bắt buộc với chuyển khoản hoặc POS; không phải mã xác nhận từ ngân hàng.</small>
+                </label>
+              </div>
+
+              <div class="cards-submit-area cards-field-wide">
+                <p id="cardSubmitHint" class="cards-field-hint">Bước tiếp theo sẽ cho bạn xem lại thao tác; chỉ xác nhận cuối mới gửi yêu cầu.</p>
+                <button id="cardSubmitButton" class="cards-button cards-button-primary" type="submit">
+                  <img th:src="@{/images/lucide/arrow-right.svg}" alt="">
+                  Xem lại thao tác
+                </button>
+              </div>
+            </div>
+
+            <aside class="cards-preview" aria-labelledby="cardPreviewHeading">
+              <div class="cards-preview-heading">
+                <img th:src="@{/images/lucide/receipt.svg}" alt="">
+                <div>
+                  <p class="eyebrow">TÓM TẮT TRƯỚC KHI GỬI</p>
+                  <h3 id="cardPreviewHeading">Thông tin thao tác</h3>
+                </div>
+              </div>
+              <dl class="cards-preview-list">
+                <div><dt>Xe</dt><dd id="previewVehicle">Chọn xe đã đăng ký</dd></div>
+                <div><dt>Loại thao tác</dt><dd id="previewPassType">Vé lượt</dd></div>
+                <div><dt>Trạng thái</dt><dd id="previewStatus">Hoạt động</dd></div>
+                <div id="previewPeriodRow"><dt>Kỳ hiệu lực</dt><dd id="previewPeriod">Chưa xác định</dd></div>
+                <div><dt>Khoản thu gói</dt><dd id="previewAmount" class="cards-preview-amount">—</dd></div>
+                <div id="previewPaymentRow"><dt>Phương thức</dt><dd id="previewPayment">Tiền mặt</dd></div>
+                <div id="previewReferenceRow"><dt>Mã giao dịch</dt><dd id="previewReference">Không áp dụng</dd></div>
+              </dl>
+              <p id="previewDisclosure" class="cards-preview-disclosure">Khoản thu được ghi nhận trong hệ thống; thông tin này không xác nhận đối soát hoặc thanh toán thành công từ nhà cung cấp bên ngoài.</p>
+              <p id="previewUnavailable" class="cards-preview-warning" hidden>Chưa có giá gói tháng hợp lệ cho xe này. Hãy kiểm tra cấu hình giá trước khi tiếp tục.</p>
+            </aside>
+          </form>
+        </section>
+
+        <section class="glass-card cards-history" aria-labelledby="cardHistoryHeading">
+          <header class="cards-section-heading">
+            <div>
+              <p class="eyebrow">BẢN GHI THU GÓI</p>
+              <h2 id="cardHistoryHeading">Lịch sử khoản thu gói</h2>
+              <p class="muted">Tối đa 20 bản ghi mới nhất được tải từ máy chủ; không phải màn hình đối soát bên ngoài.</p>
+            </div>
+            <img class="cards-history-icon" th:src="@{/images/lucide/history.svg}" alt="">
+          </header>
+          <p id="paymentsTableHint" class="table-hint">Bảng có thể cuộn ngang để xem đủ cột.</p>
+          <div class="table-scroll cards-table-scroll" role="region" aria-label="Lịch sử khoản thu gói, cuộn ngang để xem đủ cột" aria-describedby="paymentsTableHint" tabindex="0">
+            <table class="cards-table cards-payment-table">
+              <caption class="sr-only">Các bản ghi thu gói tháng mới nhất theo thời điểm, thẻ, kỳ và số tiền</caption>
+              <thead><tr><th scope="col">Thời điểm ghi nhận</th><th scope="col">Mã nhận diện</th><th scope="col">Biển số</th><th scope="col">Kỳ hạn tính cả ngày cuối</th><th scope="col">Số tiền</th></tr></thead>
+              <tbody>
+                <tr th:each="p:${payments}">
+                  <td th:text="${#temporals.format(p.paidAt,'dd/MM/yyyy HH:mm')}">01/11/2026 09:00</td>
+                  <td><strong class="card-code" th:text="${p.parkingCard.cardCode}">59A112345</strong></td>
+                  <td class="card-plate" th:text="${p.parkingCard.vehicle.plateNumber}">59A1-123.45</td>
+                  <td th:text="${#temporals.format(p.periodStart,'dd/MM/yyyy') + ' – ' + #temporals.format(p.periodEnd,'dd/MM/yyyy')}">01/11/2026 – 30/11/2026</td>
+                  <td class="card-price"><strong th:text="${#numbers.formatDecimal(p.amount,0,'COMMA',0,'POINT') + ' đ'}">150.000 đ</strong></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(payments)}"><td colspan="5" class="empty-cell">Chưa có bản ghi thu gói tháng.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị">
+    <button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng</button>
+    <div th:replace="~{dashboard-shell :: navigation}"></div>
+  </dialog>
+
+  <dialog id="cardReviewDialog" class="card-review-dialog" aria-labelledby="cardReviewHeading" aria-describedby="cardReviewDescription">
+    <div class="card-review-header">
+      <div>
+        <p class="eyebrow">XÁC NHẬN THAO TÁC</p>
+        <h2 id="cardReviewHeading" tabindex="-1">Rà soát trước khi ghi nhận</h2>
+        <p id="cardReviewDescription" class="muted">Kiểm tra xe, kỳ, trạng thái và khoản thu. Chưa có yêu cầu nào được gửi.</p>
+      </div>
+      <img th:src="@{/images/lucide/receipt.svg}" alt="">
+    </div>
+    <dl class="card-review-details">
+      <div><dt>Xe</dt><dd id="reviewVehicle">—</dd></div>
+      <div><dt>Loại thao tác</dt><dd id="reviewPassType">—</dd></div>
+      <div><dt>Trạng thái</dt><dd id="reviewStatus">—</dd></div>
+      <div id="reviewPeriodRow"><dt>Kỳ hiệu lực</dt><dd id="reviewPeriod">—</dd></div>
+      <div><dt>Khoản thu gói</dt><dd id="reviewAmount">—</dd></div>
+      <div id="reviewPaymentRow"><dt>Phương thức</dt><dd id="reviewPayment">—</dd></div>
+      <div id="reviewReferenceRow"><dt>Mã giao dịch</dt><dd id="reviewReference">—</dd></div>
+    </dl>
+    <p id="reviewDisclosure" class="cards-preview-disclosure">Khoản thu được ghi nhận trong hệ thống; thông tin này không xác nhận đối soát hoặc thanh toán thành công từ nhà cung cấp bên ngoài.</p>
+    <div class="card-review-actions">
+      <button id="cancelCardReview" class="cards-button cards-button-secondary" type="button">Quay lại chỉnh sửa</button>
+      <button id="confirmCardWrite" class="cards-button cards-button-primary" type="button">Xác nhận và gửi một lần</button>
+    </div>
+  </dialog>
+</body>
+</html>

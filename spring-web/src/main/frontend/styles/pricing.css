@@ -1,0 +1,39 @@
+@import "tailwindcss" source(none);
+@import "./tokens.css";
+@source "../../resources/templates/pricing.html";
+@layer components {
+  .pricing-page { color: var(--ui-text); }
+  .pricing-intro { display:flex; gap:.8rem; margin:0 0 1.5rem; padding:1rem 1.2rem; }
+  .pricing-intro img { width:1.3rem; height:1.3rem; flex:none; }
+  .pricing-intro h2 { margin:0; font-size:.95rem; font-weight:700; }
+  .pricing-intro p,.pricing-section-heading p { margin:.3rem 0 0; color:var(--ui-text-muted); font-size:.85rem; line-height:1.55; }
+  .pricing-section-heading { margin:0 0 1rem; }
+  .pricing-section-heading h2 { margin:0; font-size:1.25rem; font-weight:700; }
+  .pricing-section-heading .eyebrow { margin:0 0 .3rem; }
+  .pricing-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:1rem; }
+  .pricing-form { min-width:0; padding:1.35rem; }
+  .pricing-card-header { display:flex; justify-content:space-between; gap:1rem; align-items:center; padding-bottom:1rem; border-bottom:1px solid #d8e0ef; }
+  .pricing-card-header h3 { margin:0; font-size:1.1rem; font-weight:700; }
+  .pricing-card-header .eyebrow { margin:0 0 .25rem; }
+  .pricing-card-header img { width:2.7rem; height:2.7rem; padding:.65rem; border-radius:.8rem; background:#eef1ff; }
+  .pricing-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; padding:1rem 0; }
+  .pricing-fields label { display:grid; align-content:start; gap:.4rem; min-width:0; font-size:.8rem; font-weight:600; }
+  .pricing-fields small { color:var(--ui-text-muted); font-size:.72rem; line-height:1.4; font-weight:400; }
+  .pricing-input { display:flex; align-items:center; overflow:hidden; border:1px solid var(--ui-control-border); border-radius:.75rem; background:#fff; }
+  .pricing-input:focus-within { outline:3px solid #3042aa; outline-offset:2px; }
+  .pricing-input input { width:100%; min-width:0; min-height:2.75rem; padding:.55rem .75rem; border:0; background:transparent; outline:0; font:inherit; font-size:.9rem; font-weight:400; font-variant-numeric:tabular-nums; }
+  .pricing-input input[readonly] { background:#f0f3f8; color:#465672; }
+  .pricing-input span { padding:0 .75rem; color:var(--ui-text-muted); font-size:.75rem; }
+  .pricing-card-actions { display:flex; gap:.75rem; justify-content:space-between; align-items:center; padding-top:1rem; border-top:1px solid #d8e0ef; }
+  .pricing-card-actions span { color:var(--ui-text-muted); font-size:.75rem; }
+  .pricing-button,.pricing-secondary { min-height:2.75rem; padding:.6rem 1rem; border:1px solid #3042aa; border-radius:.75rem; font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; }
+  .pricing-button { color:#fff; background:#3042aa; }.pricing-button:hover:not(:disabled) { background:#293698; }.pricing-button:disabled { background:#e8ebf2; color:#4d5870; border-color:#c3cada; cursor:not-allowed; }
+  .pricing-secondary { color:#3042aa; background:#fff; }
+  .pricing-empty,.pricing-feedback { margin:0 0 1rem; padding:1rem; border:1px solid #c4cde2; border-radius:1rem; background:#fff; }
+  .pricing-feedback p { margin:0; line-height:1.5; }.pricing-feedback a { display:inline-block; margin-top:.5rem; color:#3042aa; font-weight:700; }.pricing-feedback[data-state="pending"] { background:#eff6ff; border-color:#91a9dc; }.pricing-feedback[data-state="error"] { background:#fff4f2; border-color:#c87d75; }.pricing-feedback[data-state="success"],.pricing-success { background:#edf8f3; border-color:#9ac8b9; }
+  .pricing-review { width:min(calc(100% - 2rem),38rem); max-height:90dvh; overflow:auto; margin:auto; padding:1.5rem; border:1px solid #d8e0ef; border-radius:1.25rem; background:#fff; color:var(--ui-text); }
+  .pricing-review::backdrop { background:rgb(23 33 59 / 40%); }.pricing-review h2 { margin:0; font-size:1.25rem; font-weight:700; }.pricing-review p { line-height:1.5; }.pricing-review dl { display:grid; gap:.4rem; }.pricing-review dl div { display:flex; justify-content:space-between; gap:1rem; padding:.5rem; border-bottom:1px solid #e2e7f1; }.pricing-review dd { margin:0; font-weight:700; text-align:right; }.pricing-review-actions { display:flex; justify-content:flex-end; gap:.5rem; flex-wrap:wrap; }
+  .pricing-page :is(button,a,input):focus-visible { outline:3px solid #3042aa; outline-offset:2px; }
+  @media(max-width:63.999rem) { .pricing-grid { grid-template-columns:minmax(0,1fr); } }
+  @media(max-width:35rem) { .pricing-form { padding:1rem; }.pricing-fields { grid-template-columns:minmax(0,1fr); }.pricing-card-actions { align-items:stretch; flex-direction:column; }.pricing-review-actions { flex-direction:column-reverse; } }
+}

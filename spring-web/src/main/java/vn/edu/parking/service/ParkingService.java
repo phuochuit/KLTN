@@ -353,7 +353,7 @@ public class ParkingService {
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy lượt gửi ID " + sessionId));
 
         if (session.getStatus() != SessionStatus.OPEN) {
-            throw new IllegalStateException("Lượt xe không ở trạng thái mở.");
+            throw new IllegalStateException("Chỉ có thể điều phối lượt xe đang mở.");
         }
         if (slot.getStatusOverride() == SlotStatusOverride.BLOCKED) {
             throw new IllegalStateException("Không thể điều phối xe vào ô đang cấm đỗ / bảo trì.");

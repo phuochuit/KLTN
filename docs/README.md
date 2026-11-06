@@ -2,7 +2,7 @@
 
 Đây là điểm vào chính cho người đọc và AI. Bộ tài liệu giải thích nghiệp vụ và kỹ thuật độc lập bằng Markdown; không cần mở PDF/DOCX/ảnh render để hiểu dự án. [ADR-001](decisions/0005-docs-as-project-reference.md) quy định cách tổ chức này. Tài liệu không chứng nhận hệ thống đã hoàn thiện hoặc sẵn sàng production.
 
-**Phạm vi implementation:** các trang kỹ thuật và mục implementation main đối chiếu tĩnh `abd6183`; không sửa source nghiệp vụ để làm khớp tài liệu hoặc hạ yêu cầu để khớp code. Các bảng được ghi rõ “lịch sử Security + WIP” bảo toàn snapshot cũ, không phải contract hoặc kết quả test của main. [Trạng thái](implementation-status.md) và [testing](testing/strategy.md) phân biệt source hiện hành, kết quả lịch sử và kiểm chứng chưa chạy. Chưa có application/live E2E PASS của revision main trong đợt này.
+**Phạm vi implementation:** tài liệu nghiệp vụ main là authority theo NV; bảng implementation snapshots giữ provenance lịch sử, không phải acceptance hoặc kết quả chạy của integration branch. [Trạng thái](implementation-status.md) và [testing](testing/strategy.md) phân biệt source hiện hành, kết quả lịch sử và kiểm chứng chưa chạy. Web final-review integration được mô tả tại [handoff](review/web-final-review-integration.md); Root verification chưa được ghi nhận ở đây.
 
 ## Đọc theo nhu cầu
 
@@ -44,6 +44,7 @@
 | [Testing](testing/strategy.md) | Cách chạy, coverage, kết quả lịch sử và scenarios chưa kiểm chứng |
 | [Nghiệm thu Phase 10](testing/acceptance-report-phase10.md) | PASS/FAIL/BLOCKED của `52ed2cf`: test tự động, live Laragon, runtime và giới hạn bằng chứng |
 | [Implementation status](implementation-status.md) | Phần đã có code, subset đã kiểm thử và giới hạn còn lại |
+| [Web final-review integration handoff](review/web-final-review-integration.md) | Contract đã duyệt, phạm vi tích hợp và trạng thái kiểm chứng; không thay test report |
 
 ## Quy tắc tránh hiểu sai
 
@@ -52,3 +53,8 @@
 3. GateEvidence/evidence IDs là dữ liệu nhận dạng của ứng dụng, không kho tư liệu đề cương. Không xóa/đổi API hoặc bảng vì thay cách lưu tài liệu.
 4. Chỉ cập nhật trang sở hữu khi thay đổi hệ thống; trang khác dẫn link thay vì chép lại. Cuối nhiệm vụ báo docs đã sửa hoặc lý do không cần, checks đã/chưa chạy.
 5. P01–P09 còn mở không được tự giải quyết bằng cách chọn tên bản “final” hoặc giảm yêu cầu cho khớp code. Không đưa secrets/PII vào docs.
+
+
+## Bàn giao LumiPark Web 2026-11-03
+
+[Tổng duyệt và giới hạn kiểm chứng](review/web-final-review-integration.md) ghi phạm vi 15 màn hình, tích hợp main, findings đã sửa và kết quả focused checks. Người dùng đã duyệt chuyển sang bàn giao GitHub; các quyết định nghiệm thu trực quan lịch sử vẫn được giữ riêng.
