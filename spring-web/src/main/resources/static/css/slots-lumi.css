@@ -1,0 +1,967 @@
+/* LumiPark skin cho trang Sơ đồ & điều phối bãi đỗ xe.
+   Chỉ thay đổi giao diện, giữ nguyên toàn bộ cấu trúc nghiệp vụ của slots.html. */
+
+.slots-page {
+  padding: 0;
+}
+
+.slots-page .slots-container {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- Tiêu đề trang ---------- */
+.slots-page .slots-header {
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.slots-page .slots-header h1 {
+  margin: 0 0 .35rem;
+  color: var(--d-ink);
+  font-size: clamp(1.7rem, 2.6vw, 2.35rem);
+  line-height: 1.15;
+  letter-spacing: -.02em;
+}
+
+.slots-page .slots-header .help {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--d-muted);
+  font-size: .93rem;
+  line-height: 1.55;
+}
+
+.slots-page .header-actions {
+  justify-content: flex-end;
+  gap: .5rem;
+}
+
+/* ---------- Nút bấm ---------- */
+.slots-page .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  min-height: 2.6rem;
+  margin: 0;
+  padding: .55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: .8rem;
+  font: inherit;
+  font-size: .86rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.slots-page .btn img {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  opacity: .8;
+}
+
+.slots-page .btn-primary {
+  background: var(--d-blue);
+  border-color: var(--d-blue);
+  color: #fff;
+  box-shadow: 0 10px 22px -16px rgb(48 66 170 / 85%);
+}
+
+.slots-page .btn-primary:hover {
+  background: #293698;
+  border-color: #293698;
+}
+
+.slots-page .btn-primary img {
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+.slots-page .btn-secondary {
+  background: #fff;
+  border-color: #aab7d4;
+  color: var(--d-blue);
+}
+
+.slots-page .btn-secondary:hover {
+  background: #f1f4fc;
+}
+
+.slots-page .btn-outline {
+  background: rgb(255 255 255 / 78%);
+  border-color: #c3cada;
+  color: var(--d-ink);
+}
+
+.slots-page .btn-outline:hover {
+  background: #fff;
+  border-color: #9aa6c4;
+}
+
+.slots-page .btn-danger {
+  background: #a32b25;
+  border-color: #a32b25;
+  color: #fff;
+}
+
+.slots-page .btn-danger:hover {
+  background: #8d211d;
+  border-color: #8d211d;
+}
+
+.slots-page .btn-warning {
+  background: #b45309;
+  border-color: #b45309;
+  color: #fff;
+}
+
+.slots-page .btn-warning:hover {
+  background: #96450a;
+  border-color: #96450a;
+}
+
+.slots-page .btn-reset {
+  padding-inline: .5rem;
+  border-color: transparent;
+  background: transparent;
+  color: var(--d-blue);
+}
+
+.slots-page .btn-reset:hover {
+  background: #eef2fd;
+}
+
+.slots-page .btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.slots-page .btn:focus-visible {
+  outline: 2px solid var(--d-blue);
+  outline-offset: 2px;
+}
+
+/* ---------- Thông báo ---------- */
+.slots-page .notice {
+  margin: 0 0 1rem;
+  padding: .8rem 1rem;
+  border: 1px solid #bfe3c9;
+  border-radius: .9rem;
+  background: #edf8f0;
+  color: #176052;
+  font-size: .9rem;
+}
+
+.slots-page .notice.error {
+  border-color: #f0bdb6;
+  background: #fdeeeb;
+  color: #a32b25;
+}
+
+/* ---------- Thẻ tổng quan ---------- */
+.slots-page .slot-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: .7rem;
+  margin-bottom: 1rem;
+}
+
+.slots-page .summary-card {
+  padding: .95rem 1.05rem 1rem;
+  border: 1px solid rgb(255 255 255 / 92%);
+  border-left: 4px solid #8c9ba5;
+  border-radius: 1.1rem;
+  background: linear-gradient(160deg, #fff, #f6f8ff);
+  box-shadow: 0 12px 26px -24px rgb(46 60 110 / 65%);
+  animation: none;
+}
+
+.slots-page .summary-label {
+  margin: 0 0 .3rem;
+  color: var(--d-muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.slots-page .summary-value {
+  color: var(--d-ink);
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.slots-page .summary-card.stat-available {
+  border-left-color: #2f9e6b;
+  background: linear-gradient(160deg, #f2faf5, #fff);
+}
+
+.slots-page .summary-card.stat-available .summary-value {
+  color: #176052;
+}
+
+.slots-page .summary-card.stat-reserved {
+  border-left-color: #3042aa;
+  background: linear-gradient(160deg, #eff2fd, #fff);
+}
+
+.slots-page .summary-card.stat-reserved .summary-value {
+  color: #3042aa;
+}
+
+.slots-page .summary-card.stat-occupied {
+  border-left-color: #e08a2e;
+  background: linear-gradient(160deg, #fff7ec, #fff);
+}
+
+.slots-page .summary-card.stat-occupied .summary-value {
+  color: #8a4b0f;
+}
+
+.slots-page .summary-card.stat-borrowed {
+  border-left-color: #7962be;
+  background: linear-gradient(160deg, #f5f1ff, #fff);
+}
+
+.slots-page .summary-card.stat-borrowed .summary-value {
+  color: #5b3fa8;
+}
+
+.slots-page .summary-card.stat-overdue {
+  border-left-color: #a32b25;
+  background: linear-gradient(160deg, #fdeeeb, #fff);
+}
+
+.slots-page .summary-card.stat-overdue .summary-value {
+  color: #a32b25;
+}
+
+.slots-page .summary-card.stat-blocked {
+  border-left-color: #7b8496;
+  background: linear-gradient(160deg, #f2f4f8, #fff);
+}
+
+.slots-page .summary-card.stat-blocked .summary-value {
+  color: #4a5568;
+}
+
+/* ---------- Bộ lọc ---------- */
+.slots-page .filter-bar {
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: .9rem 1.1rem;
+  border: 1px solid rgb(255 255 255 / 92%);
+  border-radius: 1.1rem;
+  background: var(--d-panel);
+  box-shadow: 0 12px 26px -24px rgb(46 60 110 / 65%);
+}
+
+.slots-page .filter-form {
+  align-items: flex-end;
+  gap: .75rem;
+}
+
+.slots-page .filter-form label {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .3rem;
+  color: var(--d-muted);
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+.slots-page .filter-form select {
+  min-width: 11rem;
+  min-height: 2.5rem;
+  padding: .45rem .7rem;
+  border: 1px solid #b2beda;
+  border-radius: .7rem;
+  background: #fff;
+  color: var(--d-ink);
+  font: inherit;
+  font-size: .86rem;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.slots-page .filter-form select:focus {
+  border-color: var(--d-blue);
+  box-shadow: 0 0 0 3px rgb(48 66 170 / 15%);
+  outline: none;
+}
+
+.slots-page .filter-hint {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: 0;
+  color: var(--d-muted);
+  font-size: .82rem;
+}
+
+.slots-page .filter-hint img {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  opacity: .7;
+}
+
+/* ---------- Thẻ chung ---------- */
+.slots-page .card {
+  border: 1px solid rgb(255 255 255 / 92%);
+  border-radius: 1.1rem;
+  background: var(--d-panel);
+  box-shadow: 0 12px 26px -24px rgb(46 60 110 / 65%);
+}
+
+/* ---------- Chú thích màu ---------- */
+.slots-page .slot-legend {
+  gap: .45rem;
+  margin-bottom: 1rem;
+  padding: .7rem .85rem;
+  border: 1px solid rgb(255 255 255 / 92%);
+  border-radius: 1rem;
+  background: var(--d-panel);
+}
+
+.slots-page .legend-item {
+  gap: .4rem;
+  padding: .28rem .6rem;
+  border: 1px solid #e1e7f2;
+  border-radius: 999px;
+  background: #f8faff;
+  color: var(--d-muted);
+  font-size: .76rem;
+  font-weight: 600;
+}
+
+.slots-page .color-dot {
+  width: .62rem;
+  height: .62rem;
+  border-radius: 50%;
+}
+
+.slots-page .dot-available { background: #2f9e6b; }
+.slots-page .dot-reserved { background: #3042aa; }
+.slots-page .dot-occupied { background: #e08a2e; }
+.slots-page .dot-borrowed { background: #7962be; }
+.slots-page .dot-overdue { background: #a32b25; }
+.slots-page .dot-mismatch { background: #d4a017; }
+.slots-page .dot-blocked { background: #7b8496; }
+
+/* ---------- Lưới ô đỗ ---------- */
+.slots-page .slot-grid-interactive {
+  grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
+  gap: .7rem;
+}
+
+.slots-page .slot-card {
+  min-height: 7.25rem;
+  padding: .7rem .75rem .65rem;
+  border: 1px solid #dbe3f0;
+  border-radius: 1rem;
+  background: #fff;
+  color: var(--d-ink);
+  text-align: left;
+  justify-content: flex-start;
+  gap: .12rem;
+  box-shadow: 0 12px 22px -22px rgb(46 60 110 / 65%);
+}
+
+.slots-page .slot-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 28px -22px rgb(46 60 110 / 75%);
+}
+
+.slots-page .slot-card.available {
+  border-color: #bfe3c9;
+  background: linear-gradient(165deg, #eaf7ee, #f8fcf9);
+}
+
+.slots-page .slot-card.reserved_empty {
+  border-color: #c3d1ee;
+  background: linear-gradient(165deg, #e9effc, #f7f9ff);
+}
+
+.slots-page .slot-card.occupied_valid {
+  border-color: #f3d3ae;
+  background: linear-gradient(165deg, #fff0e2, #fffaf4);
+}
+
+.slots-page .slot-card.occupied_borrowed,
+.slots-page .slot-card.reserved_borrowed {
+  border-color: #d6c9f3;
+  background: linear-gradient(165deg, #f1ecfd, #faf8ff);
+}
+
+.slots-page .slot-card.occupied_mismatch {
+  border-color: #efdca6;
+  background: linear-gradient(165deg, #fff8df, #fffdf5);
+}
+
+.slots-page .slot-card.overdue_alert {
+  border-color: #f0bdb6;
+  background: linear-gradient(165deg, #fde9e5, #fff7f5);
+  animation: none;
+}
+
+.slots-page .slot-card.blocked {
+  border-color: #c8cfdd;
+  background: repeating-linear-gradient(45deg, #eef0f5, #eef0f5 10px, #e5e8f0 10px, #e5e8f0 20px);
+  opacity: 1;
+}
+
+.slots-page .slot-card-top {
+  color: var(--d-muted);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
+.slots-page .slot-zone {
+  max-width: 5.4rem;
+}
+
+.slots-page .slot-vtype {
+  padding: .1rem .4rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 70%);
+  border: 1px solid rgb(88 108 161 / 18%);
+  color: var(--d-muted);
+  font-size: .64rem;
+  font-weight: 700;
+}
+
+.slots-page .slot-card-code {
+  margin: .1rem 0 .2rem;
+  color: var(--d-ink);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+
+.slots-page .slot-card-plate {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--d-ink);
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.slots-page .slot-card-plate .plate-empty {
+  color: #8a93a8;
+  font-weight: 500;
+}
+
+.slots-page .slot-card-status {
+  margin-top: auto;
+  padding-top: .55rem;
+  color: var(--d-muted);
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.slots-page .slot-card.available .slot-card-status { color: #176052; }
+.slots-page .slot-card.reserved_empty .slot-card-status { color: #3042aa; }
+.slots-page .slot-card.occupied_valid .slot-card-status { color: #8a4b0f; }
+.slots-page .slot-card.occupied_borrowed .slot-card-status,
+.slots-page .slot-card.reserved_borrowed .slot-card-status { color: #5b3fa8; }
+.slots-page .slot-card.occupied_mismatch .slot-card-status { color: #8a6a0a; }
+.slots-page .slot-card.overdue_alert .slot-card-status { color: #a32b25; }
+
+.slots-page .badge-overdue {
+  display: inline-flex;
+  padding: .18rem .45rem;
+  border-radius: .45rem;
+  background: #fde7e4;
+  color: #a32b25;
+  font-size: .66rem;
+  letter-spacing: .04em;
+}
+
+/* ---------- Chế độ chọn nhiều ô ---------- */
+.slots-page .slot-management-bar {
+  margin: 0 0 1rem;
+  padding: .8rem 1rem;
+  border: 1px solid #c3d1ee;
+  border-radius: 1rem;
+  background: #edf2ff;
+  color: var(--d-ink);
+}
+
+.slots-page .slot-card.manage-selected {
+  outline: 3px solid var(--d-blue);
+  outline-offset: 2px;
+}
+
+.slots-page .slot-select-mark {
+  border-color: #7b89ab;
+  border-radius: .45rem;
+}
+
+.slots-page .manage-selected .slot-select-mark {
+  background: var(--d-blue);
+  border-color: var(--d-blue);
+}
+
+/* ---------- Biểu mẫu ---------- */
+.slots-page .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: .85rem;
+  align-items: stretch;
+}
+
+/* Ô nhập luôn bám đáy ô lưới để các ô trong cùng hàng thẳng hàng,
+   kể cả khi nhãn bên trên dài và xuống hai dòng. */
+.slots-page .form-grid > label > :is(input, select, textarea),
+.slots-page .modal-body .form-grid > label > :is(input, select, textarea) {
+  margin-top: auto;
+}
+
+.slots-page .form-grid-2col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .85rem;
+}
+
+.slots-page .form-grid label,
+.slots-page .modal-body label,
+.slots-page .field-group label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: .3rem;
+  margin: 0;
+  color: var(--d-muted);
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.slots-page input:not([type="checkbox"]):not([type="radio"]),
+.slots-page select,
+.slots-page textarea {
+  min-height: 2.5rem;
+  padding: .45rem .7rem;
+  border: 1px solid #b2beda;
+  border-radius: .7rem;
+  background: #fff;
+  color: var(--d-ink);
+  font: inherit;
+  font-size: .86rem;
+}
+
+.slots-page input:not([type="checkbox"]):not([type="radio"]):focus,
+.slots-page select:focus,
+.slots-page textarea:focus {
+  border-color: var(--d-blue);
+  box-shadow: 0 0 0 3px rgb(48 66 170 / 15%);
+  outline: none;
+}
+
+.slots-page .single-add-card h3 {
+  margin: 0 0 .9rem;
+  color: var(--d-ink);
+  font-size: 1.05rem;
+}
+
+.slots-page .form-actions {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  grid-column: 1 / -1;
+}
+
+.slots-page .manage-field-hint {
+  color: var(--d-muted);
+  font-size: .85rem;
+}
+
+/* ---------- Hộp thoại ---------- */
+.slots-page .modal-backdrop {
+  padding: 1rem;
+  background: rgb(23 30 66 / 45%);
+  backdrop-filter: blur(4px);
+}
+
+.slots-page .modal-dialog {
+  width: 92%;
+  border: 1px solid #dbe3f0;
+  border-radius: 1.35rem;
+  box-shadow: 0 32px 80px -40px rgb(23 30 66 / 75%);
+}
+
+.slots-page #slotModal .modal-dialog {
+  max-width: 46rem;
+}
+
+.slots-page .modal-header {
+  padding: 1.1rem 1.35rem;
+  border-bottom: 1px solid #e0e6f2;
+  border-radius: 1.35rem 1.35rem 0 0;
+  background: linear-gradient(135deg, #f4f7ff, #eef1fd);
+  color: var(--d-ink);
+}
+
+.slots-page .modal-header h2 {
+  margin: 0;
+  color: var(--d-ink);
+  font-size: 1.15rem;
+}
+
+.slots-page .modal-header .btn-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border: 1px solid #dbe3f0;
+  border-radius: .55rem;
+  background: #fff;
+  color: var(--d-ink);
+  font-size: 1rem;
+}
+
+.slots-page .modal-header .btn-close:hover {
+  background: #eef2fd;
+}
+
+.slots-page .modal-body {
+  padding: 1.15rem 1.35rem 1.35rem;
+  min-height: 0;
+}
+
+.slots-page .modal-dialog > form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.slots-page .modal-header-batch {
+  padding: 1.1rem 1.35rem;
+  background: linear-gradient(135deg, #3042aa, #5b4bb7);
+  border-bottom: 0;
+  color: #fff;
+}
+
+.slots-page .modal-header-batch h2 {
+  color: #fff;
+  font-size: 1.15rem;
+}
+
+.slots-page .modal-header-batch .modal-desc {
+  margin-top: .2rem;
+  color: #e2e6ff;
+  font-size: .82rem;
+}
+
+.slots-page #batchModal .modal-dialog,
+.slots-page #vehicleTypeModal .modal-dialog,
+.slots-page #zoneConvertModal .modal-dialog {
+  border: 1px solid #dbe3f0;
+  border-radius: 1.35rem;
+  box-shadow: 0 32px 80px -40px rgb(23 30 66 / 75%);
+}
+
+.slots-page #batchModal .modal-header .btn-close,
+.slots-page .modal-header-batch .btn-close {
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: .6rem;
+  background: rgb(255 255 255 / 12%);
+  color: #fff;
+  font-size: .95rem;
+  cursor: pointer;
+}
+
+.slots-page #vehicleTypeModal .modal-header .btn-close,
+.slots-page #zoneConvertModal .modal-header .btn-close {
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid #dbe3f0;
+  border-radius: .6rem;
+  background: #fff;
+  color: var(--d-ink);
+  font-size: .95rem;
+  cursor: pointer;
+}
+
+.slots-page .modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .5rem;
+  margin-top: .9rem;
+}
+
+.slots-page .modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .75rem;
+  padding: 1rem 1.35rem;
+  border-top: 1px solid #e0e6f2;
+  border-radius: 0 0 1.35rem 1.35rem;
+  background: #f7f9ff;
+}
+
+.slots-page .modal-actions > .btn,
+.slots-page .modal-footer > .btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+
+.slots-page #vehicleTypeModal .modal-dialog {
+  max-width: 44rem;
+}
+
+.slots-page #zoneConvertModal .modal-dialog {
+  max-width: 40rem;
+}
+
+/* ---------- Tab trong hộp thoại ---------- */
+.slots-page .modal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin-bottom: 1rem;
+  padding: .4rem;
+  border: 1px solid #e1e7f2;
+  border-radius: .9rem;
+  background: #f2f5fd;
+}
+
+.slots-page .tab-btn {
+  min-height: 2.35rem;
+  margin: 0;
+  padding: .45rem .8rem;
+  border: 1px solid transparent;
+  border-radius: .65rem;
+  background: transparent;
+  color: var(--d-muted);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.slots-page .tab-btn.active {
+  border-color: #dbe3f0;
+  background: #fff;
+  color: var(--d-blue);
+  box-shadow: 0 6px 14px -12px rgb(46 60 110 / 70%);
+}
+
+.slots-page .tab-content {
+  display: none;
+}
+
+.slots-page .tab-content.active {
+  display: block;
+}
+
+.slots-page .tab-hint {
+  margin: .75rem 0;
+  color: var(--d-muted);
+  font-size: .8rem;
+}
+
+.slots-page .slot-info-box {
+  margin-bottom: 1rem;
+  padding: .85rem 1rem;
+  border: 1px solid #e1e7f2;
+  border-radius: .9rem;
+  background: #f7f9ff;
+}
+
+.slots-page .info-row {
+  display: flex;
+  gap: .5rem;
+  padding: .3rem 0;
+  border-bottom: 1px dashed #e6ebf6;
+  color: var(--d-muted);
+  font-size: .85rem;
+}
+
+.slots-page .info-row:last-child {
+  border-bottom: 0;
+}
+
+.slots-page .info-row strong {
+  min-width: 9.5rem;
+  color: var(--d-ink);
+  font-weight: 600;
+}
+
+/* ---------- Nội dung hộp thoại tạo nhanh ---------- */
+.slots-page .batch-form-container {
+  gap: .85rem;
+}
+
+.slots-page .form-section-card {
+  padding: .95rem 1rem;
+  border: 1px solid #e1e7f2;
+  border-radius: .9rem;
+  background: #fbfcff;
+  box-shadow: none;
+}
+
+.slots-page .form-section-title {
+  padding-bottom: .5rem;
+  border-bottom: 1px dashed #dbe3f0;
+  color: var(--d-blue);
+  font-size: .8rem;
+  letter-spacing: .06em;
+}
+
+.slots-page .field-group .basement-toggle-pill {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: .5rem;
+  border: 1px solid #b2beda;
+  border-radius: .7rem;
+  background: #fff;
+  color: var(--d-muted);
+}
+
+.slots-page .field-group .basement-toggle-pill input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  min-width: 1rem;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--d-blue);
+}
+
+.slots-page .field-group label:has(.btn-add-type-inline) {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slots-page .btn-add-type-inline {
+  align-self: center;
+  padding: 0;
+}
+
+.slots-page .basement-toggle-pill:hover {
+  border-color: #9aa6c4;
+  background: #f7f9ff;
+}
+
+.slots-page .basement-toggle-pill:has(input:checked) {
+  border-color: var(--d-blue);
+  background: #eaf0ff;
+  color: var(--d-blue);
+  box-shadow: none;
+}
+
+.slots-page .subform-pricing {
+  border: 1px solid #e1e7f2;
+  border-radius: .9rem;
+  background: #f7f9ff;
+}
+
+.slots-page .preview-ticket-card {
+  border: 1px solid #bfe3c9;
+  border-radius: .9rem;
+  background: linear-gradient(135deg, #eff8f3, #f8fdfa);
+}
+
+.slots-page .preview-ticket-title,
+.slots-page .preview-ticket-stats,
+.slots-page .preview-ticket-hint {
+  color: #176052;
+}
+
+.slots-page .preview-range-badge,
+.slots-page .preview-stat-pill {
+  border-color: #bfe3c9;
+  color: #176052;
+}
+
+.slots-page .conversion-preview-card {
+  border: 1px solid #e1e7f2;
+  border-radius: .9rem;
+  background: #f7f9ff;
+}
+
+.slots-page .btn-add-type-inline {
+  color: var(--d-blue);
+}
+
+.slots-page .btn-add-type-inline:hover {
+  color: #293698;
+}
+
+/* ---------- Màn hình hẹp ---------- */
+@media (max-width: 47.999rem) {
+  .slots-page .slots-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .slots-page .header-actions {
+    justify-content: stretch;
+  }
+
+  .slots-page .header-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .slots-page .filter-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .slots-page .filter-form label,
+  .slots-page .filter-form select {
+    width: 100%;
+  }
+
+  .slots-page .slot-summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  }
+
+  .slots-page .slot-grid-interactive {
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  }
+
+  .slots-page .modal-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .slots-page .modal-tabs .tab-btn {
+    white-space: nowrap;
+  }
+}

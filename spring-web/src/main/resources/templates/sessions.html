@@ -6,6 +6,7 @@
   <title>Lịch sử xe · LumiPark</title>
   <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
   <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <link rel="stylesheet" th:href="@{/css/sessions-evidence.css}">
   <script th:src="@{/js/sessions.js}" type="module"></script>
 </head>
 <body class="dashboard-page sessions-page">
@@ -109,6 +110,7 @@
                 <th scope="col" class="session-id">Mã lượt</th><th scope="col" class="session-entry-plate">Biển số vào</th><th scope="col">Biển số ra</th>
                 <th scope="col">Loại xe ghi nhận</th><th scope="col">Thẻ</th><th scope="col">Thời gian vào</th>
                 <th scope="col">Thời gian ra</th><th scope="col">Trạng thái</th><th scope="col">Phí lượt</th>
+                <th scope="col" class="session-evidence-col">Ảnh vào/ra</th>
               </tr></thead>
               <tbody>
                 <tr th:each="s : ${sessions}">
@@ -121,8 +123,14 @@
                   <td class="session-time" th:text="${s.exitTime == null ? '—' : #temporals.format(s.exitTime, 'dd/MM/yyyy HH:mm')}">—</td>
                   <td><span class="session-status" th:classappend="${' is-' + #strings.toLowerCase(s.status.name())}" th:text="${s.status.displayName}">Trong bãi</span></td>
                   <td class="session-fee" th:text="${#numbers.formatDecimal(s.fee, 0, 'COMMA', 0, 'POINT') + ' đ'}">0 đ</td>
+                  <td class="session-evidence-col">
+                    <button type="button" class="secondary-button session-evidence-button" data-session-evidence aria-haspopup="dialog"
+                            th:attr="data-session-id=${s.id},data-session-plate=${s.entryPlate}">
+                      <img th:src="@{/images/lucide/image.svg}" alt="" aria-hidden="true"><span>Xem ảnh</span>
+                    </button>
+                  </td>
                 </tr>
-                <tr th:if="${#lists.isEmpty(sessions) and sessionPage.totalElements == 0}"><td colspan="9" class="sessions-empty-row" th:text="${dateRangeError != null ? 'Sửa khoảng ngày để xem lịch sử.' : 'Không có dữ liệu lượt xe để hiển thị.'}">Không có dữ liệu lượt xe để hiển thị.</td></tr>
+                <tr th:if="${#lists.isEmpty(sessions) and sessionPage.totalElements == 0}"><td colspan="10" class="sessions-empty-row" th:text="${dateRangeError != null ? 'Sửa khoảng ngày để xem lịch sử.' : 'Không có dữ liệu lượt xe để hiển thị.'}">Không có dữ liệu lượt xe để hiển thị.</td></tr>
               </tbody>
             </table>
           </div>
@@ -136,6 +144,59 @@
     </main>
   </div>
 </div>
+
+<dialog id="evidenceDialog" class="operation-dialog evidence-dialog" aria-labelledby="evidenceTitle">
+  <div class="operation-dialog-header">
+    <div>
+      <p class="eyebrow">ĐỐI CHIẾU ẢNH</p>
+      <h2 id="evidenceTitle">Ảnh xe vào / ra</h2>
+      <p class="muted" id="evidenceSubtitle">Chọn một lượt xe để xem ảnh ghi nhận.</p>
+    </div>
+    <button type="button" class="icon-button dialog-close" data-evidence-close aria-label="Đóng hộp thoại">✕</button>
+  </div>
+  <p id="evidenceSummary" class="evidence-summary" role="status" aria-live="polite">Đang tải ảnh…</p>
+  <div class="evidence-grid">
+    <figure class="evidence-card" data-evidence-card="entryVehicle">
+      <button type="button" class="evidence-thumb" data-evidence-zoom aria-label="Phóng to ảnh xe lúc vào">
+        <img alt="Ảnh xe lúc vào" hidden>
+        <span class="evidence-empty">Chưa có ảnh xe lúc vào</span>
+      </button>
+      <figcaption><strong>Ảnh xe lúc vào</strong><span class="evidence-meta" data-evidence-meta>—</span></figcaption>
+    </figure>
+    <figure class="evidence-card" data-evidence-card="exitVehicle">
+      <button type="button" class="evidence-thumb" data-evidence-zoom aria-label="Phóng to ảnh xe lúc ra">
+        <img alt="Ảnh xe lúc ra" hidden>
+        <span class="evidence-empty">Chưa có ảnh xe lúc ra</span>
+      </button>
+      <figcaption><strong>Ảnh xe lúc ra</strong><span class="evidence-meta" data-evidence-meta>—</span></figcaption>
+    </figure>
+    <figure class="evidence-card" data-evidence-card="entryFace">
+      <button type="button" class="evidence-thumb" data-evidence-zoom aria-label="Phóng to ảnh khuôn mặt lúc vào">
+        <img alt="Ảnh khuôn mặt lúc vào" hidden>
+        <span class="evidence-empty">Chưa có ảnh khuôn mặt lúc vào</span>
+      </button>
+      <figcaption><strong>Khuôn mặt lúc vào</strong><span class="evidence-meta" data-evidence-meta>—</span></figcaption>
+    </figure>
+    <figure class="evidence-card" data-evidence-card="exitFace">
+      <button type="button" class="evidence-thumb" data-evidence-zoom aria-label="Phóng to ảnh khuôn mặt lúc ra">
+        <img alt="Ảnh khuôn mặt lúc ra" hidden>
+        <span class="evidence-empty">Chưa có ảnh khuôn mặt lúc ra</span>
+      </button>
+      <figcaption><strong>Khuôn mặt lúc ra</strong><span class="evidence-meta" data-evidence-meta>—</span></figcaption>
+    </figure>
+  </div>
+  <div class="operation-dialog-footer">
+    <button type="button" class="secondary-button" data-evidence-close>Đóng</button>
+  </div>
+</dialog>
+
+<dialog id="evidenceZoom" class="operation-dialog evidence-zoom" aria-label="Ảnh ghi nhận phóng to">
+  <div class="evidence-zoom-header">
+    <strong id="evidenceZoomCaption">Ảnh ghi nhận</strong>
+    <button type="button" class="icon-button dialog-close" data-evidence-zoom-close aria-label="Đóng ảnh phóng to">✕</button>
+  </div>
+  <img id="evidenceZoomImage" alt="Ảnh ghi nhận phóng to">
+</dialog>
 
 <dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị">
   <button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button>

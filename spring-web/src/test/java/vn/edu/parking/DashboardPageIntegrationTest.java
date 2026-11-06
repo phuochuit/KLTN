@@ -110,7 +110,10 @@ class DashboardPageIntegrationTest {
             .andExpect(status().isOk()).andExpect(model().attribute("sessions", hasSize(1)))
             .andExpect(content().string(containsString("KPI-OPEN")))
             .andExpect(content().string(not(containsString("KPI-COMPLETED"))))
-            .andExpect(content().string(containsString("Xem tất cả trạng thái")));
+            .andExpect(content().string(containsString("Xem tất cả trạng thái")))
+            .andExpect(content().string(containsString("data-session-evidence")))
+            .andExpect(content().string(containsString("Xem ảnh")))
+            .andExpect(content().string(containsString("id=\"evidenceDialog\"")));
         mvc.perform(get("/sessions").session(manager).param("status", "INVALID"))
             .andExpect(status().isBadRequest());
         mvc.perform(get("/sessions").session(login(AccountRole.GATE_STAFF)).param("status", "OPEN"))
