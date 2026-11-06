@@ -32,7 +32,7 @@ class FaceEngine:
         if self.detector is not None:
             return
         if not self.models_ready:
-            raise RuntimeError("Thiếu mô hình YuNet/SFace cho xác thực khuôn mặt")
+            raise RuntimeError("Chức năng đối chiếu khuôn mặt chưa sẵn sàng; vui lòng liên hệ quản trị viên")
         # A larger input size lets YuNet recover faces at wider yaw/pitch.
         self.detector = cv2.FaceDetectorYN.create(str(YUNET), "", (640, 640), DETECTION_THRESHOLD, 0.3, 5000)
         self.recognizer = cv2.FaceRecognizerSF.create(str(SFACE), "")
@@ -109,7 +109,7 @@ class FaceEngine:
     def compare(self, registered, realtime):
         with self._lock:
             a, _, _ = self.analyze(registered, "Ảnh đăng ký")
-            b, warnings, details = self.analyze(realtime, "Ảnh realtime")
+            b, warnings, details = self.analyze(realtime, "Ảnh chụp tại cổng")
             score = round(float(self.recognizer.match(a, b, cv2.FaceRecognizerSF_FR_COSINE)), 4)
             decision = "PASS" if score >= MATCH_THRESHOLD else ("REVIEW" if score >= REVIEW_THRESHOLD else "REJECT")
             if decision == "PASS":
@@ -150,7 +150,7 @@ class FaceEngine:
                     variants.append(self._clahe_variant(candidate))
                 for variant in variants:
                     try:
-                        feature, warnings, details = self.analyze(variant, "Ảnh realtime")
+                        feature, warnings, details = self.analyze(variant, "Ảnh chụp tại cổng")
                     except ValueError:
                         continue
                     score = float(self.recognizer.match(a, feature, cv2.FaceRecognizerSF_FR_COSINE))
@@ -160,7 +160,7 @@ class FaceEngine:
                         best_details = details
                         best_frame_index = frame_index
             if best_details is None:
-                raise ValueError("Ảnh realtime: cần đúng một khuôn mặt rõ ràng (đã thấy 0)")
+                raise ValueError("Ảnh chụp tại cổng cần có đúng một khuôn mặt rõ ràng; vui lòng chụp lại")
             score = round(best_score, 4)
             decision = "PASS" if score >= MATCH_THRESHOLD else ("REVIEW" if score >= REVIEW_THRESHOLD else "REJECT")
             if decision == "PASS":
