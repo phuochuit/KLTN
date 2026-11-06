@@ -57,6 +57,7 @@
         confirm.textContent = options.confirmText || 'Đồng ý';
         cancel.textContent = options.cancelText || 'Hủy';
         cancel.hidden = !options.showCancel;
+        cancel.style.display = options.showCancel ? '' : 'none';
         dialog.classList.toggle('is-warning', Boolean(options.warning));
         dialog.showModal();
         window.setTimeout(() => (options.showCancel ? cancel : confirm).focus(), 0);
