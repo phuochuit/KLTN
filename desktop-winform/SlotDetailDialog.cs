@@ -50,7 +50,7 @@ public sealed class SlotDetailDialog : Form
         var header = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(23, 54, 93), Padding = new Padding(12) };
         var title = new Label
         {
-            Text = $"VỊ TRÍ {_slot.SlotCode} ({_slot.Floor ?? "Tầng B1"} - {_slot.ZoneName})",
+            Text = $"VỊ TRÍ {_slot.SlotCode} ({_slot.LocationLabel ?? $"{_slot.Floor ?? "Tầng"} - {_slot.ZoneName}"})",
             Font = new Font("Segoe UI", 13f, FontStyle.Bold),
             ForeColor = Color.White,
             Dock = DockStyle.Top,
@@ -58,7 +58,7 @@ public sealed class SlotDetailDialog : Form
         };
         var subtitle = new Label
         {
-            Text = $"Trạng thái: {_slot.StatusDescription ?? _slot.Status} | Loại xe: {DisplayAllowedVehicleType(_slot.AllowedVehicleType)}",
+            Text = $"Trạng thái: {_slot.StatusDescription ?? _slot.Status} | Loại xe: {_slot.VehicleTypeName ?? DisplayAllowedVehicleType(_slot.AllowedVehicleType)}",
             Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
             ForeColor = Color.FromArgb(220, 235, 252),
             Dock = DockStyle.Top,
@@ -105,9 +105,12 @@ public sealed class SlotDetailDialog : Form
         infoBox.Controls.Add(infoFlow);
         mainLayout.Controls.Add(infoBox, 0, 1);
 
-        // 3. Action Tabs
+        // 3. Action Tabs - Dong bo 100% 4 tabs voi Web
         var tabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f) };
+        tabs.TabPages.Add(BuildResidentTab());
+        tabs.TabPages.Add(BuildBorrowTab());
         tabs.TabPages.Add(BuildGuestTab());
+        tabs.TabPages.Add(BuildManagementTab());
 
         mainLayout.Controls.Add(tabs, 0, 2);
         Controls.Add(mainLayout);
@@ -227,7 +230,15 @@ public sealed class SlotDetailDialog : Form
     {
         try
         {
-            // Desktop trạm gác chỉ điều phối lượt xe vừa vào.
+            var unassignedVehicles = await _api.GetUnassignedVehiclesAsync();
+            _cboResidentVehicles.Items.Clear();
+            _cboResidentVehicles.Items.Add("-- Chọn xe cư dân (Ràng buộc 1 xe - 1 ô) --");
+            foreach (var v in unassignedVehicles)
+            {
+                _cboResidentVehicles.Items.Add(new ComboBoxItem(v.Id, $"{v.PlateNumber} - {v.OwnerName} ({v.ApartmentNumber})"));
+            }
+            _cboResidentVehicles.SelectedIndex = 0;
+
             var recentSessions = await _api.GetRecentUnassignedSessionsAsync();
             _cboRecentSessions.Items.Clear();
             _cboRecentSessions.Items.Add("-- Chọn xe vừa vào trạm --");
@@ -236,7 +247,6 @@ public sealed class SlotDetailDialog : Form
                 _cboRecentSessions.Items.Add(new ComboBoxItem(s.SessionId, $"{s.PlateNumber} | {s.OwnerName}"));
             }
             _cboRecentSessions.SelectedIndex = 0;
-
         }
         catch (Exception ex)
         {

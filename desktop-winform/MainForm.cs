@@ -34,18 +34,34 @@ public sealed class MainForm : Form
         Text = "Xe không có biển số", AutoSize = true, ForeColor = Color.DarkOrange
     };
     private readonly TextBox _exitPlate = PlateBox();
-    private readonly TextBox _vehicleType = new() { Width = 190, ReadOnly = true, Text = "UNKNOWN" };
+    private readonly TextBox _vehicleType = new() { Width = 320, ReadOnly = true, Text = "Chưa xác định" };
     private readonly Label _residentInfo = new() {
-        Width = 260, Height = 90, AutoSize = false, Padding = new Padding(10),
+        Width = 320, Height = 95, AutoSize = false, Padding = new Padding(10),
         BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(245, 247, 250),
         Text = "Chưa tra cứu cư dân"
     };
     private readonly Button _editAiResult = new() { Text = "CHỈNH SỬA BIỂN SỐ / LOẠI XE", AutoSize = true, Enabled = false };
     private readonly Button _compareEvidenceBtn = new() { Text = "ĐỐI CHIẾU ẢNH VÀO / RA", AutoSize = true };
-    private readonly Label _editAiHint = new() { Text = "Chỉ sử dụng sau khi đã có ảnh nhận diện.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 12, 0, 0) };
+    private readonly Label _editAiHint = new() { Text = "Chỉ sử dụng sau khi đã có ảnh nhận diện.", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 12, 0, 0), Visible = false };
+    private readonly Label _aiWarningBanner = new() { AutoSize = true, ForeColor = Color.FromArgb(180, 83, 9), BackColor = Color.FromArgb(255, 251, 235), Padding = new Padding(8, 4, 8, 4), Visible = false, Margin = new Padding(10, 6, 0, 0) };
+    private readonly Panel _faceBorderPanel = new() { Dock = DockStyle.Fill, Padding = new Padding(3), BackColor = Color.FromArgb(203, 213, 225) };
     private readonly TabControl _tabs = new() { Dock = DockStyle.Fill };
-    private readonly ComboBox _entryMember = new() { Width = 250, DropDownStyle = ComboBoxStyle.DropDownList };
-    private readonly ComboBox _exitMember = new() { Width = 250, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _entryMember = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _exitMember = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly ComboBox _cboExitPaymentMethod = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly TextBox _txtExitPaymentRef = new() { Width = 320, PlaceholderText = "Mã giao dịch / tham chiếu (nếu có)" };
+
+    public enum FaceFocusState { Neutral, Verified, Warning, Rejected }
+    private void SetFaceFocusState(FaceFocusState state)
+    {
+        _faceBorderPanel.BackColor = state switch
+        {
+            FaceFocusState.Verified => Color.FromArgb(22, 163, 74),
+            FaceFocusState.Warning  => Color.FromArgb(217, 119, 6),
+            FaceFocusState.Rejected => Color.FromArgb(220, 38, 38),
+            _ => Color.FromArgb(203, 213, 225)
+        };
+    }
     private readonly FlowLayoutPanel _mapPanel = new() { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true };
     private readonly Label _barrierState = new() { Text = "BARRIER: ĐANG ĐÓNG", AutoSize = true, ForeColor = Color.Firebrick, Font = new Font("Segoe UI", 10, FontStyle.Bold), Margin = new Padding(8, 17, 5, 0) };
     private bool _entryFaceVerified, _exitFaceVerified;
@@ -74,6 +90,9 @@ public sealed class MainForm : Form
         _parkingApi = parkingApi;
         _settingsStore = settingsStore;
         _barrier = barrier;
+        _faceBorderPanel.Controls.Add(_facePreview);
+        _cboExitPaymentMethod.Items.AddRange(new object[] { "Tiền mặt (Tự động)", "Chuyển khoản (Ngân hàng)", "Máy POS / Ví điện tử" });
+        _cboExitPaymentMethod.SelectedIndex = 0;
         _stationSettings = settingsStore.Load();
         _parkingApi.StationSettings = _stationSettings;
         _barrier.StatusChanged += BarrierStatusChanged;
@@ -287,6 +306,8 @@ public sealed class MainForm : Form
         flow.Controls.Add(Field("Biển số nhận dạng", _exitPlate));
         flow.Controls.Add(CreateButton("TRA CỨU NGƯỜI ĐƯỢC PHÉP", async (_, _) => await LookupResidentAsync(false)));
         flow.Controls.Add(ComboField("Người đang lấy xe", _exitMember));
+        flow.Controls.Add(ComboField("Phương thức thanh toán", _cboExitPaymentMethod));
+        flow.Controls.Add(Field("Mã giao dịch / tham chiếu", _txtExitPaymentRef));
         flow.Controls.Add(CreateButton("ĐỐI CHIẾU ẢNH VÀO / RA", async (_, _) => await OpenEvidenceComparisonAsync()));
         flow.Controls.Add(CreateButton("XEM TRƯỚC PHÍ", async (_, _) => await PreviewExitAsync()));
         flow.Controls.Add(CreateButton("XÁC NHẬN XE RA", async (_, _) => await ConfirmExitAsync()));
@@ -394,6 +415,30 @@ public sealed class MainForm : Form
             : response.VehicleType == "UNKNOWN"
                 ? $"Đã đọc biển số {response.PlateText}. Chưa xác định được loại xe, vui lòng chọn lại."
                 : $"Đã đọc biển số {response.PlateText} | {DisplayVehicleType(response.VehicleType)} | {elapsed.TotalSeconds:0.00}s";
+        if (response.Quality?.Warnings != null && response.Quality.Warnings.Count > 0)
+        {
+            var msgs = response.Quality.Warnings
+                .Select(w => string.IsNullOrWhiteSpace(w.Message) ? w.Code : w.Message)
+                .Where(s => !string.IsNullOrWhiteSpace(s));
+            string joined = string.Join(", ", msgs);
+            if (!string.IsNullOrWhiteSpace(joined))
+            {
+                _aiWarningBanner.Text = "Hình ảnh cần kiểm tra: " + joined;
+                _aiWarningBanner.Visible = true;
+            }
+            else
+            {
+                _aiWarningBanner.Text = "";
+                _aiWarningBanner.Visible = false;
+            }
+        }
+        else
+        {
+            _aiWarningBanner.Text = "";
+            _aiWarningBanner.Visible = false;
+        }
+        _editAiHint.Visible = true;
+        _editAiHint.Text = "Chỉ sử dụng sau khi đã có ảnh nhận diện.";
         UpdateManualEditState();
     }
 
@@ -528,7 +573,7 @@ public sealed class MainForm : Form
         try
         {
             ConfigureApis();
-            var previewRequest = Request(_exitPlate.Text);
+            var previewRequest = BuildGateRequest(_exitPlate.Text, includePayment: false);
             if (previewRequest == null) return;
             _lastPreview = await _parkingApi.PreviewExitAsync(previewRequest);
             ShowParkingResult(_lastPreview);
@@ -571,34 +616,17 @@ public sealed class MainForm : Form
     {
         try
         {
-            if (_lastPreview == null)
+            if (_lastPreview == null || !string.Equals(NormalizePlate(_lastPreview.PlateNumber ?? ""), NormalizePlate(_exitPlate.Text), StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show("Hãy bấm Xem trước phí trước khi xác nhận.", "Chưa xem trước", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            string previewPlate = NormalizePlate(_lastPreview.PlateNumber ?? "");
-            if (string.IsNullOrWhiteSpace(previewPlate))
-            {
-                _lastPreview = null;
-                MessageBox.Show(this,
-                    "Dữ liệu xem trước phí không có biển số hợp lệ. Vui lòng bấm Xem trước phí lại.",
-                    "Dữ liệu xem trước không hợp lệ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            if (!string.Equals(previewPlate, NormalizePlate(_exitPlate.Text),
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                MessageBox.Show(this,
-                    "Biển số hiện tại khác với lần xem trước phí. Vui lòng bấm Xem trước phí lại.",
-                    "Biển số đã thay đổi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                await PreviewExitAsync();
+                if (_lastPreview == null) return;
             }
             ConfigureApis();
-            var exitRequest = Request(_exitPlate.Text);
+            var exitRequest = BuildGateRequest(_exitPlate.Text, includePayment: true);
             if (exitRequest == null) return;
             var response = await _parkingApi.ConfirmExitAsync(exitRequest);
             ShowParkingResult(response);
-            if(!response.Warning || IsManual(false)) AutoOpenBarrier("Xe ra đã được xác nhận");
+            if (!response.Warning || IsManual(false)) AutoOpenBarrier("Xe ra đã được xác nhận và hoàn tất thanh toán");
             NotifyMapUpdated();
             _lastPreview = null;
 
@@ -720,8 +748,11 @@ public sealed class MainForm : Form
 
     private void ApplyFaceVerification(FaceVerificationResponse response, bool entry, TimeSpan elapsed)
     {
-        var combo = entry ? _entryMember : _exitMember;
         bool pass = response.Decision == "PASS";
+        if (response.Decision == "PASS") SetFaceFocusState(FaceFocusState.Verified);
+        else if (response.Decision == "REVIEW") SetFaceFocusState(FaceFocusState.Warning);
+        else SetFaceFocusState(FaceFocusState.Rejected);
+        var combo = entry ? _entryMember : _exitMember;
         if(entry) _entryFaceEvidenceId=response.EvidenceId??""; else _exitFaceEvidenceId=response.EvidenceId??"";
         long? verifiedMemberId = pass
             ? (combo.SelectedItem as AuthorizedMemberResponse)?.Id
@@ -743,7 +774,9 @@ public sealed class MainForm : Form
         _result.BackColor=pass?Color.Honeydew:Color.MistyRose;
     }
 
-    private ParkingRequest? Request(string plate)
+    private ParkingRequest? Request(string plate) => BuildGateRequest(plate, includePayment: true);
+
+    private ParkingRequest? BuildGateRequest(string plate, bool includePayment)
     {
         bool entry=_tabs.SelectedIndex==0; var selected=(entry?_entryMember:_exitMember).SelectedItem as AuthorizedMemberResponse;
         bool verified=entry?_entryFaceVerified:_exitFaceVerified;long? verifiedId=entry?_entryVerifiedMemberId:_exitVerifiedMemberId;
@@ -769,13 +802,10 @@ public sealed class MainForm : Form
         bool exit = !entry;
         string? paymentMethod = null;
         string? paymentReference = null;
-        if (exit && _lastPreview is { Fee: > 0 })
+        if (exit && includePayment)
         {
-            using var dialog = new PaymentMethodDialog(plate, _lastPreview.Fee);
-            if (dialog.ShowDialog(this) != DialogResult.OK || !dialog.ApplyPayment
-                || dialog.SelectedMethod is null) return null!;
-            paymentMethod = dialog.SelectedMethod;
-            paymentReference = dialog.TransactionReference;
+            paymentMethod = ResolveSelectedPaymentMethod();
+            paymentReference = string.IsNullOrWhiteSpace(_txtExitPaymentRef.Text) ? null : _txtExitPaymentRef.Text.Trim();
         }
         return new ParkingRequest(plate,identifier,confirmedType,IsManual(entry),selected?.Id,verified,
             entry?_entryFaceSimilarity:_exitFaceSimilarity,entry?_entryGuestFaceBase64:"",
@@ -787,6 +817,14 @@ public sealed class MainForm : Form
             SessionId: !entry && _exitLinkedSessionId != null
                 && string.Equals(_exitLinkedPlate, identifier, StringComparison.OrdinalIgnoreCase)
                 ? _exitLinkedSessionId : null);
+    }
+
+    private string ResolveSelectedPaymentMethod()
+    {
+        string text = _cboExitPaymentMethod.SelectedItem?.ToString() ?? "CASH";
+        if (text.Contains("Chuyển khoản") || text.Contains("BANK_TRANSFER")) return "BANK_TRANSFER";
+        if (text.Contains("POS") || text.Contains("MOMO")) return "MOMO";
+        return "CASH";
     }
 
     private void EnsureManualOverrideReason(bool entry)
@@ -1106,6 +1144,13 @@ public sealed class MainForm : Form
         if (_closingAfterLogout) return;
         _closingAfterLogout = true;
         _explicitLogout = true;
+        _sessionHeartbeat.Stop();
+        _outboxTimer.Stop();
+        _clockTimer.Stop();
+        foreach (var owned in OwnedForms.ToArray())
+        {
+            try { owned.Close(); } catch { }
+        }
         await ShowShiftSummaryAsync(previous: false);
         Enabled = false;
         try { await _parkingApi.LogoutAsync(); }
@@ -1249,8 +1294,6 @@ public sealed class MainForm : Form
         _result.BackColor = Color.MistyRose;
         _result.ForeColor = Color.Firebrick;
         _result.Text = "KHÔNG THỂ THỰC HIỆN\r\n\r\n" + message;
-        _aiStatus.Text = "Nhận dạng thất bại - có thể nhập biển số thủ công";
-        _aiStatus.ForeColor = Color.Firebrick;
     }
 
     private static void WriteDiagnosticError(string errorId, Exception ex)
@@ -1302,6 +1345,7 @@ public sealed class MainForm : Form
             _exitVerifiedMemberId = null;
         }
         combo.SelectedIndex = -1;
+        SetFaceFocusState(FaceFocusState.Rejected);
         _faceStatus.Text = "Khuôn mặt: " + ex.Message;
         _faceStatus.ForeColor = Color.Firebrick;
     }
@@ -1324,13 +1368,14 @@ public sealed class MainForm : Form
         vehicleButtons.Controls.Add(CreateButton("Camera xe", async (_, _) => await RecognizeVehicleCameraAsync()));
         vehicleLayout.Controls.Add(vehicleButtons, 0, 1);
         vehicleLayout.Controls.Add(_aiStatus, 0, 2);
+        vehicleLayout.Controls.Add(_aiWarningBanner, 0, 3);
         var vehicle = new GroupBox { Text = "XE / BIỂN SỐ", Dock = DockStyle.Fill, Padding = new Padding(8) };
         vehicle.Controls.Add(vehicleLayout);
         var faceLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1 };
         faceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         faceLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         faceLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        faceLayout.Controls.Add(_facePreview, 0, 0);
+        faceLayout.Controls.Add(_faceBorderPanel, 0, 0);
         var faceButtons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         faceButtons.Controls.Add(CreateButton("Tải ảnh", async (_, _) => await SelectFaceMediaAsync(false)));
         faceButtons.Controls.Add(CreateButton("Tải video", async (_, _) => await SelectFaceMediaAsync(true)));
@@ -1344,7 +1389,7 @@ public sealed class MainForm : Form
         return split;
     }
     private static PictureBox PreviewBox() => new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(235, 240, 246) };
-    internal static string DisplayVehicleType(string type) => type switch
+    internal static string DisplayVehicleType(string? type) => (type ?? "").Trim() switch
     {
         "BICYCLE_ELECTRIC_BICYCLE" => "Xe đạp / xe đạp điện",
         "MOTORBIKE" => "Xe máy / xe máy điện",
@@ -1352,7 +1397,8 @@ public sealed class MainForm : Form
         "CAR" => "Ô tô 4-5 chỗ",
         "CAR_6_7" => "Ô tô 6-7 chỗ",
         "CAR_8_9" => "Ô tô 8-9 chỗ",
-        _ => "Không xác định"
+        "" or "UNKNOWN" => "Chưa xác định",
+        _ => type!
     };
     private static string DisplayFaceDecision(string decision) => decision switch
     {
@@ -1361,7 +1407,7 @@ public sealed class MainForm : Form
         "REJECT" => "KHÔNG KHỚP",
         _ => decision
     };
-    private static TextBox PlateBox() => new() { Width = 190, CharacterCasing = CharacterCasing.Upper };
+    private static TextBox PlateBox() => new() { Width = 320, CharacterCasing = CharacterCasing.Upper };
     private static string NormalizePlate(string value) => new(value.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
     private static string Blank(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
     private static FlowLayoutPanel FormFlow() => new() { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };

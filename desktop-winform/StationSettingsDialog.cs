@@ -35,7 +35,7 @@ public sealed class StationSettingsDialog : Form
         root.Controls.Add(new Label { Text = "Tự đóng barrier (giây)", AutoSize = true }, 0, 3);
         root.Controls.Add(_autoClose, 1, 3);
         root.Controls.Add(new Label {
-            Text = "Nhập 0, 1... cho camera USB hoặc địa chỉ RTSP/HTTP. Địa chỉ mạng sẽ được hỗ trợ ở bước tiếp theo.",
+            Text = "Nhập 0, 1... cho camera USB hoặc địa chỉ camera mạng. Địa chỉ mạng sẽ được hỗ trợ ở bước tiếp theo.",
             AutoSize = true, MaximumSize = new Size(500, 0), ForeColor = Color.DimGray
         }, 0, 4);
         root.SetColumnSpan(root.GetControlFromPosition(0, 4)!, 2);

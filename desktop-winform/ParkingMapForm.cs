@@ -88,7 +88,11 @@ public sealed class ParkingMapForm : Form
     {
         try
         {
-            _allSlots = await _api.GetSlotsAsync();
+            var rawSlots = await _api.GetSlotsAsync();
+            _allSlots = rawSlots
+                .OrderBy(s => GetSlotPrefix(s.SlotCode))
+                .ThenBy(s => GetSlotNumber(s.SlotCode))
+                .ToList();
 
             // Cập nhật các danh mục tầng & khu
             var floors = _allSlots.Select(s => s.Floor ?? "Tầng B1").Distinct().OrderBy(f => f).ToList();
@@ -182,5 +186,23 @@ public sealed class ParkingMapForm : Form
             }
         }
         panel.ResumeLayout();
+    }
+    private static string GetSlotPrefix(string? code)
+    {
+        if (string.IsNullOrEmpty(code)) return "";
+        int i = 0;
+        while (i < code.Length && !char.IsDigit(code[i])) i++;
+        return code.Substring(0, i);
+    }
+
+    private static int GetSlotNumber(string? code)
+    {
+        if (string.IsNullOrEmpty(code)) return 0;
+        int i = 0;
+        while (i < code.Length && !char.IsDigit(code[i])) i++;
+        int j = i;
+        while (j < code.Length && char.IsDigit(code[j])) j++;
+        if (i < j && int.TryParse(code.Substring(i, j - i), out int num)) return num;
+        return 0;
     }
 }
