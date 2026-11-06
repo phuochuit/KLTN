@@ -50,7 +50,7 @@ class FaceEngine:
         missing = [str(path.name) for path in (YUNET_PATH, SFACE_PATH) if not path.exists()]
         if missing:
             raise RuntimeError(
-                "Thiếu mô hình: " + ", ".join(missing) + ". Hãy chạy download-models.ps1."
+                "Chức năng đối chiếu khuôn mặt chưa sẵn sàng; vui lòng liên hệ quản trị viên."
             )
         self.detector = cv2.FaceDetectorYN.create(
             str(YUNET_PATH), "", (320, 320), score_threshold=0.55, nms_threshold=0.30, top_k=5000
@@ -196,11 +196,11 @@ def make_decision(enrollment: float, live_registration: float, live_id: float, h
     if classify(enrollment) == "NO_MATCH":
         return "REJECT", "Ảnh đăng ký không khớp ảnh CCCD; cần kiểm tra lại hồ sơ cư dân."
     if classify(live_registration) == "NO_MATCH":
-        return "REJECT", "Ảnh realtime không khớp ảnh đăng ký."
+        return "REJECT", "Ảnh chụp tại cổng không khớp ảnh đăng ký."
     if has_warning or "REVIEW" in (classify(enrollment), classify(live_registration), classify(live_id)):
         return "REVIEW", "Kết quả gần ngưỡng hoặc chất lượng ảnh chưa tốt; nhân viên cần kiểm tra/chụp lại."
     if classify(live_id) == "NO_MATCH":
-        return "REVIEW", "Realtime khớp ảnh đăng ký nhưng không khớp ảnh CCCD; cần đối chiếu thủ công."
+        return "REVIEW", "Ảnh chụp tại cổng khớp ảnh đăng ký nhưng không khớp ảnh CCCD; cần đối chiếu thủ công."
     return "PASS", "Cả ba nguồn ảnh nhất quán theo ngưỡng thử nghiệm."
 
 
@@ -250,14 +250,14 @@ def evaluate_liveness_video(data: bytes) -> dict:
     import tempfile
 
     if len(data) > MAX_UPLOAD_BYTES * 4:
-        raise ValueError("Video liveness vượt quá dung lượng cho phép.")
+        raise ValueError("Video kiểm tra người thật vượt quá dung lượng cho phép.")
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp:
         temp.write(data)
         path = Path(temp.name)
     try:
         capture = cv2.VideoCapture(str(path))
         if not capture.isOpened():
-            raise ValueError("Không mở được video liveness.")
+            raise ValueError("Không mở được video kiểm tra người thật.")
         count = max(1, int(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
         frames = []
         try:
@@ -269,7 +269,7 @@ def evaluate_liveness_video(data: bytes) -> dict:
         finally:
             capture.release()
         if not frames:
-            raise ValueError("Không đọc được khung hình nào từ video liveness.")
+            raise ValueError("Không đọc được hình ảnh từ video kiểm tra người thật.")
         return classify_liveness(frames)
     finally:
         path.unlink(missing_ok=True)
@@ -298,7 +298,7 @@ async def compare_faces(
     realtime: UploadFile = File(...),
     liveness_video: UploadFile | None = File(None),
 ) -> dict:
-    labels = {"cccd": "Ảnh CCCD", "registration": "Ảnh đăng ký", "realtime": "Ảnh realtime"}
+    labels = {"cccd": "Ảnh CCCD", "registration": "Ảnh đăng ký", "realtime": "Ảnh chụp tại cổng"}
     uploads = {"cccd": cccd, "registration": registration, "realtime": realtime}
     try:
         analyses: dict[str, FaceAnalysis] = {}
