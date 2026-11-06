@@ -42,6 +42,7 @@
 | [Security](security/overview.md) | Trust boundaries, quyền, secrets/privacy và controls/gaps |
 | [Traceability](requirements/traceability.md) | NV/quyết định → source/API/data/UI → tests/gaps |
 | [Testing](testing/strategy.md) | Cách chạy, coverage, kết quả lịch sử và scenarios chưa kiểm chứng |
+| [Nghiệm thu Phase 10](testing/acceptance-report-phase10.md) | PASS/FAIL/BLOCKED của `52ed2cf`: test tự động, live Laragon, runtime và giới hạn bằng chứng |
 | [Implementation status](implementation-status.md) | Phần đã có code, subset đã kiểm thử và giới hạn còn lại |
 
 ## Quy tắc tránh hiểu sai
