@@ -29,6 +29,9 @@ public class Vehicle {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50, columnDefinition = "varchar(50)")
     private VehicleType vehicleType = VehicleType.MOTORBIKE;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "vehicle_type_id")
+    private VehicleTypeEntity vehicleTypeRef;
     private String registrationNumber;
     private String brand;
     private String modelName;
@@ -71,6 +74,8 @@ public class Vehicle {
     }
     public VehicleType getVehicleType() { return vehicleType; }
     public void setVehicleType(VehicleType vehicleType) { this.vehicleType = vehicleType; }
+    public VehicleTypeEntity getVehicleTypeRef() { return vehicleTypeRef; }
+    public void setVehicleTypeRef(VehicleTypeEntity vehicleTypeRef) { this.vehicleTypeRef = vehicleTypeRef; }
     public String getRegistrationNumber() { return registrationNumber; }
     public void setRegistrationNumber(String registrationNumber) { this.registrationNumber = registrationNumber; }
     public String getBrand() { return brand; }

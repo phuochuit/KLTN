@@ -42,10 +42,19 @@ public class DesktopApiSecurityConfig {
                     "/api/parking/evidence-comparison", "/api/parking/exceptions",
                     "/api/parking/exceptions/export-csv")
                     .hasAuthority("GATE_OPERATE")
-                .requestMatchers(HttpMethod.GET, "/api/parking/vehicles-unassigned")
-                    .hasAuthority("VEHICLE_MANAGE")
-                .requestMatchers(HttpMethod.POST, "/api/parking/slots/*/dispatch-session")
-                    .hasAuthority("GATE_OPERATE")
+                .requestMatchers(HttpMethod.GET, "/api/parking/vehicles-unassigned",
+                    "/api/parking/slots/*", "/api/parking/zones", "/api/parking/vehicle-types")
+                    .hasAnyAuthority("GATE_OPERATE", "VEHICLE_MANAGE", "SLOT_MANAGE")
+                .requestMatchers(HttpMethod.POST, "/api/parking/slots/batch-generate")
+                    .hasAuthority("SLOT_MANAGE")
+                .requestMatchers(HttpMethod.POST,
+                    "/api/parking/slots/*/assign",
+                    "/api/parking/slots/*/borrow",
+                    "/api/parking/slots/*/cancel-borrow",
+                    "/api/parking/slots/*/dispatch-session",
+                    "/api/parking/slots/*/status",
+                    "/api/parking/slots/*/release")
+                    .hasAnyAuthority("GATE_OPERATE", "SLOT_MANAGE")
                 .requestMatchers(HttpMethod.POST, "/api/parking/slots/**")
                     .hasAuthority("SLOT_MANAGE")
                 .anyRequest().denyAll())
