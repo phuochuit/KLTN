@@ -3,7 +3,7 @@
   --account-muted: var(--d-muted);
   --account-primary: var(--d-blue);
   --account-line: var(--d-line);
-  --account-control-border: #7b89ab;
+  --account-control-border: var(--d-control-border);
 }
 
 .account-management-page .management-content { gap: .9rem; }
@@ -17,7 +17,7 @@
 .account-management-page .account-title-row h1 { min-width: 0; margin: 0; font-size: clamp(1.5rem,2.4vw,2rem); font-weight: 700; letter-spacing: -.04em; line-height: 1.25; }
 .account-management-page .account-hero .page-description { max-width: 62ch; margin: .5rem 0 0; line-height: 1.6; }
 
-.account-management-page .account-button-primary,.account-management-page .account-button-secondary,.account-management-page .account-button-danger { display: inline-flex; justify-content: center; align-items: center; gap: .5rem; min-height: 2.75rem; padding: .55rem .9rem; border: 1px solid transparent; border-radius: .75rem; font: inherit; font-size: .875rem; font-weight: 600; line-height: 1.25rem; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background-color 150ms,border-color 150ms,box-shadow 150ms; }
+.account-management-page .account-button-primary,.account-management-page .account-button-secondary,.account-management-page .account-button-danger { display: inline-flex; justify-content: center; align-items: center; gap: .5rem; min-height: 2.8rem; padding: .55rem .95rem; border: 1px solid transparent; border-radius: .78rem; font: inherit; font-size: var(--d-control-font); font-weight: 600; line-height: 1.25rem; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background-color 150ms,border-color 150ms,box-shadow 150ms; }
 .account-management-page .management-content button.account-button-primary { flex: none; color: #fff; border-color: transparent; background: linear-gradient(115deg,#3042aa,#5b51bd); box-shadow: 0 8px 18px rgb(48 66 170 / 18%),inset 0 1px 0 rgb(255 255 255 / 22%); }
 .account-management-page .management-content button.account-button-primary:hover:not(:disabled) { background: linear-gradient(115deg,#263792,#4b43a9); }
 .account-management-page .management-content button.account-button-primary:active:not(:disabled) { background: linear-gradient(115deg,#1d2c7e,#393186); }
@@ -67,10 +67,10 @@
 .account-management-page .account-create-intro.is-dirty { color: #754d11; font-weight: 650; }
 .account-management-page .account-profile-grid,.account-management-page .profile-grid { display: grid; grid-template-columns: repeat(2,minmax(15rem,1fr)); gap: 1rem; }
 .account-management-page .account-profile-grid label,.account-management-page .profile-grid label { display: grid; align-content: start; gap: .5rem; min-width: 0; color: var(--account-ink); font-size: .875rem; font-weight: 600; line-height: 1.25rem; scroll-margin-block: 1rem; }
-.account-management-page :is(.account-profile-grid,.account-toolbar,.profile-grid) :is(input,select,textarea) { box-sizing: border-box; width: 100%; min-width: 0; min-height: 2.75rem; padding: .6rem .75rem; border: 1px solid var(--account-control-border); border-radius: .7rem; background: #fff; color: var(--account-ink); font: inherit; font-size: 1rem; font-weight: 400; line-height: 1.5rem; }
+.account-management-page :is(.account-profile-grid,.account-toolbar,.profile-grid) :is(input,select,textarea) { box-sizing: border-box; width: 100%; min-width: 0; min-height: var(--d-control-height); padding: var(--d-control-pad); border: 1px solid var(--account-control-border); border-radius: var(--d-control-radius); background: #fff; color: var(--account-ink); font: inherit; font-size: var(--d-control-font); font-weight: 400; line-height: 1.4; box-shadow: var(--d-control-shadow); transition: border-color 150ms,box-shadow 150ms; }
 .account-management-page :is(.account-profile-grid,.account-toolbar,.profile-grid) textarea { min-height: 5rem; resize: vertical; line-height: 1.5; }
 .account-management-page :is(.account-profile-grid,.account-toolbar,.profile-grid) :is(input,select,textarea):hover { border-color: #6475ac; }
-.account-management-page :is(.account-profile-grid,.account-toolbar,.profile-grid) :is(input,select,textarea):focus-visible { outline: 3px solid rgb(82 103 213 / 35%); outline-offset: 2px; border-color: #5267d5; }
+.account-management-page :is(.account-profile-grid,.account-toolbar,.profile-grid) :is(input,select,textarea):focus-visible { outline: 3px solid rgb(82 104 189 / 18%); outline-offset: 2px; border-color: var(--d-control-border-focus); box-shadow: 0 0 0 3px rgb(82 104 189 / 12%); }
 .account-management-page :is(.account-profile-grid,.profile-grid) .wide { grid-column: 1/-1; }
 .account-management-page .account-form-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; padding-top: .85rem; border-top: 1px solid var(--account-line); }
 .account-management-page .account-form-actions button { min-width: 10rem; }
