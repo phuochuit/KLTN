@@ -97,7 +97,7 @@ public class ExceptionReportController {
             String op = item.operatorFullName() != null && !item.operatorFullName().isBlank()
                 ? item.operatorFullName() : (item.operatorUsername() != null ? item.operatorUsername() : "");
             String station = item.shiftName() != null && !item.shiftName().isBlank()
-                ? item.shiftName() : (item.operation() != null ? item.operation() : "");
+                ? item.shiftName() : ExceptionReportService.translateOperation(item.operation());
             csv.append(CsvUtils.escape(item.id())).append(",")
                .append(CsvUtils.escape(item.timestamp() != null ? dtf.format(item.timestamp()) : "")).append(",")
                .append(CsvUtils.escape(item.categoryLabel())).append(",")

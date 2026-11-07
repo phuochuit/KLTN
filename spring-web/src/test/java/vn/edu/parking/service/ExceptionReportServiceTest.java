@@ -34,7 +34,6 @@ class ExceptionReportServiceTest {
     void aggregatesExceptionsFromAllSourcesAndCalculatesSummary() throws Exception {
         Instant now = Instant.now();
         Instant from = now.minus(5, ChronoUnit.DAYS);
-
         // 1. Mock Manual Override
         SystemAccount staff = new SystemAccount("nv_thinh", "hash", AccountRole.GATE_STAFF, false);
         staff.setFullName("Lục Xuân Thịnh");
@@ -53,8 +52,12 @@ class ExceptionReportServiceTest {
             1L, "nv_thinh", "TAMPER_DETECTED", "GATE", "GATE_1", "FAILED",
             "Phát hiện can thiệp barrier bất thường", "REF-001", now.minus(2, ChronoUnit.HOURS));
 
+        SecurityAuditEvent loginFailure = new SecurityAuditEvent(
+            2L, "admin", "LOGIN_FAILURE", "SYSTEM_ACCOUNT", "admin", "FAILED",
+            "INVALID_CREDENTIALS", null, now.minus(2, ChronoUnit.HOURS).plusSeconds(60));
+
         when(securityAudits.findTop500ByOccurredAtBetweenOrderByOccurredAtDesc(any(), any()))
-            .thenReturn(List.of(auditEvent));
+            .thenReturn(List.of(auditEvent, loginFailure));
 
         // 3. Mock Payment Transaction
         PaymentTransaction pt = new PaymentTransaction(
@@ -88,14 +91,23 @@ class ExceptionReportServiceTest {
         ExceptionReportPageResponse res = service.getExceptionReport(from, now, "ALL", "ALL", null, null);
 
         // Verify
-        assertEquals(5, res.totalItems());
-        assertEquals(5, res.summary().totalExceptions());
+        assertEquals(6, res.totalItems());
+        assertEquals(6, res.summary().totalExceptions());
         assertEquals(1, res.summary().manualOverridesCount());
-        assertEquals(1, res.summary().securityAlertsCount());
+        assertEquals(2, res.summary().securityAlertsCount());
         assertEquals(1, res.summary().paymentIssuesCount());
         assertEquals(1, res.summary().faceRejectsCount());
         assertEquals(1, res.summary().qualityWarningsCount());
         assertTrue(res.items().stream().anyMatch(i -> "AI_QUALITY".equals(i.category())));
+
+        // Security audit values are business Vietnamese, not raw codes.
+        var securityItems = res.items().stream().filter(i -> "SECURITY_ALERT".equals(i.category())).toList();
+        assertEquals(2, securityItems.size());
+        assertTrue(securityItems.stream().anyMatch(i -> "Phát hiện can thiệp thiết bị".equals(i.reasonCode())
+            && "Phát hiện can thiệp barrier bất thường".equals(i.description())));
+        assertTrue(securityItems.stream().anyMatch(i -> "Đăng nhập không thành công".equals(i.reasonCode())
+            && "Sai tên đăng nhập hoặc mật khẩu.".equals(i.description())
+            && "Tài khoản".equals(i.details().get("Đối tượng"))));
 
         // Verify sorting by timestamp desc
         assertTrue(res.items().get(0).timestamp().isAfter(res.items().get(1).timestamp()));

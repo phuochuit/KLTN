@@ -47,8 +47,8 @@ public class ExceptionReportService {
             Map<String, String> details = new LinkedHashMap<>();
             if (ev.getOriginalPlateNumber() != null) details.put("Biển số ban đầu", ev.getOriginalPlateNumber());
             if (ev.getCorrectedPlateNumber() != null) details.put("Biển số đã sửa", ev.getCorrectedPlateNumber());
-            if (ev.getOriginalVehicleType() != null) details.put("Loại xe gốc", ev.getOriginalVehicleType());
-            if (ev.getCorrectedVehicleType() != null) details.put("Loại xe đã sửa", ev.getCorrectedVehicleType());
+            if (ev.getOriginalVehicleType() != null) details.put("Loại xe gốc", translateVehicleType(ev.getOriginalVehicleType()));
+            if (ev.getCorrectedVehicleType() != null) details.put("Loại xe đã sửa", translateVehicleType(ev.getCorrectedVehicleType()));
 
             String operatorUser = ev.getAccount() != null ? ev.getAccount().getUsername() : "UNKNOWN";
             String operatorName = ev.getAccount() != null && ev.getAccount().getFullName() != null
@@ -69,7 +69,7 @@ public class ExceptionReportService {
                 ev.getOperation() != null ? ev.getOperation().name() : "GATE",
                 translateReasonCode(ev.getReasonCode()),
                 ev.getReasonText(),
-                ev.getOutcome() != null ? ev.getOutcome().name() : "APPROVED",
+                translateOutcome(ev.getOutcome() != null ? ev.getOutcome().name() : "APPROVED"),
                 null,
                 details
             ));
@@ -87,25 +87,27 @@ public class ExceptionReportService {
 
             if (isWarningOrFailure) {
                 Map<String, String> details = new LinkedHashMap<>();
-                if (sa.getTargetType() != null) details.put("Đối tượng", sa.getTargetType());
+                if (sa.getTargetType() != null) details.put("Đối tượng", translateTargetType(sa.getTargetType()));
                 if (sa.getTargetReference() != null) details.put("Mã tham chiếu", sa.getTargetReference());
                 if (sa.getEvidenceReference() != null) details.put("Bằng chứng", sa.getEvidenceReference());
 
                 String sev = "FAILED".equalsIgnoreCase(sa.getOutcome()) ? "CRITICAL" : "WARNING";
+                String actorUser = sa.getActorUsername() != null ? sa.getActorUsername() : "SYSTEM";
+                String actorName = sa.getActorUsername() != null ? sa.getActorUsername() : "Hệ thống";
                 allItems.add(new ExceptionReportItemResponse(
                     "AUD-" + sa.getId(),
                     sa.getOccurredAt(),
                     "SECURITY_ALERT",
-                    "Cảnh báo bảo mật",
+                    "Cảnh báo an ninh",
                     sev,
                     sa.getTargetReference() != null ? sa.getTargetReference() : "-",
-                    sa.getActorUsername() != null ? sa.getActorUsername() : "SYSTEM",
-                    sa.getActorUsername() != null ? sa.getActorUsername() : "Hệ thống",
+                    actorUser,
+                    actorName,
                     null,
                     "AUDIT",
-                    sa.getAction(),
-                    sa.getReason() != null ? sa.getReason() : ("Cảnh báo an ninh từ hành động " + sa.getAction()),
-                    sa.getOutcome(),
+                    translateAuditAction(sa.getAction()),
+                    translateAuditReason(sa.getReason(), sa.getAction()),
+                    translateOutcome(sa.getOutcome()),
                     null,
                     details
                 ));
@@ -123,7 +125,7 @@ public class ExceptionReportService {
                 Map<String, String> details = new LinkedHashMap<>();
                 details.put("Biên nhận", pt.getReceiptNumber());
                 details.put("Số tiền", String.format("%,.0f đ", pt.getAmount()));
-                details.put("Hình thức", pt.getPaymentMethod().name());
+                details.put("Hình thức", translatePaymentMethod(pt.getPaymentMethod().name()));
                 if (pt.getReconciliationNote() != null) details.put("Ghi chú đối soát", pt.getReconciliationNote());
 
                 String plate = pt.getParkingSession() != null ? pt.getParkingSession().getEntryPlate() : "-";
@@ -136,16 +138,16 @@ public class ExceptionReportService {
                     "PAY-" + pt.getId(),
                     pt.getPaidAt(),
                     "PAYMENT_ISSUE",
-                    "Lỗi thanh toán / Đối soát",
+                    "Lỗi thanh toán và đối soát",
                     isCritical ? "CRITICAL" : "WARNING",
                     plate,
                     collector,
                     collectorName,
                     null,
                     "PAYMENT",
-                    pt.getStatus().name(),
+                    pt.getStatus().getDisplayName(),
                     pt.getReconciliationNote() != null ? pt.getReconciliationNote() : ("Giao dịch thanh toán: " + pt.getStatus().getDisplayName()),
-                    pt.getStatus().name(),
+                    translateOutcome(pt.getStatus().name()),
                     pt.getParkingSession() != null ? pt.getParkingSession().getId() : null,
                     details
                 ));
@@ -157,9 +159,7 @@ public class ExceptionReportService {
             EvidenceType.FACE, List.of("REJECT", "REVIEW"), effectiveFrom, effectiveTo);
         for (GateEvidence fe : faceEvidences) {
             Map<String, String> details = new LinkedHashMap<>();
-            if (fe.getFaceDecision() != null) details.put("Quyết định nhận dạng", fe.getFaceDecision());
-            if (fe.getFaceSimilarity() != null) details.put("Độ tương đồng", String.format("%.3f", fe.getFaceSimilarity().doubleValue()));
-            if (fe.getFaceMatchThreshold() != null) details.put("Ngưỡng cho phép", String.format("%.3f", fe.getFaceMatchThreshold().doubleValue()));
+            if (fe.getFaceDecision() != null) details.put("Kết quả đối chiếu", translateFaceDecision(fe.getFaceDecision()));
 
             String opUser = fe.getAccount() != null ? fe.getAccount().getUsername() : "UNKNOWN";
             String opName = fe.getAccount() != null ? fe.getAccount().getFullName() : opUser;
@@ -168,17 +168,18 @@ public class ExceptionReportService {
                 "FAC-" + fe.getId().substring(0, Math.min(fe.getId().length(), 12)),
                 fe.getCreatedAt(),
                 "FACE_REJECT",
-                "Khuôn mặt bất thường",
+                "Xác thực khuôn mặt chưa đạt",
                 "REJECT".equalsIgnoreCase(fe.getFaceDecision()) ? "CRITICAL" : "WARNING",
                 fe.getPlateNumber() != null ? fe.getPlateNumber() : "-",
                 opUser,
                 opName,
                 null,
                 fe.getOperation() != null ? fe.getOperation().name() : "GATE",
-                fe.getFaceDecision(),
-                "Đối chiếu khuôn mặt trả về kết quả " + fe.getFaceDecision() + " (Độ tương đồng: "
-                    + (fe.getFaceSimilarity() != null ? String.format("%.3f", fe.getFaceSimilarity().doubleValue()) : "-") + ")",
-                fe.getFaceDecision(),
+                translateFaceDecision(fe.getFaceDecision()),
+                "Khuôn mặt " + ("REJECT".equalsIgnoreCase(fe.getFaceDecision())
+                    ? "chưa khớp với ảnh đăng ký" : "cần được xem lại")
+                    + ". Vui lòng đối chiếu thủ công trước khi xác nhận.",
+                translateFaceDecision(fe.getFaceDecision()),
                 fe.getParkingSession() != null ? fe.getParkingSession().getId() : null,
                 details
             ));
@@ -197,11 +198,9 @@ public class ExceptionReportService {
             String readable = String.join("; ",
                 codes.stream().map(ExceptionReportService::translateQualityWarning).toList());
             Map<String, String> details = new LinkedHashMap<>();
-            details.put("Mức chất lượng", status);
-            details.put("Mã cảnh báo", String.join(", ", codes));
+            details.put("Mức chất lượng", translateQualityStatus(status));
             details.put("Diễn giải", readable);
-            if (qe.getQualityVersion() != null) details.put("Phiên bản chấm chất lượng", qe.getQualityVersion());
-            if (qe.getLivenessStatus() != null) details.put("Liveness", qe.getLivenessStatus().name());
+            if (qe.getLivenessStatus() != null) details.put("Xác thực khuôn mặt", translateLiveness(qe.getLivenessStatus().name()));
 
             String opUser = qe.getAccount() != null ? qe.getAccount().getUsername() : "UNKNOWN";
             String opName = qe.getAccount() != null && qe.getAccount().getFullName() != null
@@ -220,7 +219,7 @@ public class ExceptionReportService {
                 qe.getOperation() != null ? qe.getOperation().name() : "GATE",
                 status,
                 "Cảnh báo chất lượng ảnh: " + readable,
-                status,
+                translateQualityStatus(status),
                 qe.getParkingSession() != null ? qe.getParkingSession().getId() : null,
                 details
             ));
@@ -265,6 +264,146 @@ public class ExceptionReportService {
             .toList();
 
         return new ExceptionReportPageResponse(filteredList, summary, filteredList.size());
+    }
+
+    private static String translateOutcome(String outcome) {
+        if (outcome == null || outcome.isBlank()) return "Đã ghi nhận";
+        if (!isTechnicalCode(outcome)) return outcome;
+        return switch (outcome) {
+            case "APPROVED" -> "Đã chấp nhận";
+            case "REJECTED" -> "Đã từ chối";
+            case "SUCCESS", "PASSED", "PASS" -> "Đạt";
+            case "FAILED", "FAILURE", "FAIL", "DENIED", "REJECT" -> "Chưa đạt";
+            case "NO_MATCH", "MISMATCH" -> "Không khớp";
+            case "REVIEW", "PENDING" -> "Cần xem lại";
+            case "PAID" -> "Đã thanh toán";
+            case "VOIDED", "CANCELLED" -> "Đã hủy";
+            case "REFUNDED" -> "Đã hoàn trả";
+            case "RECONCILED" -> "Đã đối soát";
+            case "WARNING" -> "Cảnh báo";
+            case "MATCH" -> "Khớp";
+            default -> "Đã ghi nhận";
+        };
+    }
+
+    private static boolean isTechnicalCode(String value) {
+        return value != null && value.matches("[A-Z][A-Z0-9_]*");
+    }
+
+    private static String translateAuditAction(String action) {
+        if (action == null || action.isBlank()) return "Hoạt động cần kiểm tra";
+        return switch (action) {
+            case "LOGIN_FAILURE", "LOGIN_FAILED" -> "Đăng nhập không thành công";
+            case "LOGIN_SUCCESS" -> "Đăng nhập thành công";
+            case "LOGOUT" -> "Đăng xuất";
+            case "TAMPER_DETECTED" -> "Phát hiện can thiệp thiết bị";
+            case "ACCESS_DENIED", "PERMISSION_DENIED" -> "Truy cập bị từ chối";
+            case "PASSWORD_CHANGED" -> "Đổi mật khẩu";
+            case "PASSWORD_RESET" -> "Đặt lại mật khẩu";
+            case "SESSION_REVOKED" -> "Thu hồi phiên đăng nhập";
+            case "OVERRIDE_APPROVED" -> "Chấp thuận can thiệp thủ công";
+            case "OVERRIDE_REJECTED" -> "Từ chối can thiệp thủ công";
+            case "ROLE_CHANGED" -> "Thay đổi vai trò";
+            case "ACCOUNT_LOCKED" -> "Khóa tài khoản";
+            case "ACCOUNT_UNLOCKED" -> "Mở khóa tài khoản";
+            case "ACCOUNT_DISABLED" -> "Vô hiệu hóa tài khoản";
+            default -> isTechnicalCode(action) ? "Hoạt động cần kiểm tra" : action;
+        };
+    }
+
+    private static String translateAuditReason(String reason, String action) {
+        if (reason == null || reason.isBlank()) return "Hệ thống ghi nhận hoạt động này cần được kiểm tra.";
+        if (!isTechnicalCode(reason)) return reason;
+        return switch (reason) {
+            case "INVALID_CREDENTIALS" -> "Sai tên đăng nhập hoặc mật khẩu.";
+            case "ACCOUNT_LOCKED" -> "Tài khoản đang tạm khóa.";
+            case "ACCOUNT_DISABLED" -> "Tài khoản đã bị vô hiệu hóa.";
+            case "SESSION_EXPIRED" -> "Phiên đăng nhập đã hết hạn.";
+            case "INSUFFICIENT_PRIVILEGES", "ACCESS_DENIED" -> "Tài khoản không đủ quyền thực hiện thao tác.";
+            default -> action != null && action.startsWith("LOGIN")
+                ? "Thông tin đăng nhập chưa đúng hoặc phiên không hợp lệ."
+                : "Hệ thống ghi nhận hoạt động này cần được kiểm tra.";
+        };
+    }
+
+    private static String translateTargetType(String targetType) {
+        if (targetType == null) return null;
+        if (!isTechnicalCode(targetType)) return targetType;
+        return switch (targetType) {
+            case "SYSTEM_ACCOUNT", "ACCOUNT" -> "Tài khoản";
+            case "GATE" -> "Trạm gác";
+            case "PARKING_SESSION" -> "Lượt xe";
+            case "PAYMENT", "PAYMENT_TRANSACTION" -> "Giao dịch";
+            case "VEHICLE" -> "Phương tiện";
+            case "RESIDENT", "HOUSEHOLD" -> "Cư dân";
+            case "EVIDENCE" -> "Hình ảnh ghi nhận";
+            default -> "Đối tượng liên quan";
+        };
+    }
+
+    private static String translateVehicleType(String type) {
+        if (type == null) return null;
+        return switch (type.trim().toUpperCase(Locale.ROOT)) {
+            case "CAR", "AUTO", "AUTOMOBILE" -> "Ô tô";
+            case "MOTORBIKE", "MOTORCYCLE", "BIKE" -> "Xe máy";
+            case "BICYCLE" -> "Xe đạp";
+            case "EBIKE", "ELECTRIC_BIKE" -> "Xe điện";
+            case "TRUCK" -> "Xe tải";
+            default -> type;
+        };
+    }
+
+    private static String translatePaymentMethod(String method) {
+        if (method == null) return "-";
+        return switch (method.toUpperCase(Locale.ROOT)) {
+            case "CASH" -> "Tiền mặt";
+            case "TRANSFER", "BANK_TRANSFER" -> "Chuyển khoản";
+            case "CARD", "CREDIT_CARD" -> "Thẻ";
+            case "EWALLET", "E_WALLET", "MOMO", "VNPAY" -> "Ví điện tử";
+            default -> "Hình thức khác";
+        };
+    }
+
+    private static String translateFaceDecision(String decision) {
+        if (decision == null) return "Chưa xác định";
+        return switch (decision.toUpperCase(Locale.ROOT)) {
+            case "REJECT" -> "Không khớp";
+            case "REVIEW" -> "Cần xem lại";
+            case "MATCH", "ACCEPT" -> "Khớp";
+            default -> "Chưa xác định";
+        };
+    }
+
+    private static String translateQualityStatus(String status) {
+        if (status == null) return "Cần kiểm tra";
+        return switch (status.toUpperCase(Locale.ROOT)) {
+            case "WARNING" -> "Cảnh báo";
+            case "REJECT", "FAILED", "FAIL" -> "Không đạt";
+            case "PASS", "OK" -> "Đạt";
+            default -> "Cần kiểm tra";
+        };
+    }
+
+    private static String translateLiveness(String status) {
+        if (status == null) return "Chưa xác định";
+        return switch (status.toUpperCase(Locale.ROOT)) {
+            case "PASS" -> "Đạt";
+            case "FAIL" -> "Chưa đạt";
+            case "REVIEW" -> "Cần xem lại";
+            default -> "Chưa xác định";
+        };
+    }
+
+    public static String translateOperation(String operation) {
+        if (operation == null) return "Ghi nhận vận hành";
+        return switch (operation.toUpperCase(Locale.ROOT)) {
+            case "ENTRY" -> "Xe vào";
+            case "EXIT" -> "Xe ra";
+            case "AUDIT" -> "Ghi nhận an ninh";
+            case "PAYMENT" -> "Giao dịch";
+            case "GATE" -> "Trạm gác";
+            default -> "Ghi nhận vận hành";
+        };
     }
 
     private static String translateReasonCode(String code) {

@@ -119,4 +119,19 @@ class DashboardPageIntegrationTest {
         mvc.perform(get("/sessions").session(login(AccountRole.GATE_STAFF)).param("status", "OPEN"))
             .andExpect(status().isForbidden());
     }
+
+    @Test
+    void exceptionsPageUsesLumiParkShellAndKeepsBusinessFilters() throws Exception {
+        mvc.perform(get("/exceptions").session(login(AccountRole.MANAGEMENT)))
+            .andExpect(status().isOk()).andExpect(view().name("exceptions"))
+            .andExpect(content().string(containsString("/css/dashboard-ui.css")))
+            .andExpect(content().string(not(containsString("/css/app.css"))))
+            .andExpect(content().string(containsString("class=\"dashboard-page exceptions-page\"")))
+            .andExpect(content().string(containsString("id=\"exceptionsFilterTitle\"")))
+            .andExpect(content().string(containsString("Ngoại lệ và can thiệp vận hành")))
+            .andExpect(content().string(containsString("Xuất báo cáo CSV")))
+            .andExpect(content().string(not(containsString("Auto Parking"))))
+            .andExpect(content().string(not(containsString("Manual Override"))))
+            .andExpect(content().string(not(containsString("Security Alert"))));
+    }
 }

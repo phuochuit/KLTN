@@ -1,0 +1,297 @@
+/* Ngoại lệ vận hành · LumiPark */
+
+.exceptions-page .exceptions-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.exceptions-page .exceptions-heading {
+  align-items: flex-start;
+}
+
+.exceptions-export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.exceptions-export img {
+  width: 1rem;
+  height: 1rem;
+  opacity: .85;
+}
+
+/* Tổng hợp nhanh */
+.exceptions-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.exceptions-stat {
+  min-width: 0;
+  padding: 1rem 1.05rem;
+}
+
+.exceptions-stat .kpi-label {
+  font-size: .8rem;
+}
+
+.exceptions-stat .kpi-label img {
+  flex: 0 0 auto;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: .42rem;
+}
+
+.exceptions-stat .kpi-value {
+  margin: .55rem 0 .15rem;
+  font-size: clamp(1.45rem, 1.9vw, 1.85rem);
+}
+
+.exceptions-stat .kpi-note {
+  font-size: .72rem;
+}
+
+.exceptions-stat.is-warn .kpi-value {
+  color: #a8620a;
+}
+
+.exceptions-stat.is-alert .kpi-value {
+  color: #b4382f;
+}
+
+.exceptions-stat.is-info .kpi-value {
+  color: #6a4bb0;
+}
+
+/* Bộ lọc */
+.exceptions-controls {
+  display: grid;
+  gap: .85rem;
+}
+
+.exceptions-filter-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: .75rem;
+  align-items: end;
+}
+
+.exceptions-filter-form label {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  min-width: 0;
+  color: var(--d-muted);
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.exceptions-filter-form input,
+.exceptions-filter-form select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: .55rem .7rem;
+  border: 1px solid #8592b0;
+  border-radius: .65rem;
+  background: #fff;
+  color: var(--d-ink);
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 400;
+}
+
+.exceptions-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+}
+
+.exceptions-filter-actions .primary-button,
+.exceptions-filter-actions .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Bảng dữ liệu */
+.exceptions-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #dbe2ef;
+  border-radius: .85rem;
+  background: #fff;
+}
+
+.exceptions-table {
+  width: 100%;
+  min-width: 69rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  color: var(--d-ink);
+  font-size: .82rem;
+  text-align: left;
+}
+
+.exceptions-table th {
+  padding: .7rem;
+  border-bottom: 1px solid #d5deed;
+  background: linear-gradient(105deg, #eaf1ff, #f1effb);
+  color: #344363;
+  font-size: .74rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+  vertical-align: bottom;
+  white-space: normal;
+}
+
+.exceptions-table th:first-child {
+  border-top-left-radius: .8rem;
+}
+
+.exceptions-table th:last-child {
+  border-top-right-radius: .8rem;
+}
+
+.exceptions-table td {
+  padding: .7rem;
+  border-bottom: 1px solid #e5eaf3;
+  color: #263550;
+  font-size: .8rem;
+  line-height: 1.5;
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.exceptions-table tbody tr:nth-child(even) td {
+  background: #f8faff;
+}
+
+.exceptions-table tbody tr:hover td {
+  background: #f0f3ff;
+}
+
+.exceptions-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.exceptions-table .col-id {
+  width: 6rem;
+}
+
+.exceptions-table .col-time {
+  width: 8.5rem;
+}
+
+.exceptions-table .col-category {
+  width: 8.5rem;
+}
+
+.exceptions-table .col-severity {
+  width: 6.5rem;
+}
+
+.exceptions-table .col-plate {
+  width: 7rem;
+}
+
+.exceptions-table .col-operator {
+  width: 8.5rem;
+}
+
+.exceptions-table .col-content {
+  width: 17rem;
+}
+
+.exceptions-table .col-outcome {
+  width: 7rem;
+}
+
+.exceptions-table .exception-id {
+  font-variant-numeric: tabular-nums;
+}
+
+.exceptions-table .exception-reason {
+  display: block;
+  color: var(--d-ink);
+  font-weight: 600;
+}
+
+.exceptions-table .exception-description {
+  margin: .25rem 0 0;
+  color: #475774;
+}
+
+.exceptions-table .exception-details {
+  margin: .3rem 0 0;
+  color: #5b6684;
+  font-size: .74rem;
+}
+
+.exceptions-table .exception-operator small {
+  display: block;
+  color: var(--d-muted);
+  font-size: .74rem;
+}
+
+.exceptions-table .exception-empty {
+  padding: 2rem 1rem;
+  color: var(--d-muted);
+  text-align: center;
+}
+
+.exceptions-badge {
+  display: inline-block;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  font-size: .74rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.exceptions-badge.is-critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.exceptions-badge.is-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.exceptions-badge.is-info {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+@media (max-width: 79.999rem) {
+  .exceptions-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 47.999rem) {
+  .exceptions-page .exceptions-heading {
+    align-items: stretch;
+  }
+
+  .exceptions-export {
+    width: 100%;
+  }
+
+  .exceptions-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

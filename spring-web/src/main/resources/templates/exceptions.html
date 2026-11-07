@@ -1,225 +1,201 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Khung báo cáo ngoại lệ - Auto Parking</title>
-    <link rel="stylesheet" th:href="@{/css/app.css}">
-    <style>
-        .badge-critical {
-            background-color: #fee2e2;
-            color: #991b1b;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            display: inline-block;
-        }
-        .badge-warning {
-            background-color: #fef3c7;
-            color: #92400e;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            display: inline-block;
-        }
-        .badge-info {
-            background-color: #e0f2fe;
-            color: #0369a1;
-            font-weight: 600;
-            padding: 3px 8px;
-            border-radius: 9999px;
-            font-size: 0.8rem;
-            display: inline-block;
-        }
-        .filter-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px;
-            margin-bottom: 12px;
-            align-items: end;
-        }
-        .filter-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .filter-item label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #374151;
-        }
-        .filter-item input, .filter-item select {
-            padding: 8px 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 0.9rem;
-        }
-        .filter-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-        }
-        .detail-row {
-            font-size: 0.85rem;
-            color: #4b5563;
-            margin-top: 3px;
-        }
-        .stats-grid-5 {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ngoại lệ vận hành · LumiPark</title>
+  <link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml">
+  <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
+  <link rel="stylesheet" th:href="@{/css/exceptions-lumi.css}">
 </head>
-<body>
-<header th:replace="~{fragments :: header}"></header>
-<main>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <div>
-            <h1>Khung báo cáo ngoại lệ và can thiệp vận hành</h1>
-            <p style="color: #6b7280; margin: 4px 0 0 0;">Tổng hợp can thiệp thủ công, cảnh báo an ninh, lỗi thanh toán, bất thường nhận dạng và cảnh báo chất lượng ảnh.</p>
-        </div>
-        <div>
-            <a th:href="@{/exceptions/export-csv(fromDate=${fromDate}, toDate=${toDate}, category=${category}, severity=${severity}, operator=${operator}, keyword=${keyword})}"
-               class="btn btn-outline" style="text-decoration: none;">📥 Xuất file CSV</a>
-        </div>
-    </div>
+<body class="dashboard-page exceptions-page" th:with="activePage='exceptions'">
+<a href="#exceptionsMain" class="skip-link">Đến nội dung chính</a>
+<div class="dashboard-shell">
+  <aside class="sidebar" aria-label="Điều hướng quản trị">
+    <div th:replace="~{dashboard-shell :: navigation}"></div>
+  </aside>
+  <div class="dashboard-workspace">
+    <header class="dashboard-topbar">
+      <div class="topbar-location">
+        <button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng" aria-haspopup="dialog"><img th:src="@{/images/lucide/menu.svg}" alt=""></button>
+        <span>Vận hành <span aria-hidden="true">/</span> <strong>Ngoại lệ</strong></span>
+      </div>
+      <a class="account-link" th:href="@{/account/password}"><span class="account-avatar" aria-hidden="true"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span></a>
+    </header>
 
-    <!-- Stats Cards -->
-    <div class="stats-grid-5">
-        <div class="stats-item">
-            <div class="label">Tổng ngoại lệ</div>
-            <div class="value" th:text="${summary.totalExceptions}">0</div>
+    <main id="exceptionsMain" class="exceptions-content" tabindex="-1">
+      <section class="page-heading exceptions-heading">
+        <div>
+          <p class="eyebrow">LUMIPARK / GIÁM SÁT VẬN HÀNH</p>
+          <h1>Ngoại lệ và can thiệp vận hành</h1>
+          <p class="page-description">Theo dõi can thiệp thủ công, cảnh báo an ninh, lỗi thanh toán, xác thực khuôn mặt và chất lượng ảnh trong khoảng thời gian đã chọn.</p>
         </div>
-        <div class="stats-item">
-            <div class="label">Can thiệp thủ công</div>
-            <div class="value" style="color: #d97706;" th:text="${summary.manualOverridesCount}">0</div>
-        </div>
-        <div class="stats-item">
-            <div class="label">Cảnh báo bảo mật</div>
-            <div class="value" style="color: #dc2626;" th:text="${summary.securityAlertsCount}">0</div>
-        </div>
-        <div class="stats-item">
-            <div class="label">Lỗi thanh toán / đối soát</div>
-            <div class="value" style="color: #b91c1c;" th:text="${summary.paymentIssuesCount}">0</div>
-        </div>
-        <div class="stats-item">
-            <div class="label">Khuôn mặt bất thường</div>
-            <div class="value" style="color: #ea580c;" th:text="${summary.faceRejectsCount}">0</div>
-        </div>
-        <div class="stats-item">
-            <div class="label">Chất lượng ảnh</div>
-            <div class="value" style="color: #7c3aed;" th:text="${summary.qualityWarningsCount}">0</div>
-        </div>
-    </div>
+        <a class="secondary-button exceptions-export" th:href="@{/exceptions/export-csv(fromDate=${fromDate}, toDate=${toDate}, category=${category}, severity=${severity}, operator=${operator}, keyword=${keyword})}">
+          <img th:src="@{/images/lucide/receipt.svg}" alt="">
+          Xuất báo cáo CSV
+        </a>
+      </section>
 
-    <!-- Filter Card -->
-    <div class="card" style="margin-bottom: 20px;">
-        <form method="get" th:action="@{/exceptions}">
-            <div class="filter-grid">
-                <div class="filter-item">
-                    <label for="fromDate">Từ ngày</label>
-                    <input type="date" id="fromDate" name="fromDate" th:value="${fromDate}">
-                </div>
-                <div class="filter-item">
-                    <label for="toDate">Đến ngày</label>
-                    <input type="date" id="toDate" name="toDate" th:value="${toDate}">
-                </div>
-                <div class="filter-item">
-                    <label for="category">Phân loại ngoại lệ</label>
-                    <select id="category" name="category">
-                        <option value="ALL" th:selected="${category == 'ALL'}">-- Tất cả phân loại --</option>
-                        <option value="MANUAL_OVERRIDE" th:selected="${category == 'MANUAL_OVERRIDE'}">Can thiệp thủ công (Manual Override)</option>
-                        <option value="SECURITY_ALERT" th:selected="${category == 'SECURITY_ALERT'}">Cảnh báo bảo mật (Security Alert)</option>
-                        <option value="PAYMENT_ISSUE" th:selected="${category == 'PAYMENT_ISSUE'}">Lỗi thanh toán / Đối soát</option>
-                        <option value="FACE_REJECT" th:selected="${category == 'FACE_REJECT'}">Khuôn mặt bất thường (Face Reject/Review)</option>
-                        <option value="AI_QUALITY" th:selected="${category == 'AI_QUALITY'}">Ảnh mờ, lóa, tối hoặc nghiêng</option>
-                    </select>
-                </div>
-                <div class="filter-item">
-                    <label for="severity">Mức độ cảnh báo</label>
-                    <select id="severity" name="severity">
-                        <option value="ALL" th:selected="${severity == 'ALL'}">-- Tất cả mức độ --</option>
-                        <option value="WARNING" th:selected="${severity == 'WARNING'}">Cảnh báo (WARNING)</option>
-                        <option value="CRITICAL" th:selected="${severity == 'CRITICAL'}">Nghiêm trọng (CRITICAL)</option>
-                        <option value="INFO" th:selected="${severity == 'INFO'}">Thông tin (INFO)</option>
-                    </select>
-                </div>
-                <div class="filter-item">
-                    <label for="operator">Nhân viên / Tài khoản</label>
-                    <input type="text" id="operator" name="operator" placeholder="Username hoặc họ tên" th:value="${operator}">
-                </div>
-                <div class="filter-item">
-                    <label for="keyword">Biển số / Từ khóa</label>
-                    <input type="text" id="keyword" name="keyword" placeholder="Nhập biển số hoặc nội dung" th:value="${keyword}">
-                </div>
-            </div>
-            <div class="filter-actions">
-                <button type="submit" class="btn btn-primary">Lọc dữ liệu</button>
-                <a th:href="@{/exceptions}" class="btn btn-outline" style="text-decoration: none;">Đặt lại</a>
-            </div>
+      <section class="exceptions-stats" aria-label="Tổng hợp ngoại lệ">
+        <article class="glass-card exceptions-stat">
+          <p class="kpi-label">Tổng ngoại lệ <img th:src="@{/images/lucide/circle-alert.svg}" alt=""></p>
+          <p class="kpi-value" th:text="${summary.totalExceptions}">0</p>
+          <p class="kpi-note">Toàn bộ sự kiện ghi nhận</p>
+        </article>
+        <article class="glass-card exceptions-stat is-warn">
+          <p class="kpi-label">Can thiệp thủ công <img th:src="@{/images/lucide/clipboard-list.svg}" alt=""></p>
+          <p class="kpi-value" th:text="${summary.manualOverridesCount}">0</p>
+          <p class="kpi-note">Xử lý khi hệ thống chưa xác định đúng</p>
+        </article>
+        <article class="glass-card exceptions-stat is-alert">
+          <p class="kpi-label">Cảnh báo an ninh <img th:src="@{/images/lucide/shield-check.svg}" alt=""></p>
+          <p class="kpi-value" th:text="${summary.securityAlertsCount}">0</p>
+          <p class="kpi-note">Truy cập và thao tác bất thường</p>
+        </article>
+        <article class="glass-card exceptions-stat is-alert">
+          <p class="kpi-label">Lỗi thanh toán <img th:src="@{/images/lucide/wallet.svg}" alt=""></p>
+          <p class="kpi-value" th:text="${summary.paymentIssuesCount}">0</p>
+          <p class="kpi-note">Biên nhận cần kiểm tra lại</p>
+        </article>
+        <article class="glass-card exceptions-stat is-warn">
+          <p class="kpi-label">Khuôn mặt chưa đạt <img th:src="@{/images/lucide/scan-line.svg}" alt=""></p>
+          <p class="kpi-value" th:text="${summary.faceRejectsCount}">0</p>
+          <p class="kpi-note">Cần đối chiếu thủ công</p>
+        </article>
+        <article class="glass-card exceptions-stat is-info">
+          <p class="kpi-label">Chất lượng ảnh <img th:src="@{/images/lucide/image.svg}" alt=""></p>
+          <p class="kpi-value" th:text="${summary.qualityWarningsCount}">0</p>
+          <p class="kpi-note">Ảnh mờ, lóa, tối hoặc nghiêng</p>
+        </article>
+      </section>
+
+      <section class="glass-card exceptions-controls" aria-labelledby="exceptionsFilterTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">TRA CỨU NGOẠI LỆ</p>
+            <h2 id="exceptionsFilterTitle">Lọc danh sách ghi nhận</h2>
+          </div>
+        </div>
+        <form id="exceptionsFilterForm" class="exceptions-filter-form" method="get" th:action="@{/exceptions}">
+          <label for="fromDate">Từ ngày
+            <input type="date" id="fromDate" name="fromDate" th:value="${fromDate}">
+          </label>
+          <label for="toDate">Đến ngày
+            <input type="date" id="toDate" name="toDate" th:value="${toDate}">
+          </label>
+          <label for="category">Phân loại ngoại lệ
+            <select id="category" name="category">
+              <option value="ALL" th:selected="${category == 'ALL'}">Tất cả phân loại</option>
+              <option value="MANUAL_OVERRIDE" th:selected="${category == 'MANUAL_OVERRIDE'}">Can thiệp thủ công</option>
+              <option value="SECURITY_ALERT" th:selected="${category == 'SECURITY_ALERT'}">Cảnh báo an ninh</option>
+              <option value="PAYMENT_ISSUE" th:selected="${category == 'PAYMENT_ISSUE'}">Lỗi thanh toán và đối soát</option>
+              <option value="FACE_REJECT" th:selected="${category == 'FACE_REJECT'}">Xác thực khuôn mặt chưa đạt</option>
+              <option value="AI_QUALITY" th:selected="${category == 'AI_QUALITY'}">Ảnh mờ, lóa, tối hoặc nghiêng</option>
+            </select>
+          </label>
+          <label for="severity">Mức độ cảnh báo
+            <select id="severity" name="severity">
+              <option value="ALL" th:selected="${severity == 'ALL'}">Tất cả mức độ</option>
+              <option value="WARNING" th:selected="${severity == 'WARNING'}">Cảnh báo</option>
+              <option value="CRITICAL" th:selected="${severity == 'CRITICAL'}">Nghiêm trọng</option>
+              <option value="INFO" th:selected="${severity == 'INFO'}">Thông tin</option>
+            </select>
+          </label>
+          <label for="operator">Nhân viên xử lý
+            <input type="text" id="operator" name="operator" maxlength="80" placeholder="Tên đăng nhập hoặc họ tên" th:value="${operator}" autocomplete="off">
+          </label>
+          <label for="keyword">Biển số hoặc từ khóa
+            <input type="text" id="keyword" name="keyword" maxlength="80" placeholder="Nhập biển số hoặc nội dung" th:value="${keyword}" autocomplete="off">
+          </label>
         </form>
-    </div>
-
-    <!-- Data Table Card -->
-    <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h2>Danh sách ngoại lệ ghi nhận (<span th:text="${totalItems}">0</span> bản ghi)</h2>
+        <div class="exceptions-filter-actions">
+          <button type="submit" form="exceptionsFilterForm" class="primary-button">Lọc dữ liệu</button>
+          <a th:href="@{/exceptions}" class="secondary-button">Đặt lại bộ lọc</a>
         </div>
-        <table>
+      </section>
+
+      <section class="glass-card" aria-labelledby="exceptionsTableTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">DANH SÁCH GHI NHẬN</p>
+            <h2 id="exceptionsTableTitle">Ngoại lệ trong khoảng thời gian đã chọn</h2>
+            <p class="muted"><strong th:text="${totalItems}">0</strong> bản ghi phù hợp với bộ lọc.</p>
+          </div>
+        </div>
+        <p class="table-hint">Vuốt ngang bảng để xem đầy đủ các cột.</p>
+        <div class="exceptions-table-scroll">
+          <table class="exceptions-table">
+            <colgroup>
+              <col class="col-id">
+              <col class="col-time">
+              <col class="col-category">
+              <col class="col-severity">
+              <col class="col-plate">
+              <col class="col-operator">
+              <col class="col-content">
+              <col class="col-outcome">
+            </colgroup>
             <thead>
             <tr>
-                <th style="width: 110px;">Mã</th>
-                <th style="width: 140px;">Thời gian</th>
-                <th style="width: 150px;">Phân loại</th>
-                <th style="width: 110px;">Mức độ</th>
-                <th style="width: 120px;">Biển số</th>
-                <th>Người xử lý</th>
-                <th style="width: 100px;">Thao tác</th>
-                <th>Lý do &amp; Mô tả chi tiết</th>
-                <th style="width: 110px;">Trạng thái</th>
+              <th scope="col">Mã</th>
+              <th scope="col">Thời gian</th>
+              <th scope="col">Phân loại</th>
+              <th scope="col">Mức độ</th>
+              <th scope="col">Đối tượng</th>
+              <th scope="col">Người xử lý</th>
+              <th scope="col">Nội dung ghi nhận</th>
+              <th scope="col">Kết quả</th>
             </tr>
             </thead>
             <tbody>
             <tr th:each="item : ${items}">
-                <td><strong th:text="${item.id}"></strong></td>
-                <td th:text="${#temporals.format(item.timestamp, 'dd/MM/yyyy HH:mm:ss', 'Asia/Ho_Chi_Minh')}"></td>
-                <td>
-                    <span th:text="${item.categoryLabel}"></span>
-                </td>
-                <td>
-                    <span th:if="${item.severity == 'CRITICAL'}" class="badge-critical">Nghiêm trọng</span>
-                    <span th:if="${item.severity == 'WARNING'}" class="badge-warning">Cảnh báo</span>
-                    <span th:if="${item.severity == 'INFO'}" class="badge-info">Thông tin</span>
-                </td>
-                <td><strong th:text="${item.plateNumber}"></strong></td>
-                <td>
-                    <span th:text="${item.operatorFullName}"></span>
-                    <div class="muted" style="font-size: 0.8rem;" th:text="${item.operatorUsername}"></div>
-                </td>
-                <td><code th:text="${item.operation}"></code></td>
-                <td>
-                    <strong style="color: #1f2937;" th:text="${item.reasonCode}"></strong>
-                    <div style="color: #4b5563; font-size: 0.9rem;" th:text="${item.description}"></div>
-                    <div th:if="${item.details != null and not #maps.isEmpty(item.details)}" class="detail-row">
-                        <span th:each="entry, stat : ${item.details}">
-                            <small><b th:text="${entry.key} + ': '"></b><span th:text="${entry.value}"></span><span th:if="${!stat.last}"> | </span></small>
-                        </span>
-                    </div>
-                </td>
-                <td>
-                    <span th:text="${item.statusOrOutcome}"></span>
-                </td>
+              <td class="exception-id"><strong th:text="${item.id}">OVR-1</strong></td>
+              <td th:text="${#temporals.format(item.timestamp, 'dd/MM/yyyy HH:mm:ss', 'Asia/Ho_Chi_Minh')}">07/11/2026 10:00:00</td>
+              <td th:text="${item.categoryLabel}">Can thiệp thủ công</td>
+              <td>
+                <span th:if="${item.severity == 'CRITICAL'}" class="exceptions-badge is-critical">Nghiêm trọng</span>
+                <span th:if="${item.severity == 'WARNING'}" class="exceptions-badge is-warning">Cảnh báo</span>
+                <span th:if="${item.severity == 'INFO'}" class="exceptions-badge is-info">Thông tin</span>
+              </td>
+              <td><strong th:text="${item.plateNumber}">-</strong></td>
+              <td class="exception-operator">
+                <span th:text="${item.operatorFullName ?: item.operatorUsername}">-</span>
+                <small th:if="${item.operatorUsername != null and item.operatorUsername != 'SYSTEM' and item.operatorFullName != null and item.operatorUsername != item.operatorFullName}" th:text="${item.operatorUsername}"></small>
+                <small th:if="${item.shiftName != null and !item.shiftName.isBlank()}" th:text="${'Ca trực: ' + item.shiftName}"></small>
+              </td>
+              <td>
+                <strong class="exception-reason" th:text="${item.reasonCode}">Lý do ghi nhận</strong>
+                <p class="exception-description" th:text="${item.description}">Mô tả chi tiết</p>
+                <p class="exception-details" th:if="${item.details != null and !#maps.isEmpty(item.details)}">
+                  <span th:each="entry, stat : ${item.details}"><span><b th:text="${entry.key} + ': '"></b><span th:text="${entry.value}"></span><span th:if="${!stat.last}"> · </span></span></span>
+                </p>
+              </td>
+              <td th:text="${item.statusOrOutcome}">Đã ghi nhận</td>
             </tr>
             <tr th:if="${#lists.isEmpty(items)}">
-                <td colspan="9" class="muted" style="text-align: center; padding: 24px;">Không tìm thấy sự kiện ngoại lệ nào trong khoảng thời gian đã chọn.</td>
+              <td colspan="8" class="exception-empty">Không có ngoại lệ nào trong khoảng thời gian đã chọn. Hãy điều chỉnh bộ lọc hoặc chọn khoảng ngày khác.</td>
             </tr>
             </tbody>
-        </table>
-    </div>
-</main>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị">
+  <button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button>
+  <div th:replace="~{dashboard-shell :: navigation}"></div>
+</dialog>
+<script>
+  (() => {
+    const navigation = document.querySelector('#navigationDialog');
+    document.querySelector('#openNavigation')?.addEventListener('click', () => navigation?.showModal());
+    document.querySelector('#closeNavigation')?.addEventListener('click', () => navigation?.close());
+    navigation?.addEventListener('click', event => {
+      if (event.target === navigation) navigation.close();
+    });
+  })();
+</script>
 </body>
 </html>
