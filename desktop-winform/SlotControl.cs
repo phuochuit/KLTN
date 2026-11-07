@@ -5,29 +5,29 @@ public sealed class SlotControl : UserControl
     private readonly Label _zoneHeader = new()
     {
         Dock = DockStyle.Top,
-        Height = 20,
-        Font = new Font("Segoe UI", 8f, FontStyle.Regular),
+        Height = 24,
+        Font = LumiTheme.AppFont(8f),
         TextAlign = ContentAlignment.MiddleCenter,
-        BackColor = Color.FromArgb(40, 0, 0, 0),
+        BackColor = Color.FromArgb(32, 0, 0, 0),
         ForeColor = Color.White
     };
 
     private readonly Label _title = new()
     {
         Dock = DockStyle.Top,
-        Height = 26,
+        Height = 30,
         TextAlign = ContentAlignment.MiddleCenter,
-        Font = new Font("Segoe UI", 11.5f, FontStyle.Bold),
+        Font = LumiTheme.AppFont(12f, FontStyle.Bold),
         ForeColor = Color.White
     };
 
     private readonly Label _plate = new()
     {
         Dock = DockStyle.Top,
-        Height = 24,
+        Height = 26,
         TextAlign = ContentAlignment.MiddleCenter,
-        Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-        BackColor = Color.FromArgb(50, 0, 0, 0),
+        Font = LumiTheme.AppFont(9.3f, FontStyle.Bold),
+        BackColor = Color.FromArgb(35, 0, 0, 0),
         ForeColor = Color.White
     };
 
@@ -35,7 +35,7 @@ public sealed class SlotControl : UserControl
     {
         Dock = DockStyle.Fill,
         TextAlign = ContentAlignment.MiddleCenter,
-        Font = new Font("Segoe UI", 8f, FontStyle.Italic),
+        Font = LumiTheme.AppFont(8f, FontStyle.Italic),
         ForeColor = Color.White
     };
 
@@ -44,10 +44,12 @@ public sealed class SlotControl : UserControl
 
     public SlotControl()
     {
-        Size = new Size(155, 98);
-        Margin = new Padding(6);
-        BorderStyle = BorderStyle.FixedSingle;
+        Size = new Size(164, 112);
+        Margin = new Padding(7);
+        BorderStyle = BorderStyle.None;
         Cursor = Cursors.Hand;
+        Padding = new Padding(1);
+        LumiTheme.Round(this, 14);
 
         Controls.Add(_status);
         Controls.Add(_plate);
@@ -102,27 +104,27 @@ public sealed class SlotControl : UserControl
         if (slot.Overdue)
         {
             _status.Text = "⚠️ QUÁ GIỜ ĐỖ NHỜ";
-            _status.Font = new Font("Segoe UI", 8f, FontStyle.Bold);
-            _status.ForeColor = Color.Yellow;
+            _status.Font = LumiTheme.AppFont(8f, FontStyle.Bold);
+            _status.ForeColor = Color.FromArgb(255, 238, 160);
         }
         else
         {
             _status.Text = slot.StatusDescription ?? slot.Status;
-            _status.Font = new Font("Segoe UI", 8f, FontStyle.Regular);
+            _status.Font = LumiTheme.AppFont(8f);
             _status.ForeColor = Color.White;
         }
 
         BackColor = slot.Status switch
         {
-            "AVAILABLE" => Color.FromArgb(39, 174, 96),       // Xanh lá
-            "RESERVED_EMPTY" => Color.FromArgb(41, 128, 185),  // Xanh dương
-            "OCCUPIED_VALID" => Color.FromArgb(192, 57, 43),   // Đỏ
-            "OCCUPIED_BORROWED" => Color.FromArgb(211, 84, 0),// Cam đậm
-            "RESERVED_BORROWED" => Color.FromArgb(230, 126, 34), // Cam
-            "OVERDUE_ALERT" => Color.FromArgb(120, 40, 31),    // Đỏ thẫm cảnh báo
-            "OCCUPIED_MISMATCH" => Color.FromArgb(185, 119, 14), // Vàng đất
-            "BLOCKED" => Color.FromArgb(108, 122, 137),       // Xám cấm đỗ
-            _ => Color.FromArgb(52, 73, 94)
+            "AVAILABLE" => LumiTheme.Good,
+            "RESERVED_EMPTY" => LumiTheme.Primary,
+            "OCCUPIED_VALID" => LumiTheme.Danger,
+            "OCCUPIED_BORROWED" => Color.FromArgb(180, 83, 9),
+            "RESERVED_BORROWED" => Color.FromArgb(194, 101, 18),
+            "OVERDUE_ALERT" => Color.FromArgb(117, 35, 30),
+            "OCCUPIED_MISMATCH" => Color.FromArgb(139, 91, 15),
+            "BLOCKED" => Color.FromArgb(75, 85, 105),
+            _ => LumiTheme.Muted
         };
     }
 }

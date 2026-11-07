@@ -27,20 +27,24 @@ public sealed class ExitSessionPickerDialog : Form
     public ExitSessionPickerDialog(string plate, List<ExitCandidateResponse> candidates)
     {
         _candidates = candidates;
-        Text = "Chọn lượt xe vào để xác nhận xe ra";
+        Text = "LumiPark - Chọn lượt xe vào";
         StartPosition = FormStartPosition.CenterParent;
         MinimizeBox = false;
         MaximizeBox = false;
         FormBorderStyle = FormBorderStyle.FixedDialog;
-        ClientSize = new Size(620, 430);
-        Font = new Font("Segoe UI", 9.5f);
+        ClientSize = new Size(720, 500);
+        Font = LumiTheme.AppFont(9.5f);
+        BackColor = LumiTheme.Canvas;
 
         var header = new Label
         {
             Dock = DockStyle.Top,
             AutoSize = false,
             Height = 78,
-            Padding = new Padding(12),
+            Padding = new Padding(20, 16, 20, 12),
+            BackColor = LumiTheme.SurfaceSoft,
+            ForeColor = LumiTheme.Ink,
+            Font = LumiTheme.AppFont(10f, FontStyle.Bold),
             Text = $"Biển số đọc được: {plate}\r\n"
                 + "Không tìm thấy lượt vào theo biển này. Hãy chọn đúng xe đang đỗ bằng mã tạm "
                 + "dựa vào giờ vào và ô đỗ."
@@ -89,6 +93,11 @@ public sealed class ExitSessionPickerDialog : Form
         _choose.Click += (_, _) => Accept();
         AcceptButton = _choose;
         CancelButton = cancel;
+        _list.BackColor = LumiTheme.Surface;
+        _list.ForeColor = LumiTheme.Ink;
+        _list.BorderStyle = BorderStyle.FixedSingle;
+        LumiTheme.Apply(this);
+        LumiTheme.StyleButton(_choose, primary: true);
     }
 
     private void Accept()

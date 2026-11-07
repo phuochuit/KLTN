@@ -17,21 +17,23 @@ public sealed class EvidenceComparisonDialog : Form
         EvidenceComparisonResponse data,
         bool hasActiveShift,
         string currentPlate,
-        string currentVehicleType)
+        string currentVehicleType,
+        IReadOnlyList<VehicleTypeDto>? vehicleTypes = null)
     {
-        Text = $"Đối chiếu ảnh Vào / Ra — Lượt #{data.SessionId} ({data.EntryPlate})";
+        Text = $"LumiPark - Đối chiếu ảnh vào / ra — Lượt #{data.SessionId} ({data.EntryPlate})";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(1020, 720);
-        Size = new Size(1120, 780);
-        Font = new Font("Segoe UI", 9.5f);
-        BackColor = Color.White;
+        Size = new Size(1180, 820);
+        Font = LumiTheme.AppFont(9.5f);
+        BackColor = LumiTheme.Canvas;
 
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             RowCount = 4,
             ColumnCount = 1,
-            Padding = new Padding(14)
+            Padding = new Padding(20),
+            BackColor = LumiTheme.Canvas
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
@@ -49,8 +51,9 @@ public sealed class EvidenceComparisonDialog : Form
                 "NO_MATCH" => Color.FromArgb(253, 237, 237),
                 _ => Color.FromArgb(255, 247, 230)
             },
-            BorderStyle = BorderStyle.FixedSingle
+            BorderStyle = BorderStyle.None
         };
+        LumiTheme.Round(banner, 14);
         Color statusColor = data.MatchStatus switch
         {
             "MATCH" => Color.SeaGreen,
@@ -67,7 +70,7 @@ public sealed class EvidenceComparisonDialog : Form
         {
             Text = $"{statusTitle}  |  Lượt #{data.SessionId} — Biển số lượt vào: {data.EntryPlate} ({DisplayVehicleType(data.EntryVehicleType)})",
             AutoSize = true,
-            Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+            Font = LumiTheme.AppFont(10.5f, FontStyle.Bold),
             ForeColor = statusColor,
             Location = new Point(12, 8)
         };
@@ -88,7 +91,8 @@ public sealed class EvidenceComparisonDialog : Form
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
-            Padding = new Padding(0, 6, 0, 4)
+            Padding = new Padding(0, 6, 0, 4),
+            BackColor = LumiTheme.Canvas
         };
         badgesFlow.Controls.Add(CreateMatchBadge(
             $"Biển số: {(data.PlateMatched ? "KHỚP" : "LỆCH")} ({Blank(data.EntryPlate)} vs {Blank(data.ExitPlate)})",
@@ -113,7 +117,8 @@ public sealed class EvidenceComparisonDialog : Form
         {
             Dock = DockStyle.Fill,
             RowCount = 2,
-            ColumnCount = 2
+            ColumnCount = 2,
+            BackColor = LumiTheme.Canvas
         };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -151,7 +156,8 @@ public sealed class EvidenceComparisonDialog : Form
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.RightToLeft,
-            Padding = new Padding(0, 8, 0, 0)
+            Padding = new Padding(0, 8, 0, 0),
+            BackColor = LumiTheme.Canvas
         };
         var closeBtn = new Button
         {
@@ -190,7 +196,7 @@ public sealed class EvidenceComparisonDialog : Form
             string defaultType = !string.IsNullOrWhiteSpace(currentVehicleType) && currentVehicleType != "UNKNOWN"
                 ? currentVehicleType
                 : (data.EntryVehicleType ?? "UNKNOWN");
-            using var dlg = new ManualOverrideDialog(defaultPlate, defaultType);
+            using var dlg = new ManualOverrideDialog(defaultPlate, defaultType, vehicleTypes);
             if (dlg.ShowDialog(this) == DialogResult.OK)
             {
                 OverrideApplied = true;
@@ -228,6 +234,12 @@ public sealed class EvidenceComparisonDialog : Form
 
         Controls.Add(root);
         CancelButton = closeBtn;
+        LumiTheme.Apply(this);
+        LumiTheme.StyleButton(confirmBtn, primary: true);
+        LumiTheme.StyleButton(overrideBtn);
+        overrideBtn.BackColor = LumiTheme.Warning;
+        overrideBtn.ForeColor = Color.White;
+        overrideBtn.FlatAppearance.BorderColor = LumiTheme.Warning;
     }
 
     private Control BuildEvidenceCard(string title, string? base64Image, string primaryMeta, string secondaryMeta)
@@ -236,7 +248,7 @@ public sealed class EvidenceComparisonDialog : Form
         {
             Text = title,
             Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+            Font = LumiTheme.AppFont(9.5f, FontStyle.Bold),
             Padding = new Padding(8),
             Margin = new Padding(4)
         };
@@ -254,7 +266,7 @@ public sealed class EvidenceComparisonDialog : Form
         {
             Dock = DockStyle.Fill,
             SizeMode = PictureBoxSizeMode.Zoom,
-            BackColor = Color.FromArgb(235, 240, 246),
+            BackColor = LumiTheme.SurfaceSoft,
             Cursor = Cursors.Hand
         };
         Image? decoded = DecodeBase64Image(base64Image);
@@ -270,7 +282,7 @@ public sealed class EvidenceComparisonDialog : Form
                 TextRenderer.DrawText(
                     e.Graphics,
                     "Chưa có ảnh lưu trữ cho mục này",
-                    new Font("Segoe UI", 9.5f, FontStyle.Italic),
+                    LumiTheme.AppFont(9.5f, FontStyle.Italic),
                     picture.ClientRectangle,
                     Color.DimGray,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
@@ -281,16 +293,16 @@ public sealed class EvidenceComparisonDialog : Form
         {
             Text = primaryMeta,
             AutoSize = true,
-            Font = new Font("Segoe UI", 9f, FontStyle.Regular),
-            ForeColor = Color.FromArgb(23, 54, 93),
+            Font = LumiTheme.AppFont(9f),
+            ForeColor = LumiTheme.Ink,
             Margin = new Padding(2, 4, 2, 0)
         };
         var line2 = new Label
         {
             Text = secondaryMeta,
             AutoSize = true,
-            Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
-            ForeColor = Color.DimGray,
+            Font = LumiTheme.AppFont(8.5f),
+            ForeColor = LumiTheme.Muted,
             Margin = new Padding(2, 2, 2, 0)
         };
 

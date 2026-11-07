@@ -10,20 +10,21 @@ public sealed class StationSettingsDialog : Form
 
     public StationSettingsDialog(GateStationSettings current)
     {
-        Text = "Cấu hình trạm gác";
+        Text = "LumiPark - Cấu hình trạm gác";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(560, 330);
-        Font = new Font("Segoe UI", 10);
+        ClientSize = new Size(620, 400);
+        Font = LumiTheme.AppFont();
+        BackColor = LumiTheme.Canvas;
 
         _vehicleSource.Text = current.VehicleCameraSource;
         _faceSource.Text = current.FaceCameraSource;
         _frameCount.Value = current.CameraFrameCount;
         _autoClose.Value = current.BarrierAutoCloseSeconds;
 
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), RowCount = 7, ColumnCount = 2 };
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(28, 24, 28, 22), RowCount = 7, ColumnCount = 2, BackColor = LumiTheme.Surface, Margin = new Padding(22) };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.Controls.Add(new Label { Text = "Camera xe", AutoSize = true }, 0, 0);
@@ -50,6 +51,8 @@ public sealed class StationSettingsDialog : Form
         Controls.Add(root);
         AcceptButton = save;
         CancelButton = cancel;
+        LumiTheme.Apply(this);
+        LumiTheme.StyleButton(save, primary: true);
     }
 
     private void SaveClicked(object? sender, EventArgs e)

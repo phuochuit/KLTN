@@ -4,16 +4,17 @@ public sealed class ShiftSummaryDialog : Form
 {
     public ShiftSummaryDialog(ShiftSummary summary, int offlineQueueCount, bool previous)
     {
-        Text = previous ? "Tổng kết ca trước" : "Tổng kết ca hiện tại";
+        Text = previous ? "LumiPark - Tổng kết ca trước" : "LumiPark - Tổng kết ca hiện tại";
         StartPosition = FormStartPosition.CenterParent;
         MinimumSize = new Size(620, 650);
         Size = new Size(680, 720);
-        Font = new Font("Segoe UI", 10);
-        BackColor = Color.White;
+        Font = LumiTheme.AppFont();
+        BackColor = LumiTheme.Canvas;
 
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
-            Padding = new Padding(24), AutoScroll = true
+            Padding = new Padding(30, 26, 30, 24), AutoScroll = true,
+            BackColor = LumiTheme.Surface
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -21,8 +22,8 @@ public sealed class ShiftSummaryDialog : Form
 
         root.Controls.Add(new Label {
             Text = previous ? "BÁO CÁO BÀN GIAO CA TRƯỚC" : "BÁO CÁO CA HIỆN TẠI",
-            AutoSize = true, Font = new Font("Segoe UI", 16, FontStyle.Bold),
-            ForeColor = Color.FromArgb(23, 54, 93), Margin = new Padding(0, 0, 0, 18)
+            AutoSize = true, Font = LumiTheme.AppFont(17, FontStyle.Bold),
+            ForeColor = LumiTheme.Primary, Margin = new Padding(0, 0, 0, 18)
         }, 0, 0);
 
         var details = new TableLayoutPanel {
@@ -61,6 +62,8 @@ public sealed class ShiftSummaryDialog : Form
         root.Controls.Add(close, 0, 2);
         Controls.Add(root);
         AcceptButton = close;
+        LumiTheme.Apply(this);
+        LumiTheme.StyleButton(close, primary: true);
     }
 
     private static string Money(decimal value) => $"{value:N0} đ";
@@ -71,11 +74,11 @@ public sealed class ShiftSummaryDialog : Form
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         table.Controls.Add(new Label {
             Text = label, AutoSize = true, Dock = DockStyle.Fill,
-            Padding = new Padding(10), Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            Padding = new Padding(12), Font = LumiTheme.AppFont(10, FontStyle.Bold)
         }, 0, row);
         table.Controls.Add(new Label {
             Text = value, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(10),
-            ForeColor = warning ? Color.Firebrick : Color.FromArgb(23, 54, 93)
+            ForeColor = warning ? LumiTheme.Danger : LumiTheme.Ink
         }, 1, row);
     }
 }

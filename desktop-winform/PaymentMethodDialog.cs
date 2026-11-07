@@ -16,13 +16,14 @@ public sealed class PaymentMethodDialog : Form
 
     public PaymentMethodDialog(string plate, decimal fee)
     {
-        Text = "Thu phí xe ra";
+        Text = "LumiPark - Thu phí xe ra";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(370, 230);
-        Font = new Font("Segoe UI", 10);
+        ClientSize = new Size(460, 320);
+        Font = LumiTheme.AppFont();
+        BackColor = LumiTheme.Canvas;
 
         _method.Items.Add(new PaymentOption("CASH", "Tiền mặt", false));
         _method.Items.Add(new PaymentOption("BANK_TRANSFER", "Chuyển khoản", true));
@@ -33,9 +34,11 @@ public sealed class PaymentMethodDialog : Form
         _method.SelectedIndexChanged += OnMethodChanged;
 
         _fee.Text = $"Biển số: {plate}\r\nPhí thu: {fee:N0} đ";
-        var feePanel = new Panel { Height = 55, Dock = DockStyle.Top };
+        _fee.Font = LumiTheme.AppFont(12f, FontStyle.Bold);
+        _fee.ForeColor = LumiTheme.Primary;
+        var feePanel = new Panel { Height = 76, Dock = DockStyle.Top, BackColor = LumiTheme.SurfaceSoft, Padding = new Padding(18, 12, 18, 10) };
         feePanel.Controls.Add(_fee);
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(18), RowCount = 5, ColumnCount = 2 };
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24, 90, 24, 20), RowCount = 5, ColumnCount = 2, BackColor = LumiTheme.Surface };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 115));
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.Controls.Add(new Label { Text = "Hình thức thu", AutoSize = true }, 0, 0);
@@ -60,6 +63,8 @@ public sealed class PaymentMethodDialog : Form
         AcceptButton = save;
         CancelButton = cancel;
         OnMethodChanged(this, EventArgs.Empty);
+        LumiTheme.Apply(this);
+        LumiTheme.StyleButton(save, primary: true);
     }
 
     private void OnMethodChanged(object? sender, EventArgs e)

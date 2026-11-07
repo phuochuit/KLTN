@@ -12,15 +12,16 @@ public sealed class ManualOverrideDialog : Form
     public string CorrectedPlate => _plate.Text.Trim();
     public string CorrectedVehicleType => (_vehicleType.SelectedItem as VehicleTypeOption)?.Code ?? "UNKNOWN";
 
-    public ManualOverrideDialog(string currentPlate, string currentVehicleType)
+    public ManualOverrideDialog(string currentPlate, string currentVehicleType, IReadOnlyList<VehicleTypeDto>? availableTypes = null)
     {
-        Text = "Xử lý thủ công";
+        Text = "LumiPark - Xử lý thủ công";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(390, 450);
-        Font = new Font("Segoe UI", 10);
+        ClientSize = new Size(460, 560);
+        Font = LumiTheme.AppFont();
+        BackColor = LumiTheme.Canvas;
 
         _reason.Items.AddRange(new object[] {
             new ReasonOption("PLATE_NOT_DETECTED", "Không đọc được biển số"),
@@ -32,21 +33,23 @@ public sealed class ManualOverrideDialog : Form
         });
         _reason.SelectedIndex = string.IsNullOrWhiteSpace(currentPlate) ? 0 : 1;
         _plate.Text = currentPlate;
-        _vehicleType.Items.AddRange(new object[] {
-            new VehicleTypeOption("BICYCLE_ELECTRIC_BICYCLE", "Xe đạp / xe đạp điện"),
-            new VehicleTypeOption("MOTORBIKE", "Xe máy / xe máy điện thông thường"),
-            new VehicleTypeOption("LARGE_MOTORBIKE", "Xe mô tô phân khối lớn"),
-            new VehicleTypeOption("CAR", "Ô tô 4-5 chỗ"),
-            new VehicleTypeOption("CAR_6_7", "Ô tô 6-7 chỗ"),
-            new VehicleTypeOption("CAR_8_9", "Ô tô 8-9 chỗ"),
-            new VehicleTypeOption("UNKNOWN", "Không xác định")
-        });
+        bool currentIsCar = currentVehicleType.StartsWith("CAR", StringComparison.OrdinalIgnoreCase);
+        var dynamicOptions = (availableTypes ?? Array.Empty<VehicleTypeDto>())
+            .Where(type => type.Active)
+            .Where(type => currentVehicleType == "UNKNOWN"
+                || (type.Category.Contains("CAR", StringComparison.OrdinalIgnoreCase)
+                    || type.Code.StartsWith("CAR", StringComparison.OrdinalIgnoreCase)) == currentIsCar)
+            .Select(type => new VehicleTypeOption(type.Code, type.DisplayName))
+            .ToArray();
+        if (dynamicOptions.Length > 0)
+            _vehicleType.Items.AddRange(dynamicOptions);
+        else
+            _vehicleType.Items.Add(new VehicleTypeOption(currentVehicleType, MainForm.DisplayVehicleType(currentVehicleType)));
         int selectedVehicleType = Enumerable.Range(0, _vehicleType.Items.Count)
             .FirstOrDefault(index => string.Equals(
                 (_vehicleType.Items[index] as VehicleTypeOption)?.Code,
                 currentVehicleType, StringComparison.OrdinalIgnoreCase), -1);
-        _vehicleType.SelectedIndex = selectedVehicleType >= 0
-            ? selectedVehicleType : _vehicleType.Items.Count - 1;
+        _vehicleType.SelectedIndex = selectedVehicleType >= 0 ? selectedVehicleType : 0;
 
         var ok = new Button { Text = "Xác nhận xử lý", Width = 145, DialogResult = DialogResult.None };
         var cancel = new Button { Text = "Hủy", Width = 90, DialogResult = DialogResult.Cancel };
@@ -70,7 +73,7 @@ public sealed class ManualOverrideDialog : Form
         buttons.Controls.Add(cancel);
         var layout = new FlowLayoutPanel {
             Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            Padding = new Padding(20), AutoScroll = true
+            Padding = new Padding(28, 24, 28, 22), AutoScroll = true, BackColor = LumiTheme.Surface
         };
         layout.Controls.Add(new Label {
             Text = "Chỉ sử dụng khi kết quả nhận dạng chưa chính xác. Thao tác sẽ được lưu lại để quản lý kiểm tra.",
@@ -88,6 +91,8 @@ public sealed class ManualOverrideDialog : Form
         Controls.Add(layout);
         AcceptButton = ok;
         CancelButton = cancel;
+        LumiTheme.Apply(this);
+        LumiTheme.StyleButton(ok, primary: true);
     }
 
     private sealed record ReasonOption(string Code, string Label)

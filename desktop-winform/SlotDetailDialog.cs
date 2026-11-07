@@ -5,12 +5,12 @@ public sealed class SlotDetailDialog : Form
     private readonly ParkingApiClient _api;
     private readonly ParkingSlotResponse _slot;
 
-    private readonly ComboBox _cboResidentVehicles = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 480 };
-    private readonly ComboBox _cboRecentSessions = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 480 };
+    private readonly ComboBox _cboResidentVehicles = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 720 };
+    private readonly ComboBox _cboRecentSessions = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 720 };
 
-    private readonly TextBox _txtBorrowPlate = new() { Width = 200, CharacterCasing = CharacterCasing.Upper, Font = new Font("Segoe UI", 10f, FontStyle.Bold) };
-    private readonly ComboBox _cboBorrowHours = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140 };
-    private readonly TextBox _txtBorrowNotes = new() { Width = 480 };
+    private readonly TextBox _txtBorrowPlate = new() { Width = 720, CharacterCasing = CharacterCasing.Upper, Font = new Font("Segoe UI", 10f, FontStyle.Bold) };
+    private readonly ComboBox _cboBorrowHours = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 720 };
+    private readonly TextBox _txtBorrowNotes = new() { Width = 720 };
 
     private readonly Label _lblInfoAssigned = new() { AutoSize = true, Font = new Font("Segoe UI", 10f), ForeColor = Color.FromArgb(30, 41, 59), Margin = new Padding(0, 6, 0, 8) };
     private readonly Label _lblInfoOccupied = new() { AutoSize = true, Font = new Font("Segoe UI", 10f), ForeColor = Color.FromArgb(30, 41, 59), Margin = new Padding(0, 0, 0, 8) };
@@ -21,15 +21,17 @@ public sealed class SlotDetailDialog : Form
         _api = api;
         _slot = slot;
 
-        Text = $"Chi tiết & Điều phối vị trí {_slot.SlotCode}";
-        Size = new Size(680, 720);
+        Text = $"LumiPark - Chi tiết vị trí {_slot.SlotCode}";
+        Size = new Size(880, 760);
         StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MinimumSize = new Size(680, 620);
+        MaximizeBox = true;
         MinimizeBox = false;
-        BackColor = Color.White;
+        BackColor = LumiTheme.Canvas;
 
         BuildUi();
+        LumiTheme.Apply(this);
         Shown += async (_, _) => await LoadDataAsync();
     }
 
@@ -40,18 +42,20 @@ public sealed class SlotDetailDialog : Form
             Dock = DockStyle.Fill,
             RowCount = 3,
             ColumnCount = 1,
-            Padding = new Padding(16)
+            Padding = new Padding(20),
+            BackColor = LumiTheme.Canvas
         };
         mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
-        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 195));
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 165));
         mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         // 1. Header
-        var header = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(23, 54, 93), Padding = new Padding(12) };
+        var header = new Panel { Dock = DockStyle.Fill, BackColor = LumiTheme.Primary, Padding = new Padding(16, 12, 16, 12), Margin = new Padding(0, 0, 0, 8) };
+        LumiTheme.Round(header, 14);
         var title = new Label
         {
             Text = $"VỊ TRÍ {_slot.SlotCode} ({_slot.LocationLabel ?? $"{_slot.Floor ?? "Tầng"} - {_slot.ZoneName}"})",
-            Font = new Font("Segoe UI", 13f, FontStyle.Bold),
+            Font = LumiTheme.AppFont(13f, FontStyle.Bold),
             ForeColor = Color.White,
             Dock = DockStyle.Top,
             Height = 28
@@ -59,7 +63,7 @@ public sealed class SlotDetailDialog : Form
         var subtitle = new Label
         {
             Text = $"Trạng thái: {_slot.StatusDescription ?? _slot.Status} | Loại xe: {_slot.VehicleTypeName ?? DisplayAllowedVehicleType(_slot.AllowedVehicleType)}",
-            Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
+            Font = LumiTheme.AppFont(9.5f),
             ForeColor = Color.FromArgb(220, 235, 252),
             Dock = DockStyle.Top,
             Height = 22
@@ -73,8 +77,9 @@ public sealed class SlotDetailDialog : Form
         {
             Text = "Thông tin thực tế ô đỗ",
             Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
-            ForeColor = Color.FromArgb(23, 54, 93),
+            Font = LumiTheme.AppFont(9.5f, FontStyle.Bold),
+            ForeColor = LumiTheme.Ink,
+            BackColor = LumiTheme.Surface,
             Padding = new Padding(14, 10, 14, 10)
         };
         var infoFlow = new FlowLayoutPanel
@@ -83,6 +88,11 @@ public sealed class SlotDetailDialog : Form
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             AutoScroll = false
+        };
+        infoFlow.Resize += (_, _) =>
+        {
+            int width = Math.Max(300, infoFlow.ClientSize.Width - 8);
+            foreach (var label in infoFlow.Controls.OfType<Label>()) label.Width = width;
         };
 
         _lblInfoAssigned.Text = !string.IsNullOrWhiteSpace(_slot.AssignedPlate)
@@ -106,7 +116,7 @@ public sealed class SlotDetailDialog : Form
         mainLayout.Controls.Add(infoBox, 0, 1);
 
         // 3. Action Tabs - Dong bo 100% 4 tabs voi Web
-        var tabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f) };
+        var tabs = new TabControl { Dock = DockStyle.Fill, Font = LumiTheme.AppFont(9.5f) };
         tabs.TabPages.Add(BuildResidentTab());
         tabs.TabPages.Add(BuildBorrowTab());
         tabs.TabPages.Add(BuildGuestTab());
@@ -118,11 +128,11 @@ public sealed class SlotDetailDialog : Form
 
     private TabPage BuildResidentTab()
     {
-        var page = new TabPage("Gán xe cư dân") { Padding = new Padding(14) };
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        var page = new TabPage("Gán xe") { Padding = new Padding(14) };
+        var flow = ResponsiveFlow();
 
         flow.Controls.Add(new Label { Text = "Chọn xe cư dân chưa có vị trí đỗ (Quy tắc 1 xe - 1 ô):", AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) });
-        flow.Controls.Add(_cboResidentVehicles);
+        flow.Controls.Add(LumiTheme.InputFrame(_cboResidentVehicles, 760));
 
         var hint = new Label
         {
@@ -147,19 +157,19 @@ public sealed class SlotDetailDialog : Form
 
     private TabPage BuildBorrowTab()
     {
-        var page = new TabPage("Đỗ nhờ (Hàng xóm)") { Padding = new Padding(14) };
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        var page = new TabPage("Đỗ nhờ") { Padding = new Padding(14) };
+        var flow = ResponsiveFlow();
 
         flow.Controls.Add(new Label { Text = "Biển số xe đỗ nhờ (Xe B):", AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) });
-        flow.Controls.Add(_txtBorrowPlate);
+        flow.Controls.Add(LumiTheme.InputFrame(_txtBorrowPlate, 760));
 
         flow.Controls.Add(new Label { Text = "Thời gian cho phép đậu nhờ:", AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold), Margin = new Padding(0, 8, 0, 0) });
         _cboBorrowHours.Items.AddRange(new object[] { "1 giờ", "2 giờ", "4 giờ", "8 giờ", "12 giờ", "24 giờ", "48 giờ" });
         _cboBorrowHours.SelectedIndex = 1;
-        flow.Controls.Add(_cboBorrowHours);
+        flow.Controls.Add(LumiTheme.InputFrame(_cboBorrowHours, 760));
 
         flow.Controls.Add(new Label { Text = "Ghi chú:", AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold), Margin = new Padding(0, 8, 0, 0) });
-        flow.Controls.Add(_txtBorrowNotes);
+        flow.Controls.Add(LumiTheme.InputFrame(_txtBorrowNotes, 760));
 
         var hint = new Label
         {
@@ -184,11 +194,11 @@ public sealed class SlotDetailDialog : Form
 
     private TabPage BuildGuestTab()
     {
-        var page = new TabPage("Điều phối xe vừa vào") { Padding = new Padding(14) };
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        var page = new TabPage("Điều phối") { Padding = new Padding(14) };
+        var flow = ResponsiveFlow();
 
         flow.Controls.Add(new Label { Text = "Chọn xe vừa quét camera vào trạm (chưa có ô):", AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) });
-        flow.Controls.Add(_cboRecentSessions);
+        flow.Controls.Add(LumiTheme.InputFrame(_cboRecentSessions, 760));
 
         var hint = new Label
         {
@@ -209,8 +219,8 @@ public sealed class SlotDetailDialog : Form
 
     private TabPage BuildManagementTab()
     {
-        var page = new TabPage("Khóa / Giải phóng") { Padding = new Padding(14) };
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+        var page = new TabPage("Quản lý") { Padding = new Padding(14) };
+        var flow = ResponsiveFlow();
 
         bool isBlocked = _slot.StatusOverride == "BLOCKED";
         var btnBlock = CreateBtn(isBlocked ? "✅ MỞ LẠI VỊ TRÍ ĐỖ (BỎ CẤM ĐỖ)" : "🚫 ĐẶT LÀM Ô CẤM ĐỖ / ĐANG BẢO TRÌ",
@@ -398,6 +408,30 @@ public sealed class SlotDetailDialog : Form
         btn.FlatAppearance.BorderSize = 0;
         btn.Click += onClick;
         return btn;
+    }
+
+    private static FlowLayoutPanel ResponsiveFlow()
+    {
+        var flow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true,
+            BackColor = LumiTheme.Surface
+        };
+        void FitInputs()
+        {
+            int scrollbar = flow.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0;
+            int width = Math.Max(280, flow.ClientSize.Width - scrollbar - 10);
+            foreach (Control control in flow.Controls)
+            {
+                if (control.Name == "LumiInputFrame") control.Width = width;
+            }
+        }
+        flow.Resize += (_, _) => FitInputs();
+        flow.ControlAdded += (_, _) => FitInputs();
+        return flow;
     }
 
     private sealed class ComboBoxItem

@@ -21,20 +21,31 @@ public sealed class MainForm : Form
     private readonly System.Windows.Forms.Timer _sessionHeartbeat = new() { Interval = 2000 };
     private readonly System.Windows.Forms.Timer _outboxTimer = new() { Interval = 15000 };
     private readonly System.Windows.Forms.Timer _clockTimer = new() { Interval = 1000 };
+    private readonly System.Windows.Forms.Timer _mapResizeTimer = new() { Interval = 150 };
+    private readonly Label _mapSummary = new()
+    {
+        Dock = DockStyle.Fill,
+        AutoSize = false,
+        Text = "Đang tải số lượng vị trí...",
+        TextAlign = ContentAlignment.MiddleRight,
+        ForeColor = LumiTheme.Ink,
+        Font = LumiTheme.AppFont(9f, FontStyle.Bold),
+        Padding = new Padding(8, 0, 8, 0)
+    };
     private readonly Label _operatorName = new() { AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Color.FromArgb(23, 54, 93) };
     private readonly Label _operatorShift = new() { AutoSize = true, ForeColor = Color.DimGray };
     private readonly Label _currentTime = new() { AutoSize = true, ForeColor = Color.FromArgb(23, 54, 93) };
     private readonly PictureBox _vehiclePreview = PreviewBox();
     private readonly PictureBox _facePreview = PreviewBox();
     private readonly Label _result = new() { Dock = DockStyle.Fill, AutoSize = false, Padding = new Padding(16), Font = new Font("Segoe UI", 10.5f), BorderStyle = BorderStyle.FixedSingle };
-    private readonly Label _aiStatus = new() { Text = "Chọn ảnh hoặc video để đọc biển số", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 12, 0, 0) };
-    private readonly Label _faceStatus = new() { Text = "Chưa chụp khuôn mặt", AutoSize = true, ForeColor = Color.DimGray, Padding = new Padding(8) };
+    private readonly Label _aiStatus = new() { Text = "Chọn ảnh hoặc video để đọc biển số", AutoSize = false, Dock = DockStyle.Fill, Height = 44, ForeColor = Color.DimGray, Margin = new Padding(10, 8, 10, 4), TextAlign = ContentAlignment.MiddleLeft };
+    private readonly Label _faceStatus = new() { Text = "Chưa chụp khuôn mặt", AutoSize = false, Dock = DockStyle.Fill, Height = 44, ForeColor = Color.DimGray, Padding = new Padding(8, 4, 8, 4), TextAlign = ContentAlignment.MiddleLeft };
     private readonly TextBox _entryPlate = PlateBox();
     private readonly CheckBox _entryNoPlate = new() {
         Text = "Xe không có biển số", AutoSize = true, ForeColor = Color.DarkOrange
     };
     private readonly TextBox _exitPlate = PlateBox();
-    private readonly TextBox _vehicleType = new() { Width = 320, ReadOnly = true, Text = "Chưa xác định" };
+    private readonly ComboBox _vehicleType = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Label _residentInfo = new() {
         Width = 320, Height = 95, AutoSize = false, Padding = new Padding(10),
         BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(245, 247, 250),
@@ -78,6 +89,9 @@ public sealed class MainForm : Form
     private string? _exitLinkedSessionId;
     private string _exitLinkedPlate = "";
     private string _entryDetectedType = "UNKNOWN", _exitDetectedType = "UNKNOWN";
+    private string _entryVehicleFamily = "";
+    private List<VehicleTypeDto> _vehicleTypeCatalog = new();
+    private bool _syncingVehicleType;
     private string _savedEntryPlate = "", _savedEntryVehicleType = "UNKNOWN";
     private bool _changingNoPlate;
     private bool _checkingSession;
@@ -93,11 +107,33 @@ public sealed class MainForm : Form
         _faceBorderPanel.Controls.Add(_facePreview);
         _cboExitPaymentMethod.Items.AddRange(new object[] { "Tiền mặt (Tự động)", "Chuyển khoản (Ngân hàng)", "Máy POS / Ví điện tử" });
         _cboExitPaymentMethod.SelectedIndex = 0;
+        _vehicleType.DisplayMember = nameof(VehicleTypeDto.DisplayName);
+        _vehicleType.SelectedIndexChanged += (_, _) =>
+        {
+            if (_syncingVehicleType || _vehicleType.SelectedItem is not VehicleTypeDto selected) return;
+            string selectedFamily = VehicleFamily(selected);
+            if (!string.IsNullOrWhiteSpace(_entryVehicleFamily)
+                    && !string.Equals(selectedFamily, _entryVehicleFamily, StringComparison.OrdinalIgnoreCase))
+                return;
+            _entryDetectedType = selected.Code;
+            _entryVehicleFamily = selectedFamily;
+            _editAiHint.Visible = true;
+            _editAiHint.Text = "Nhân viên đã xác nhận loại xe trong đúng nhóm phương tiện.";
+        };
         _stationSettings = settingsStore.Load();
         _parkingApi.StationSettings = _stationSettings;
         _barrier.StatusChanged += BarrierStatusChanged;
         _parkingApi.OperatorProfileChanged += UpdateOperatorHeader;
-        _mapPanel.Resize += (_, _) => ResizeSlots(_mapPanel);
+        _mapResizeTimer.Tick += (_, _) =>
+        {
+            _mapResizeTimer.Stop();
+            ResizeSlots(_mapPanel);
+        };
+        _mapPanel.Resize += (_, _) =>
+        {
+            _mapResizeTimer.Stop();
+            _mapResizeTimer.Start();
+        };
 
         OnSharedMapUpdated += () => {
             if (!this.IsDisposed && this.IsHandleCreated)
@@ -108,25 +144,35 @@ public sealed class MainForm : Form
             }
         };
 
-        Text = "Trạm gác - Auto Parking";
+        Text = "LumiPark - Trạm gác";
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(1120, 720);
-        Size = new Size(1240, 800);
-        Font = new Font("Segoe UI", 10);
-        BackColor = Color.White;
+        MinimumSize = new Size(900, 650);
+        Size = new Size(1320, 860);
+        Font = LumiTheme.AppFont();
+        BackColor = LumiTheme.Canvas;
 
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Padding = new Padding(16) };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 145));
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Padding = new Padding(22, 18, 22, 14), BackColor = LumiTheme.Canvas };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 136));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
         Controls.Add(root);
         root.Controls.Add(BuildHeader(), 0, 0);
         root.Controls.Add(BuildBody(), 0, 1);
-        var editPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
+        var editPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, BackColor = LumiTheme.Canvas, Padding = new Padding(0, 4, 0, 0) };
         editPanel.Controls.Add(_editAiResult);
         editPanel.Controls.Add(_compareEvidenceBtn);
         editPanel.Controls.Add(_editAiHint);
         root.Controls.Add(editPanel, 0, 2);
+        void ApplyRootResponsiveLayout()
+        {
+            bool compact = ClientSize.Width < 1450;
+            root.RowStyles[0].Height = compact ? 202 : 152;
+            root.Padding = compact
+                ? new Padding(14, 12, 14, 10)
+                : new Padding(22, 18, 22, 14);
+        }
+        Resize += (_, _) => ApplyRootResponsiveLayout();
+        ApplyRootResponsiveLayout();
         _editAiResult.Click += (_, _) => EditAiResult();
         _compareEvidenceBtn.Click += async (_, _) => await OpenEvidenceComparisonAsync();
         _vehiclePreview.Cursor = Cursors.Hand;
@@ -144,7 +190,10 @@ public sealed class MainForm : Form
         this.Shown += async (_, _) =>
         {
             ConfigureApis();
-            await CheckServicesAsync();
+            await Task.Yield();
+            await Task.WhenAll(CheckServicesAsync(refreshMap: false), LoadVehicleTypeCatalogAsync());
+            await Task.Delay(100);
+            await RefreshMapAsync();
             if (_parkingApi.CurrentOperator is not null) UpdateOperatorHeader(_parkingApi.CurrentOperator);
             UpdateClock();
             _clockTimer.Start();
@@ -173,31 +222,58 @@ public sealed class MainForm : Form
             _sessionHeartbeat.Dispose();
             _outboxTimer.Dispose();
             _clockTimer.Dispose();
+            _mapResizeTimer.Dispose();
         };
+        LumiTheme.Apply(this);
     }
 
     private Control BuildHeader()
     {
-        var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true };
-        panel.Controls.Add(new Label { Text = "AUTO PARKING", AutoSize = true, Font = new Font("Segoe UI", 18, FontStyle.Bold), ForeColor = Color.FromArgb(23, 54, 93), Margin = new Padding(0, 8, 25, 0) });
-        panel.Controls.Add(HeaderField("Địa chỉ hệ thống", _parkingUrl));
-        panel.Controls.Add(CreateButton("Kiểm tra", async (_, _) => await CheckServicesAsync()));
-        panel.Controls.Add(CreateButton("Đăng xuất", LogoutClicked));
-        panel.Controls.Add(CreateButton("Sơ đồ bãi", (_, _) => { ConfigureApis(); new ParkingMapForm(_parkingApi).Show(this); }));
-        panel.Controls.Add(CreateButton("Cấu hình trạm", (_, _) => ShowStationSettings()));
-        panel.Controls.Add(CreateButton("MỞ BARRIER", async (_, _) => await SetBarrierAsync(true, "Mở thủ công")));
-        panel.Controls.Add(CreateButton("ĐÓNG BARRIER", async (_, _) => await SetBarrierAsync(false, "Đóng thủ công")));
-        panel.Controls.Add(_barrierState);
-        panel.Controls.Add(_connection);
-        _connection.Margin = new Padding(10, 17, 0, 0);
+        var panel = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 2, BackColor = LumiTheme.Surface, Padding = new Padding(18, 10, 18, 9), Margin = new Padding(0, 0, 0, 10) };
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        LumiTheme.StyleCard(panel);
+
+        var brand = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, BackColor = LumiTheme.Surface };
+        brand.Controls.Add(new Label { Text = "LumiPark", AutoSize = true, Font = LumiTheme.AppFont(21, FontStyle.Bold), ForeColor = LumiTheme.Primary, Margin = new Padding(0, 4, 16, 0) });
+        brand.Controls.Add(new Label { Text = "TRẠM GÁC", AutoSize = true, Font = LumiTheme.AppFont(9.5f, FontStyle.Bold), ForeColor = LumiTheme.Accent, BackColor = LumiTheme.SurfaceSoft, Padding = new Padding(12, 7, 12, 7), Margin = new Padding(0, 7, 0, 0) });
+        panel.Controls.Add(brand, 0, 0);
+
         var operatorPanel = new FlowLayoutPanel {
-            AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            Margin = new Padding(20, 6, 0, 0)
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false,
+            Margin = Padding.Empty, Padding = new Padding(0, 1, 0, 0), BackColor = LumiTheme.Surface
         };
         operatorPanel.Controls.Add(_operatorName);
         operatorPanel.Controls.Add(_operatorShift);
         operatorPanel.Controls.Add(_currentTime);
-        panel.Controls.Add(operatorPanel);
+        _operatorName.Margin = Padding.Empty;
+        _operatorShift.Margin = Padding.Empty;
+        _currentTime.Margin = Padding.Empty;
+        panel.Controls.Add(operatorPanel, 1, 0);
+
+        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = true, AutoScroll = false, BackColor = LumiTheme.Surface, Padding = new Padding(0, 2, 0, 0) };
+        actions.Controls.Add(new Label { Text = "Hệ thống", AutoSize = true, ForeColor = LumiTheme.Muted, Font = LumiTheme.AppFont(8.8f, FontStyle.Bold), Margin = new Padding(0, 13, 7, 0) });
+        actions.Controls.Add(LumiTheme.InputFrame(_parkingUrl, 170));
+        actions.Controls.Add(CreateButton("Kiểm tra", async (_, _) => await CheckServicesAsync()));
+        actions.Controls.Add(CreateButton("Sơ đồ bãi", (_, _) => { ConfigureApis(); new ParkingMapForm(_parkingApi).Show(this); }));
+        actions.Controls.Add(CreateButton("Cấu hình trạm", (_, _) => ShowStationSettings()));
+        actions.Controls.Add(CreateButton("MỞ BARRIER", async (_, _) => await SetBarrierAsync(true, "Mở thủ công")));
+        actions.Controls.Add(CreateButton("ĐÓNG BARRIER", async (_, _) => await SetBarrierAsync(false, "Đóng thủ công")));
+        actions.Controls.Add(CreateButton("Đăng xuất", LogoutClicked));
+        _barrierState.Margin = new Padding(12, 13, 6, 0);
+        _connection.Margin = new Padding(4, 13, 0, 0);
+        actions.Controls.Add(_barrierState);
+        actions.Controls.Add(_connection);
+        panel.Controls.Add(actions, 0, 1);
+        panel.SetColumnSpan(actions, 2);
+        panel.Resize += (_, _) =>
+        {
+            bool compact = panel.ClientSize.Width < 1400;
+            panel.RowStyles[0].Height = 68;
+            panel.RowStyles[1].Height = compact ? 104 : 52;
+        };
         return panel;
     }
 
@@ -220,22 +296,42 @@ public sealed class MainForm : Form
 
     private Control BuildBody()
     {
-        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 570, BackColor = Color.White };
-        var left = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Padding = new Padding(0, 0, 10, 0) };
+        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterWidth = 14, BackColor = LumiTheme.Canvas, BorderStyle = BorderStyle.None };
+        split.Resize += (_, _) =>
+        {
+            if (split.ClientSize.Width < 760) return;
+            bool compact = split.ClientSize.Width < 1320;
+            double ratio = compact ? 0.55 : 0.64;
+            int minLeft = compact ? 380 : 560;
+            int minRight = compact ? 360 : 420;
+            int maximum = split.ClientSize.Width - minRight - split.SplitterWidth;
+            if (maximum < minLeft) return;
+            split.SplitterDistance = Math.Clamp((int)(split.ClientSize.Width * ratio), minLeft, maximum);
+        };
+        split.Panel1.BackColor = LumiTheme.Surface;
+        split.Panel2.BackColor = LumiTheme.Surface;
+        var left = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Padding = new Padding(14), BackColor = LumiTheme.Surface };
         left.RowStyles.Add(new RowStyle(SizeType.Percent, 68));
         left.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
         left.RowStyles.Add(new RowStyle(SizeType.Percent, 32));
         left.Controls.Add(BuildCapturePreviews(), 0, 0);
-        var media = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.LeftToRight };
+        var media = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, FlowDirection = FlowDirection.LeftToRight, BackColor = LumiTheme.Surface };
         media.Controls.Add(CreateButton("XỬ LÝ SONG SONG", async (_, _) => await SelectAndProcessParallelAsync()));
         media.Controls.Add(new Label { Text = "Media xe và camera mặt sẽ chạy đồng thời", AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(10, 17, 0, 0) });
         left.Controls.Add(media, 0, 1);
-        var mapBox=new GroupBox{Text="Sơ đồ vị trí đỗ",Dock=DockStyle.Fill};mapBox.Controls.Add(_mapPanel);left.Controls.Add(mapBox,0,2);
+        var mapBox = new GroupBox { Text = "Sơ đồ vị trí đỗ", Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var mapLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
+        mapLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        mapLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        mapLayout.Controls.Add(_mapSummary, 0, 0);
+        mapLayout.Controls.Add(_mapPanel, 0, 1);
+        mapBox.Controls.Add(mapLayout);
+        left.Controls.Add(mapBox, 0, 2);
         split.Panel1.Controls.Add(left);
 
-        var right = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1, Padding = new Padding(10, 0, 0, 0) };
-        right.RowStyles.Add(new RowStyle(SizeType.Percent, 70));
-        right.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
+        var right = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1, Padding = new Padding(14), BackColor = LumiTheme.Surface };
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        right.RowStyles.Add(new RowStyle(SizeType.Absolute, 160));
         _tabs.TabPages.Add(BuildEntryTab());
         _tabs.TabPages.Add(BuildExitTab());
         right.Controls.Add(_tabs, 0, 0);
@@ -272,8 +368,7 @@ public sealed class MainForm : Form
                 _savedEntryPlate = _entryPlate.Text;
                 _savedEntryVehicleType = _entryDetectedType;
                 _entryPlate.Text = "";
-                _entryDetectedType = "BICYCLE_ELECTRIC_BICYCLE";
-                _vehicleType.Text = DisplayVehicleType(_entryDetectedType);
+                SetEntryVehicleType("BICYCLE_ELECTRIC_BICYCLE");
                 _residentInfo.Text = "XE KHÔNG BIỂN SỐ\r\nBắt buộc ảnh xe và khuôn mặt; hệ thống sẽ sinh mã lượt NPL.";
                 _residentInfo.BackColor = Color.FromArgb(255, 247, 230);
             }
@@ -283,13 +378,12 @@ public sealed class MainForm : Form
                     _entryPlate.Text = _savedEntryPlate;
                 if (_savedEntryVehicleType != "UNKNOWN")
                 {
-                    _entryDetectedType = _savedEntryVehicleType;
-                    _vehicleType.Text = DisplayVehicleType(_entryDetectedType);
+                    SetEntryVehicleType(_savedEntryVehicleType);
                 }
             }
         };
         flow.Controls.Add(_entryNoPlate);
-        flow.Controls.Add(Field("Loại xe nhận dạng", _vehicleType));
+        flow.Controls.Add(ComboField("Loại xe nhân viên xác nhận", _vehicleType));
         flow.Controls.Add(CreateButton("TRA CỨU CƯ DÂN", async (_, _) => await LookupResidentAsync()));
         flow.Controls.Add(ComboField("Người đang điều khiển", _entryMember));
         flow.Controls.Add(new Label { Text = "Cư dân / gói gửi xe", AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold) });
@@ -390,14 +484,12 @@ public sealed class MainForm : Form
     private void ApplyRecognition(AnprResponse response, TimeSpan elapsed)
     {
         if (_tabs.SelectedIndex == 0) {
-            if (!_entryNoPlate.Checked) _entryDetectedType = response.VehicleType;
+            if (!_entryNoPlate.Checked) SetEntryVehicleFamilyFromRecognition(response.VehicleType);
             _entryVehicleEvidenceId = response.EvidenceId ?? "";
         } else {
             _exitDetectedType = response.VehicleType;
             _exitVehicleEvidenceId = response.EvidenceId ?? "";
         }
-        _vehicleType.Text = DisplayVehicleType(
-            _tabs.SelectedIndex == 0 ? _entryDetectedType : _exitDetectedType);
         if (_tabs.SelectedIndex == 0) _entryPlate.Text = response.PlateText;
         else _exitPlate.Text = response.PlateText;
         if (!string.IsNullOrWhiteSpace(response.AnnotatedImageBase64))
@@ -413,8 +505,8 @@ public sealed class MainForm : Form
         _aiStatus.Text = string.IsNullOrWhiteSpace(response.PlateText)
             ? $"Chưa đọc rõ biển số ({elapsed.TotalSeconds:0.00}s). Vui lòng chụp lại hoặc nhập thủ công."
             : response.VehicleType == "UNKNOWN"
-                ? $"Đã đọc biển số {response.PlateText}. Chưa xác định được loại xe, vui lòng chọn lại."
-                : $"Đã đọc biển số {response.PlateText} | {DisplayVehicleType(response.VehicleType)} | {elapsed.TotalSeconds:0.00}s";
+                ? $"Đã đọc biển số {response.PlateText}. Chưa xác định được nhóm xe, vui lòng chọn loại xe."
+                : $"Đã đọc biển số {response.PlateText} | Đã xác định {DisplayVehicleFamily(response.VehicleType)}, vui lòng xác nhận loại xe | {elapsed.TotalSeconds:0.00}s";
         if (response.Quality?.Warnings != null && response.Quality.Warnings.Count > 0)
         {
             var msgs = response.Quality.Warnings
@@ -442,7 +534,7 @@ public sealed class MainForm : Form
         UpdateManualEditState();
     }
 
-    private async Task CheckServicesAsync()
+    private async Task CheckServicesAsync(bool refreshMap = true)
     {
         try
         {
@@ -456,7 +548,7 @@ public sealed class MainForm : Form
                     : "Hệ thống chưa sẵn sàng";
             _connection.ForeColor = pending > 0 ? Color.DarkOrange
                 : checks.All(x => x) ? Color.SeaGreen : Color.Firebrick;
-            if(checks.All(x=>x)) await RefreshMapAsync();
+            if (refreshMap && checks.All(x => x)) await RefreshMapAsync();
         }
         catch (Exception ex) { ShowError(ex); }
     }
@@ -540,9 +632,8 @@ public sealed class MainForm : Form
             if(entry){_entryFaceVerified=false;_entryFaceSimilarity=null;_entryVerifiedMemberId=null;}else{_exitFaceVerified=false;_exitFaceSimilarity=null;_exitVerifiedMemberId=null;}
             if (resident.Registered && !string.IsNullOrWhiteSpace(resident.VehicleType))
             {
-                if (entry) _entryDetectedType = resident.VehicleType;
+                if (entry) SetEntryVehicleType(resident.VehicleType);
                 else _exitDetectedType = resident.VehicleType;
-                _vehicleType.Text = DisplayVehicleType(resident.VehicleType);
             }
             _residentInfo.BackColor = resident.Registered && resident.CardMatched
                 ? Color.FromArgb(234, 245, 239) : Color.FromArgb(255, 247, 230);
@@ -848,14 +939,14 @@ public sealed class MainForm : Form
         }
         string plate = entry ? _entryPlate.Text : _exitPlate.Text;
         string vehicleType = entry ? _entryDetectedType : _exitDetectedType;
-        using var dialog = new ManualOverrideDialog(plate, vehicleType);
+        string family = entry ? _entryVehicleFamily : VehicleFamily(vehicleType);
+        using var dialog = new ManualOverrideDialog(plate, vehicleType, VehicleTypesForFamily(family));
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
         if (entry) {
             _entryPlate.Text = dialog.CorrectedPlate;
-            _entryDetectedType = dialog.CorrectedVehicleType;
+            SetEntryVehicleType(dialog.CorrectedVehicleType);
             _entryOverrideReasonCode = dialog.ReasonCode;
             _entryOverrideReasonText = dialog.ReasonText;
-            _vehicleType.Text = DisplayVehicleType(_entryDetectedType);
         } else {
             _exitPlate.Text = dialog.CorrectedPlate;
             _exitDetectedType = dialog.CorrectedVehicleType;
@@ -888,16 +979,16 @@ public sealed class MainForm : Form
             string currentType = entry ? _entryDetectedType : _exitDetectedType;
             var comparison = await CompareEvidenceAsync(entry, plate, currentType, sessionId);
             bool hasActiveShift = _activeShiftId.HasValue || _parkingApi.CurrentOperator?.ActiveShift is not null;
-            using var dlg = new EvidenceComparisonDialog(comparison, hasActiveShift, plate, currentType);
+            string family = entry ? _entryVehicleFamily : VehicleFamily(currentType);
+            using var dlg = new EvidenceComparisonDialog(comparison, hasActiveShift, plate, currentType, VehicleTypesForFamily(family));
             if (dlg.ShowDialog(this) == DialogResult.OK && dlg.OverrideApplied)
             {
                 if (entry)
                 {
                     _entryPlate.Text = dlg.CorrectedPlate;
-                    _entryDetectedType = dlg.CorrectedVehicleType;
+                    SetEntryVehicleType(dlg.CorrectedVehicleType);
                     _entryOverrideReasonCode = dlg.OverrideReasonCode;
                     _entryOverrideReasonText = dlg.OverrideReasonText;
-                    _vehicleType.Text = DisplayVehicleType(_entryDetectedType);
                 }
                 else
                 {
@@ -977,11 +1068,42 @@ public sealed class MainForm : Form
 
     private async Task CaptureFaceSnapshotAsync(bool entry){try{SetFaceBusy(true,"Đang chụp khuôn mặt...");ConfigureApis();var r=await _parkingApi.CaptureCameraAsync(entry?"ENTRY":"EXIT");if(entry)_entryFaceEvidenceId=r.EvidenceId??"";else _exitFaceEvidenceId=r.EvidenceId??"";_latestFaceImageBase64="data:image/jpeg;base64,"+r.RealtimeImageBase64;if(entry)_entryGuestFaceBase64=_latestFaceImageBase64;ShowCapturedFace(r);_faceStatus.Text="Đã chụp khuôn mặt; đang chờ đối chiếu";_faceStatus.ForeColor=Color.SeaGreen;}catch(Exception ex){ShowFaceError(ex);}finally{SetFaceBusy(false,_faceStatus.Text);}}
     private void ShowCapturedFace(FaceVerificationResponse r){if(string.IsNullOrWhiteSpace(r.RealtimeImageBase64))return;using var ms=new MemoryStream(Convert.FromBase64String(r.RealtimeImageBase64));using var img=Image.FromStream(ms);_facePreview.Image?.Dispose();_facePreview.Image=new Bitmap(img);}
-        private async Task RefreshMapAsync()
+    private async Task RefreshMapAsync()
     {
         try
         {
+            if (!_mapPanel.Controls.OfType<SlotControl>().Any())
+            {
+                _mapPanel.Controls.Clear();
+                _mapPanel.Controls.Add(new Label
+                {
+                    Text = "Đang tải sơ đồ tổng quan...",
+                    AutoSize = true,
+                    ForeColor = LumiTheme.Muted,
+                    Font = LumiTheme.AppFont(9.5f, FontStyle.Bold),
+                    Margin = new Padding(12)
+                });
+                await Task.Yield();
+            }
             var items = await _parkingApi.GetSlotsAsync();
+            int availableCount = items.Count(item => item.Status == "AVAILABLE");
+            int occupiedCount = items.Count(item => !string.IsNullOrWhiteSpace(item.OccupiedPlate)
+                || item.Status.StartsWith("OCCUPIED", StringComparison.OrdinalIgnoreCase));
+            int attentionCount = items.Count(NeedsAttention);
+            _mapSummary.Text = $"Còn trống: {availableCount}/{items.Count}   •   Đang sử dụng: {occupiedCount}   •   Cần chú ý: {attentionCount}";
+
+            var visibleItems = items
+                .Where(item => item.Status != "AVAILABLE")
+                .OrderByDescending(NeedsAttention)
+                .ThenByDescending(item => item.OccupiedEntryTime ?? DateTime.MinValue)
+                .ThenBy(item => item.SlotCode, StringComparer.OrdinalIgnoreCase)
+                .Take(30)
+                .ToList();
+            foreach (var loading in _mapPanel.Controls.Cast<Control>().Where(c => c is not SlotControl).ToList())
+            {
+                _mapPanel.Controls.Remove(loading);
+                loading.Dispose();
+            }
             var existing = _mapPanel.Controls.OfType<SlotControl>()
                 .Where(c => c.Slot != null)
                 .GroupBy(c => c.Slot!.SlotCode, StringComparer.OrdinalIgnoreCase)
@@ -993,7 +1115,8 @@ public sealed class MainForm : Form
             _mapPanel.SuspendLayout();
             try
             {
-                foreach (var item in items)
+                var newControls = new List<Control>();
+                foreach (var item in visibleItems)
                 {
                     incoming.Add(item.SlotCode);
                     if (existing.TryGetValue(item.SlotCode, out var control))
@@ -1012,13 +1135,26 @@ public sealed class MainForm : Form
                             NotifyMapUpdated();
                         }
                     };
-                    _mapPanel.Controls.Add(slot);
+                    newControls.Add(slot);
                 }
+                if (newControls.Count > 0) _mapPanel.Controls.AddRange(newControls.ToArray());
 
                 foreach (var stale in existing.Where(kv => !incoming.Contains(kv.Key)).Select(kv => kv.Value).ToList())
                 {
                     _mapPanel.Controls.Remove(stale);
                     stale.Dispose();
+                }
+
+                if (visibleItems.Count == 0)
+                {
+                    _mapPanel.Controls.Add(new Label
+                    {
+                        Text = "Hiện không có vị trí nào cần theo dõi.",
+                        AutoSize = true,
+                        ForeColor = LumiTheme.Good,
+                        Font = LumiTheme.AppFont(9.5f, FontStyle.Bold),
+                        Margin = new Padding(12)
+                    });
                 }
 
                 ResizeSlots(_mapPanel);
@@ -1032,6 +1168,10 @@ public sealed class MainForm : Form
         }
         catch { }
     }
+
+    private static bool NeedsAttention(ParkingSlotResponse slot) =>
+        slot.Overdue || slot.Status is "OVERDUE_ALERT" or "OCCUPIED_MISMATCH" or "BLOCKED"
+            or "OCCUPIED_BORROWED" or "RESERVED_BORROWED";
 
     private void ResizeSlots(FlowLayoutPanel panel)
     {
@@ -1214,8 +1354,7 @@ public sealed class MainForm : Form
         _entryNoPlate.Checked = false;
         _entryPlate.ReadOnly = false;
         _entryPlate.Text = "";
-        _vehicleType.Text = "UNKNOWN";
-        _entryDetectedType = "UNKNOWN";
+        SetEntryVehicleType("UNKNOWN", requireSelection: true);
         _vehiclePreview.Image?.Dispose();
         _vehiclePreview.Image = null;
         _facePreview.Image?.Dispose();
@@ -1247,7 +1386,6 @@ public sealed class MainForm : Form
         _exitPlate.Text = "";
         _exitLinkedSessionId = null;
         _exitLinkedPlate = "";
-        _vehicleType.Text = "UNKNOWN";
         _exitDetectedType = "UNKNOWN";
         _vehiclePreview.Image?.Dispose();
         _vehiclePreview.Image = null;
@@ -1357,8 +1495,9 @@ public sealed class MainForm : Form
         var split = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
         split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        var vehicleLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1 };
+        var vehicleLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 4, ColumnCount = 1 };
         vehicleLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        vehicleLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         vehicleLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         vehicleLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         vehicleLayout.Controls.Add(_vehiclePreview, 0, 0);
@@ -1386,6 +1525,37 @@ public sealed class MainForm : Form
         face.Controls.Add(faceLayout);
         split.Controls.Add(vehicle, 0, 0);
         split.Controls.Add(face, 1, 0);
+        bool stacked = false;
+        split.Resize += (_, _) =>
+        {
+            bool shouldStack = split.ClientSize.Width < 720;
+            if (shouldStack == stacked) return;
+            stacked = shouldStack;
+            split.SuspendLayout();
+            split.ColumnStyles.Clear();
+            split.RowStyles.Clear();
+            if (stacked)
+            {
+                split.ColumnCount = 1;
+                split.RowCount = 2;
+                split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                split.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+                split.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+                split.SetCellPosition(vehicle, new TableLayoutPanelCellPosition(0, 0));
+                split.SetCellPosition(face, new TableLayoutPanelCellPosition(0, 1));
+            }
+            else
+            {
+                split.ColumnCount = 2;
+                split.RowCount = 1;
+                split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+                split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+                split.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                split.SetCellPosition(vehicle, new TableLayoutPanelCellPosition(0, 0));
+                split.SetCellPosition(face, new TableLayoutPanelCellPosition(1, 0));
+            }
+            split.ResumeLayout(true);
+        };
         return split;
     }
     private static PictureBox PreviewBox() => new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.FromArgb(235, 240, 246) };
@@ -1400,6 +1570,76 @@ public sealed class MainForm : Form
         "" or "UNKNOWN" => "Chưa xác định",
         _ => type!
     };
+
+    private async Task LoadVehicleTypeCatalogAsync()
+    {
+        var types = await _parkingApi.GetVehicleTypesAsync();
+        _vehicleTypeCatalog = types
+            .Where(type => type.Active)
+            .Select(type => type with
+            {
+                DisplayName = type.Code is "CAR" or "CAR_6_7" or "CAR_8_9"
+                    ? DisplayVehicleType(type.Code)
+                    : type.DisplayName
+            })
+            .ToList();
+        SetEntryVehicleType(_entryDetectedType, _entryDetectedType == "UNKNOWN");
+    }
+
+    private void SetEntryVehicleFamilyFromRecognition(string? detectedCode)
+    {
+        _entryVehicleFamily = VehicleFamily(detectedCode);
+        _entryDetectedType = "UNKNOWN";
+        PopulateEntryVehicleTypes(_entryVehicleFamily, null);
+    }
+
+    private void SetEntryVehicleType(string? code, bool requireSelection = false)
+    {
+        string normalized = string.IsNullOrWhiteSpace(code) ? "UNKNOWN" : code.Trim();
+        var catalogType = _vehicleTypeCatalog.FirstOrDefault(type =>
+            string.Equals(type.Code, normalized, StringComparison.OrdinalIgnoreCase));
+        _entryVehicleFamily = catalogType is null ? VehicleFamily(normalized) : VehicleFamily(catalogType);
+        _entryDetectedType = requireSelection ? "UNKNOWN" : normalized;
+        PopulateEntryVehicleTypes(_entryVehicleFamily, requireSelection ? null : normalized);
+    }
+
+    private void PopulateEntryVehicleTypes(string family, string? selectedCode)
+    {
+        _syncingVehicleType = true;
+        try
+        {
+            _vehicleType.Items.Clear();
+            var options = _vehicleTypeCatalog
+                .Where(type => string.IsNullOrWhiteSpace(family)
+                    || string.Equals(VehicleFamily(type), family, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(type => type.DisplayName)
+                .ToList();
+            foreach (var option in options) _vehicleType.Items.Add(option);
+            int selectedIndex = options.FindIndex(type =>
+                string.Equals(type.Code, selectedCode, StringComparison.OrdinalIgnoreCase));
+            _vehicleType.SelectedIndex = selectedIndex;
+        }
+        finally { _syncingVehicleType = false; }
+    }
+
+    private static string VehicleFamily(VehicleTypeDto type) =>
+        type.Category.Contains("CAR", StringComparison.OrdinalIgnoreCase)
+            || type.Code.StartsWith("CAR", StringComparison.OrdinalIgnoreCase)
+                ? "CAR" : "TWO_WHEEL";
+
+    private static string VehicleFamily(string? code) =>
+        (code ?? "").StartsWith("CAR", StringComparison.OrdinalIgnoreCase) ? "CAR"
+            : string.IsNullOrWhiteSpace(code) || string.Equals(code, "UNKNOWN", StringComparison.OrdinalIgnoreCase) ? ""
+            : "TWO_WHEEL";
+
+    private static string DisplayVehicleFamily(string? code) =>
+        VehicleFamily(code) == "CAR" ? "nhóm ô tô" : "nhóm xe hai bánh";
+
+    private IReadOnlyList<VehicleTypeDto> VehicleTypesForFamily(string family) =>
+        _vehicleTypeCatalog
+            .Where(type => string.IsNullOrWhiteSpace(family)
+                || string.Equals(VehicleFamily(type), family, StringComparison.OrdinalIgnoreCase))
+            .ToList();
     private static string DisplayFaceDecision(string decision) => decision switch
     {
         "PASS" => "ĐẠT - được phép tiếp tục",
@@ -1410,7 +1650,31 @@ public sealed class MainForm : Form
     private static TextBox PlateBox() => new() { Width = 320, CharacterCasing = CharacterCasing.Upper };
     private static string NormalizePlate(string value) => new(value.ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
     private static string Blank(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
-    private static FlowLayoutPanel FormFlow() => new() { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+    private static FlowLayoutPanel FormFlow()
+    {
+        var flow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true,
+            Padding = new Padding(14, 12, 14, 10),
+            BackColor = LumiTheme.Surface
+        };
+        void FitControls()
+        {
+            int scrollbar = flow.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0;
+            int width = Math.Max(260, flow.ClientSize.Width - flow.Padding.Horizontal - scrollbar - 8);
+            foreach (Control control in flow.Controls)
+            {
+                if (control is Button || control.AutoSize && control is CheckBox) continue;
+                control.Width = width;
+            }
+        }
+        flow.Resize += (_, _) => FitControls();
+        flow.ControlAdded += (_, _) => FitControls();
+        return flow;
+    }
 
     private static Control HeaderField(string title, TextBox textBox)
     {
@@ -1422,16 +1686,28 @@ public sealed class MainForm : Form
 
     private static Control Field(string title, TextBox textBox)
     {
-        var panel = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 12) };
-        panel.Controls.Add(new Label { Text = title, AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold) });
-        panel.Controls.Add(textBox);
+        var panel = new TableLayoutPanel { ColumnCount = 1, RowCount = 2, Width = 320, Height = 72, Margin = new Padding(0, 0, 0, 8) };
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        panel.Controls.Add(new Label { Text = title, AutoSize = true, Font = LumiTheme.AppFont(9.5f, FontStyle.Bold), ForeColor = LumiTheme.Ink }, 0, 0);
+        var inputFrame = LumiTheme.InputFrame(textBox);
+        inputFrame.Dock = DockStyle.Fill;
+        inputFrame.Margin = Padding.Empty;
+        panel.Controls.Add(inputFrame, 0, 1);
         return panel;
     }
 
     private static Control ComboField(string title, ComboBox combo)
     {
-        var panel=new FlowLayoutPanel{FlowDirection=FlowDirection.TopDown,AutoSize=true,WrapContents=false,Margin=new Padding(0,0,0,12)};
-        panel.Controls.Add(new Label{Text=title,AutoSize=true,Font=new Font("Segoe UI",10,FontStyle.Bold)});panel.Controls.Add(combo);return panel;
+        var panel = new TableLayoutPanel { ColumnCount = 1, RowCount = 2, Width = 320, Height = 72, Margin = new Padding(0, 0, 0, 8) };
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 27));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        panel.Controls.Add(new Label { Text = title, AutoSize = true, Font = LumiTheme.AppFont(9.5f, FontStyle.Bold), ForeColor = LumiTheme.Ink }, 0, 0);
+        var inputFrame = LumiTheme.InputFrame(combo);
+        inputFrame.Dock = DockStyle.Fill;
+        inputFrame.Margin = Padding.Empty;
+        panel.Controls.Add(inputFrame, 0, 1);
+        return panel;
     }
 
     private static Button CreateButton(string text, EventHandler onClick)

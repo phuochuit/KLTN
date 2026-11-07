@@ -18,16 +18,16 @@ public sealed class ToastForm : Form
         StartPosition = FormStartPosition.Manual;
         ShowInTaskbar = false;
         TopMost = true;
-        BackColor = warning ? Color.FromArgb(180, 83, 9) : Color.FromArgb(22, 101, 52);
+        BackColor = warning ? LumiTheme.Warning : LumiTheme.Good;
         ForeColor = Color.White;
-        Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+        Font = LumiTheme.AppFont(10f, FontStyle.Bold);
 
         var area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1024, 768);
-        int width = Math.Min(440, Math.Max(280, area.Width - 48));
-        var size = TextRenderer.MeasureText(message, Font, new Size(width - 36, int.MaxValue),
+        int width = Math.Min(460, Math.Max(300, area.Width - 48));
+        var size = TextRenderer.MeasureText(message, Font, new Size(width - 48, int.MaxValue),
             TextFormatFlags.WordBreak);
         Width = width;
-        Height = Math.Max(76, size.Height + 32);
+        Height = Math.Max(82, size.Height + 38);
         Location = new Point(area.Right - Width - 24, area.Bottom - Height - 24);
 
         Controls.Add(new Label
@@ -36,8 +36,10 @@ public sealed class ToastForm : Form
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = Color.White,
-            Padding = new Padding(18, 12, 18, 12)
+            Padding = new Padding(24, 14, 24, 14),
+            Font = LumiTheme.AppFont(10f, FontStyle.Bold)
         });
+        LumiTheme.Round(this, 16);
         _timer.Tick += (_, _) => { _timer.Stop(); Close(); };
     }
 
