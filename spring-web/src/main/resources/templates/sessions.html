@@ -107,14 +107,14 @@
             <table>
               <caption class="sr-only">Lịch sử lượt xe với biển số, thời gian, trạng thái và phí</caption>
               <thead><tr>
-                <th scope="col" class="session-id">Mã lượt</th><th scope="col" class="session-entry-plate">Biển số vào</th><th scope="col">Biển số ra</th>
+                <th scope="col" class="session-id">STT</th><th scope="col" class="session-entry-plate">Biển số vào</th><th scope="col">Biển số ra</th>
                 <th scope="col">Loại xe ghi nhận</th><th scope="col">Thẻ</th><th scope="col">Thời gian vào</th>
                 <th scope="col">Thời gian ra</th><th scope="col">Trạng thái</th><th scope="col">Phí lượt</th>
                 <th scope="col" class="session-evidence-col">Ảnh vào/ra</th>
               </tr></thead>
               <tbody>
-                <tr th:each="s : ${sessions}">
-                  <td class="session-id" th:text="${s.id}">1</td>
+                <tr th:each="s, sStat : ${sessions}">
+                  <td class="session-id" th:text="${sStat.count + (sessionPage.number * sessionPage.size)}">1</td>
                   <td class="session-entry-plate"><strong th:text="${s.entryPlate}">51A00000</strong></td>
                   <td><span th:text="${s.exitPlate ?: '—'}">—</span><span class="session-plate-difference" th:if="${plateMismatchSessionIds.contains(s.id)}">Khác biển số vào</span></td>
                   <td th:text="${s.detectedVehicleType.displayName}">Xe hai bánh</td>
