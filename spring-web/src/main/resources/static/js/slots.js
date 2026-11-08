@@ -14,8 +14,11 @@ $('#openNavigation')?.addEventListener('click', () => {
   navigation.querySelector('.close-navigation').focus();
 });
 $('#closeNavigation')?.addEventListener('click', () => navigation.close());
-document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', event => {
-  if (!window.confirm('Bạn muốn đăng xuất khỏi hệ thống?')) event.preventDefault();
+document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const question = 'Bạn muốn đăng xuất khỏi hệ thống?';
+  const accepted = window.ParkingUi ? await window.ParkingUi.confirm(question, 'Đăng xuất') : window.confirm(question);
+  if (accepted) form.submit();
 }));
 
 const singleSlotSection = $('#singleSlotSection');

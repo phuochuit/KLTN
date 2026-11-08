@@ -30,8 +30,11 @@
   const navigation = document.querySelector('#navigationDialog');
   document.querySelector('#openNavigation')?.addEventListener('click', () => navigation?.showModal());
   document.querySelector('#closeNavigation')?.addEventListener('click', () => navigation?.close());
-  document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', event => {
-    if (!window.confirm('Bạn muốn đăng xuất khỏi hệ thống?')) event.preventDefault();
+  document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const question = 'Bạn muốn đăng xuất khỏi hệ thống?';
+    const accepted = window.ParkingUi ? await window.ParkingUi.confirm(question, 'Đăng xuất') : window.confirm(question);
+    if (accepted) form.submit();
   }));
   document.querySelectorAll('.table-search').forEach(input => {
     const body = document.getElementById(input.dataset.target);
@@ -125,9 +128,7 @@
       }
       if (!submitting) updateDraft();
     });
-    window.addEventListener('beforeunload', event => {
-      if (updateDraft() && !submitting) { event.preventDefault(); event.returnValue = ''; }
-    });
+    window.ParkingUi?.guardUnsaved(() => updateDraft() && !submitting);
     updateDraft();
   }
 })();

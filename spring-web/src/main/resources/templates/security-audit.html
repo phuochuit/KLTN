@@ -2,7 +2,19 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Nhật ký bảo mật · LumiPark</title>
 <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}"><link rel="stylesheet" th:href="@{/css/management-core.css}"><script defer th:src="@{/js/management-core.js}"></script>
 </head><body class="dashboard-page management-page security-audit-page" th:with="activePage='audit'">
-<a href="#auditMain" class="skip-link">Đến nội dung chính</a><div class="dashboard-shell">
+<a href="#auditMain" class="skip-link">Đến nội dung chính</a>
+<dialog id="app-dialog" class="app-dialog" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+  <div class="app-dialog-icon" aria-hidden="true">?</div>
+  <div class="app-dialog-content">
+    <h2 id="app-dialog-title">Xác nhận thao tác</h2>
+    <p id="app-dialog-message"></p>
+  </div>
+  <div class="app-dialog-actions">
+    <button id="app-dialog-cancel" type="button" class="btn btn-outline">Hủy</button>
+    <button id="app-dialog-confirm" type="button" class="btn btn-primary">Xác nhận</button>
+  </div>
+</dialog>
+<script th:src="@{/js/app-dialog.js}"></script><div class="dashboard-shell">
 <aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside>
 <div class="dashboard-workspace"><header class="dashboard-topbar"><div class="topbar-location"><button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng"><img th:src="@{/images/lucide/menu.svg}" alt=""></button><span>Quản trị / <strong>Nhật ký bảo mật</strong></span></div><a class="account-link" th:href="@{/account/password}" th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</a></header>
 <main id="auditMain" tabindex="-1"><noscript><details><summary>Mở điều hướng</summary><div th:replace="~{dashboard-shell :: navigation}"></div></details></noscript>

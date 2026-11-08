@@ -2,6 +2,18 @@
 <html lang="vi" xmlns:th="http://www.thymeleaf.org">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Giao dịch &amp; đối soát · LumiPark</title><link rel="icon" th:href="@{/images/brand/favicon.svg}" type="image/svg+xml"><link rel="stylesheet" th:href="@{/css/dashboard-ui.css}"><link rel="stylesheet" th:href="@{/css/payments.css}"><script type="module" defer th:src="@{/js/payments.mjs}"></script></head>
 <body class="dashboard-page payments-page" th:with="activePage='payments'">
+<dialog id="app-dialog" class="app-dialog" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+  <div class="app-dialog-icon" aria-hidden="true">?</div>
+  <div class="app-dialog-content">
+    <h2 id="app-dialog-title">Xác nhận thao tác</h2>
+    <p id="app-dialog-message"></p>
+  </div>
+  <div class="app-dialog-actions">
+    <button id="app-dialog-cancel" type="button" class="btn btn-outline">Hủy</button>
+    <button id="app-dialog-confirm" type="button" class="btn btn-primary">Xác nhận</button>
+  </div>
+</dialog>
+<script th:src="@{/js/app-dialog.js}"></script>
   <a class="skip-link" href="#paymentsMain">Đến nội dung chính</a>
   <div class="dashboard-shell"><aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside><div class="dashboard-workspace">
     <header class="dashboard-topbar"><div class="topbar-location"><button class="icon-button mobile-menu" id="openNavigation" type="button" aria-label="Mở điều hướng"><img th:src="@{/images/lucide/menu.svg}" alt=""></button><span>Vận hành <span aria-hidden="true">/</span> <strong>Giao dịch &amp; đối soát</strong></span></div><a class="account-link" th:href="@{/account/password}"><span class="account-avatar"><img th:src="@{/images/lucide/user-round.svg}" alt=""></span><span th:text="${currentAccountDisplayName ?: 'Tài khoản'}">Tài khoản</span></a></header>

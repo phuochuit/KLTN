@@ -446,3 +446,40 @@
     .sessions-filter-form label:has(input[type="date"]) { grid-column: 1 / -1; }
   }
 }
+
+/* Hộp thoại xác nhận dùng chung cho các trang quản trị */
+.app-dialog {
+  width: min(92vw, 30rem);
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--d-line, #d7dfee);
+  border-radius: .875rem;
+  background: #fff;
+  color: #172033;
+  box-shadow: 0 24px 70px rgb(8 28 52 / 35%);
+  overflow-y: auto;
+}
+.app-dialog::backdrop { background: rgb(10 25 45 / 58%); backdrop-filter: blur(2px); }
+.app-dialog[open] { display: grid; grid-template-columns: 3.25rem minmax(0,1fr); gap: 0 .875rem; padding: 1.5rem; animation: app-dialog-in .16s ease-out; }
+.app-dialog-icon { width: 2.875rem; height: 2.875rem; display: grid; place-items: center; border-radius: 50%; background: #e8f1fb; color: #1f4e9c; font-size: 1.5rem; font-weight: 800; }
+.app-dialog.is-warning .app-dialog-icon { background: #fff2dc; color: #a45b00; }
+.app-dialog-content h2 { margin: .0625rem 0 .5rem; color: #172554; font-size: 1.3125rem; line-height: 1.25; }
+.app-dialog-content p { margin: 0; color: #46566b; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+.app-dialog-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .625rem; margin-top: 1.5rem; }
+.app-dialog-actions .btn { display: inline-flex; align-items: center; justify-content: center; min-width: 6.25rem; min-height: 2.5rem; padding: .55rem 1rem; border: 1px solid transparent; border-radius: .55rem; font: inherit; font-size: .9375rem; font-weight: 600; cursor: pointer; }
+.app-dialog-actions .btn-outline { border-color: #c5cedf; background: #fff; color: #25324d; }
+.app-dialog-actions .btn-outline:hover { background: #eef2fa; }
+.app-dialog-actions .btn-primary { border-color: #2f4bd6; background: #2f4bd6; color: #fff; }
+.app-dialog-actions .btn-primary:hover { border-color: #2439b0; background: #2439b0; }
+.app-dialog-actions .btn:focus-visible { outline: 2px solid #2f4bd6; outline-offset: 2px; }
+.app-dialog-actions [hidden] { display: none !important; }
+@keyframes app-dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (max-width: 30rem) {
+  .app-dialog[open] { grid-template-columns: minmax(0,1fr); padding: 1.25rem; }
+  .app-dialog-icon { width: 2.5rem; height: 2.5rem; font-size: 1.25rem; margin-bottom: .75rem; }
+  .app-dialog-actions { flex-direction: column-reverse; }
+  .app-dialog-actions > * { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .app-dialog[open] { animation: none; } }
+@media (forced-colors: active) { .app-dialog { border: 1px solid CanvasText; background: Canvas; color: CanvasText; box-shadow: none; } }

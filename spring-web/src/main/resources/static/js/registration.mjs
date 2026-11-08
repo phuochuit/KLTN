@@ -859,11 +859,7 @@ function initializeRegistration(form) {
   });
   updatePackageSummary();
 
-  window.addEventListener('beforeunload', event => {
-    if (!state.writeLocked) return;
-    event.preventDefault();
-    event.returnValue = '';
-  });
+  window.ParkingUi?.guardUnsaved(() => state.writeLocked);
 
   const navigation = byId('navigationDialog');
   byId('openNavigation')?.addEventListener('click', () => {
@@ -873,8 +869,11 @@ function initializeRegistration(form) {
   window.matchMedia('(min-width: 64rem)').addEventListener('change', event => {
     if (event.matches && navigation?.open) navigation.close();
   });
-  document.querySelectorAll('.dashboard-logout').forEach(logout => logout.addEventListener('submit', event => {
-    if (!window.confirm('Bạn muốn đăng xuất khỏi hệ thống?')) event.preventDefault();
+  document.querySelectorAll('.dashboard-logout').forEach(logout => logout.addEventListener('submit', async event => {
+    event.preventDefault();
+    const question = 'Bạn muốn đăng xuất khỏi hệ thống?';
+    const accepted = window.ParkingUi ? await window.ParkingUi.confirm(question, 'Đăng xuất') : window.confirm(question);
+    if (accepted) logout.submit();
   }));
 
   window.addEventListener('pagehide', () => {

@@ -252,12 +252,7 @@ if (profileDialog && profileForm && discardPrompt && profileDraftState && profil
     profileSaveButton.setAttribute('aria-busy', 'true');
     profileSaveButton.textContent = 'Đang lưu…';
   });
-  window.addEventListener('beforeunload', event => {
-    if (profileDialog.open && state() !== profileBaseline && !profileSubmitting) {
-      event.preventDefault();
-      event.returnValue = '';
-    }
-  });
+  window.ParkingUi?.guardUnsaved(() => profileDialog.open && state() !== profileBaseline && !profileSubmitting);
 }
 
 document.querySelectorAll('#create-account-form').forEach(form => {

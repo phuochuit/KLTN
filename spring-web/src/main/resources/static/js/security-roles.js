@@ -274,12 +274,7 @@
     saveButton.textContent = 'Đang lưu…';
   });
 
-  window.addEventListener('beforeunload', event => {
-    if (dirty() && !submitting) {
-      event.preventDefault();
-      event.returnValue = '';
-    }
-  });
+  window.ParkingUi?.guardUnsaved(() => dirty() && !submitting);
 
   const totalAccounts = choices.reduce((sum, choice) => sum + Number(choice.dataset.accountCount), 0);
   text('#systemRolesTotal', String(choices.filter(choice => choice.dataset.system === 'true').length));

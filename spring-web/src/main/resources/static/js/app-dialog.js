@@ -80,6 +80,19 @@
         }
     };
 
+    // Cảnh báo mất thay đổi bằng hộp thoại nội bộ thay cho hộp thoại "Leave site?" của trình duyệt.
+    window.ParkingUi.guardUnsaved = (isDirty, message = 'Các thay đổi chưa lưu sẽ bị mất khi rời trang. Tiếp tục?') => {
+        document.addEventListener('click', async event => {
+            if (!isDirty()) return;
+            const link = event.target.closest('a[href]');
+            if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+            const href = link.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            event.preventDefault();
+            if (await window.ParkingUi.confirm(message, 'Rời trang')) window.location.assign(link.href);
+        }, true);
+    };
+
     // Các script cũ gọi alert() sẽ tự dùng hộp thoại mới.
     window.alert = message => window.ParkingUi.alert(message);
 

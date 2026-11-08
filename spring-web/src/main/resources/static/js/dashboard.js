@@ -12,7 +12,14 @@ const dateText = value => { const date = new Date(value); return value && !Numbe
 const navigation = $('#navigationDialog');
 $('#openNavigation').addEventListener('click', () => navigation.showModal());
 $('#closeNavigation').addEventListener('click', () => navigation.close());
-document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', event => { if (!window.confirm('Bạn muốn đăng xuất khỏi hệ thống?')) event.preventDefault(); }));
+document.querySelectorAll('.dashboard-logout').forEach(form => form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const question = 'Bạn muốn đăng xuất khỏi hệ thống?';
+  const accepted = window.ParkingUi
+    ? await window.ParkingUi.confirm(question, 'Đăng xuất')
+    : window.confirm(question);
+  if (accepted) form.submit();
+}));
 
 const now = new Date();
 for (let month = 1; month <= 12; month++) $('#filterMonth').add(new Option('Tháng ' + month, month));

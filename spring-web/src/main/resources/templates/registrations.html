@@ -11,6 +11,18 @@
 </head>
 <body class="dashboard-page registrations-page" th:with="activePage='registrations'">
   <a class="skip-link" href="#registrationMain">Đến nội dung chính</a>
+  <dialog id="app-dialog" class="app-dialog" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+    <div class="app-dialog-icon" aria-hidden="true">?</div>
+    <div class="app-dialog-content">
+      <h2 id="app-dialog-title">Xác nhận thao tác</h2>
+      <p id="app-dialog-message"></p>
+    </div>
+    <div class="app-dialog-actions">
+      <button id="app-dialog-cancel" type="button" class="btn btn-outline">Hủy</button>
+      <button id="app-dialog-confirm" type="button" class="btn btn-primary">Xác nhận</button>
+    </div>
+  </dialog>
+  <script th:src="@{/js/app-dialog.js}"></script>
   <div class="dashboard-shell">
     <aside class="sidebar" aria-label="Điều hướng quản trị">
       <div th:replace="~{dashboard-shell :: navigation}"></div>

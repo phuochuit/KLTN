@@ -12,6 +12,18 @@
   <script defer th:src="@{/js/security-roles.js}"></script>
 </head>
 <body class="dashboard-page management-page security-roles-page" th:with="activePage='roles'" th:attr="data-role-draft-scope=${roleDraftScope}">
+<dialog id="app-dialog" class="app-dialog" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+  <div class="app-dialog-icon" aria-hidden="true">?</div>
+  <div class="app-dialog-content">
+    <h2 id="app-dialog-title">Xác nhận thao tác</h2>
+    <p id="app-dialog-message"></p>
+  </div>
+  <div class="app-dialog-actions">
+    <button id="app-dialog-cancel" type="button" class="btn btn-outline">Hủy</button>
+    <button id="app-dialog-confirm" type="button" class="btn btn-primary">Xác nhận</button>
+  </div>
+</dialog>
+<script th:src="@{/js/app-dialog.js}"></script>
   <a href="#coreMain" class="skip-link">Đến nội dung chính</a>
   <div class="dashboard-shell">
     <aside class="sidebar" aria-label="Điều hướng quản trị"><div th:replace="~{dashboard-shell :: navigation}"></div></aside>
@@ -67,7 +79,7 @@
                     <span class="role-assignment" th:text="${item.accountCount + ' tài khoản'}">0 tài khoản</span>
                   </span>
                 </span>
-                <span class="role-choice-arrow" aria-hidden="true">›</span>
+                <span class="role-choice-arrow" aria-hidden="true"></span>
                 <span th:each="granted : ${item.role.permissions}" th:attr="data-role-permission=${granted.name()}" hidden></span>
               </button>
             </div>
