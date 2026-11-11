@@ -45,6 +45,7 @@ public sealed class MainForm : Form
         Text = "Xe không có biển số", AutoSize = true, ForeColor = Color.DarkOrange
     };
     private readonly TextBox _exitPlate = PlateBox();
+    private readonly TextBox _exitStoredVehicleType = new() { Width = 320, ReadOnly = true, Text = "Chưa tra cứu lượt gửi" };
     private readonly ComboBox _vehicleType = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly Label _residentInfo = new() {
         Width = 320, Height = 95, AutoSize = false, Padding = new Padding(10),
@@ -108,6 +109,11 @@ public sealed class MainForm : Form
         _cboExitPaymentMethod.Items.AddRange(new object[] { "Tiền mặt (Tự động)", "Chuyển khoản (Ngân hàng)", "Máy POS / Ví điện tử" });
         _cboExitPaymentMethod.SelectedIndex = 0;
         _vehicleType.DisplayMember = nameof(VehicleTypeDto.DisplayName);
+        _exitPlate.TextChanged += (_, _) =>
+        {
+            _lastPreview = null;
+            _exitStoredVehicleType.Text = "Chưa tra cứu lượt gửi";
+        };
         _vehicleType.SelectedIndexChanged += (_, _) =>
         {
             if (_syncingVehicleType || _vehicleType.SelectedItem is not VehicleTypeDto selected) return;
@@ -398,6 +404,7 @@ public sealed class MainForm : Form
         var tab = new TabPage("XE RA") { Padding = new Padding(18) };
         var flow = FormFlow();
         flow.Controls.Add(Field("Biển số nhận dạng", _exitPlate));
+        flow.Controls.Add(Field("Loại xe đã xác nhận lúc vào", _exitStoredVehicleType));
         flow.Controls.Add(CreateButton("TRA CỨU NGƯỜI ĐƯỢC PHÉP", async (_, _) => await LookupResidentAsync(false)));
         flow.Controls.Add(ComboField("Người đang lấy xe", _exitMember));
         flow.Controls.Add(ComboField("Phương thức thanh toán", _cboExitPaymentMethod));
@@ -504,6 +511,8 @@ public sealed class MainForm : Form
         _aiStatus.ForeColor = lowConfidence ? Color.DarkOrange : Color.SeaGreen;
         _aiStatus.Text = string.IsNullOrWhiteSpace(response.PlateText)
             ? $"Chưa đọc rõ biển số ({elapsed.TotalSeconds:0.00}s). Vui lòng chụp lại hoặc nhập thủ công."
+            : _tabs.SelectedIndex != 0
+                ? $"Đã đọc biển số {response.PlateText}. Loại xe được lấy từ lượt gửi lúc vào. | {elapsed.TotalSeconds:0.00}s"
             : response.VehicleType == "UNKNOWN"
                 ? $"Đã đọc biển số {response.PlateText}. Chưa xác định được nhóm xe, vui lòng chọn loại xe."
                 : $"Đã đọc biển số {response.PlateText} | Đã xác định {DisplayVehicleFamily(response.VehicleType)}, vui lòng xác nhận loại xe | {elapsed.TotalSeconds:0.00}s";
@@ -625,6 +634,16 @@ public sealed class MainForm : Form
                 return;
             }
             ResidentLookupResponse resident = await _parkingApi.LookupResidentAsync(plate, card);
+            if (!entry)
+            {
+                _exitStoredVehicleType.Text = "Đang tra cứu loại xe lúc vào...";
+                var openSession = await _parkingApi.GetOpenSessionAsync(plate);
+                if (!string.Equals(NormalizePlate(_exitPlate.Text), NormalizePlate(plate), StringComparison.OrdinalIgnoreCase))
+                    return;
+                _exitStoredVehicleType.Text = openSession == null
+                    ? "Không tìm thấy lượt xe đang gửi"
+                    : DisplayVehicleType(openSession.VehicleType);
+            }
             if (entry) _entryResidentRegistered = resident.Registered;
             ComboBox combo = entry ? _entryMember : _exitMember;
             combo.DataSource = resident.AuthorizedMembers?.ToList() ?? new List<AuthorizedMemberResponse>();
@@ -656,6 +675,7 @@ public sealed class MainForm : Form
         {
             _residentInfo.BackColor = Color.MistyRose;
             _residentInfo.Text = "Không tra cứu được cư dân\r\n" + ex.Message;
+            if (!entry) _exitStoredVehicleType.Text = "Chưa tra cứu được lượt gửi. Vui lòng thử lại.";
         }
     }
 
@@ -667,6 +687,7 @@ public sealed class MainForm : Form
             var previewRequest = BuildGateRequest(_exitPlate.Text, includePayment: false);
             if (previewRequest == null) return;
             _lastPreview = await _parkingApi.PreviewExitAsync(previewRequest);
+            _exitStoredVehicleType.Text = DisplayVehicleType(_lastPreview.VehicleType);
             ShowParkingResult(_lastPreview);
         }
         catch (Exception ex) when (IsMissingOpenSession(ex)) { await LinkNoPlateSessionAsync(); }
@@ -888,7 +909,7 @@ public sealed class MainForm : Form
         }
         string identifier = NormalizePlate(plate);
         string confirmedType = entry ? _entryDetectedType : _exitDetectedType;
-        if (string.IsNullOrWhiteSpace(confirmedType) || confirmedType == "UNKNOWN")
+        if (entry && (string.IsNullOrWhiteSpace(confirmedType) || confirmedType == "UNKNOWN"))
             throw new InvalidOperationException("Vui lòng xác nhận loại xe trước khi tiếp tục.");
         bool exit = !entry;
         string? paymentMethod = null;
@@ -1384,6 +1405,7 @@ public sealed class MainForm : Form
     private void ClearExitForm()
     {
         _exitPlate.Text = "";
+        _exitStoredVehicleType.Text = "Chưa tra cứu lượt gửi";
         _exitLinkedSessionId = null;
         _exitLinkedPlate = "";
         _exitDetectedType = "UNKNOWN";

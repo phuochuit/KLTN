@@ -869,7 +869,10 @@ public class ParkingService {
     private String owner(ParkingSession s) {
         return s.getVehicle() == null ? "Khách vãng lai" : s.getVehicle().getEffectiveOwnerName();
     }
-    private String type(ParkingSession s) { return s.getDetectedVehicleType().name(); }
+    private String type(ParkingSession s) {
+        if (s.getDetectedVehicleTypeRef() != null) return s.getDetectedVehicleTypeRef().getCode();
+        return s.getDetectedVehicleType() == null ? "UNKNOWN" : s.getDetectedVehicleType().name();
+    }
     private String cardCode(ParkingSession s) {
         return s.getEntryPlate();
     }

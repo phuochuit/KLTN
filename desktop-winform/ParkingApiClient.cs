@@ -230,6 +230,15 @@ public sealed class ParkingApiClient : IDisposable
             "Hệ thống", "tra cứu cư dân/phương tiện");
     }
 
+    public async Task<ParkingResponse?> GetOpenSessionAsync(string plate)
+    {
+        using var response = await SendProtectedAsync(
+            "/api/parking/open?plate=" + Uri.EscapeDataString(plate), HttpMethod.Get, retrySafeRead: true);
+        var sessions = await ApiResponseReader.ReadAsync<List<ParkingResponse>>(response, _json,
+            "Hệ thống", "tra cứu lượt xe đang gửi");
+        return sessions.FirstOrDefault();
+    }
+
     public async Task<EvidenceComparisonResponse> GetEvidenceComparisonAsync(
         string plate, string exitVehicleType, string exitVehicleEvidenceId, string exitFaceEvidenceId, long? sessionId = null)
     {

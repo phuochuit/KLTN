@@ -70,11 +70,17 @@ public class ParkingApiController {
     }
 
     @GetMapping("/open")
-    public List<ParkingResponse> openSessions() {
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<ParkingResponse> openSessions(@RequestParam(required = false) String plate) {
+        String normalizedPlate = PlateNormalizer.normalize(plate);
         return sessions.findByStatusOrderByEntryTimeDesc(SessionStatus.OPEN).stream()
+            .filter(s -> normalizedPlate.isBlank()
+                || normalizedPlate.equals(PlateNormalizer.normalize(s.getEntryPlate())))
             .map(s -> new ParkingResponse(s.getId(), s.getEntryPlate(),
                 s.getVehicle() == null ? "Khách vãng lai" : s.getVehicle().getEffectiveOwnerName(),
-                s.getDetectedVehicleType().name(), s.getEntryPlate(), s.getStatus().name(),
+                s.getDetectedVehicleTypeRef() != null ? s.getDetectedVehicleTypeRef().getCode()
+                    : s.getDetectedVehicleType() == null ? "UNKNOWN" : s.getDetectedVehicleType().name(),
+                s.getEntryPlate(), s.getStatus().name(),
                 s.getEntryTime(), s.getExitTime(), s.getFee(), "Đang đỗ xe", false))
             .toList();
     }
