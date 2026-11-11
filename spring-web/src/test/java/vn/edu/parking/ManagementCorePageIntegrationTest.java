@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -145,6 +146,23 @@ class ManagementCorePageIntegrationTest {
             .andExpect(content().string(containsString("vehicleRows")))
             .andExpect(content().string(containsString("vehicleForm")))
             .andExpect(content().string(containsString("name=\"_csrf\"")));
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGEMENT")
+    void householdAndResidentBadgesAlwaysExposeFullTotalsOnBothTabs() throws Exception {
+        long householdTotal = households.count();
+        long memberTotal = members.count();
+
+        mvc.perform(get("/households").param("mode", "households"))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("householdTotal", householdTotal))
+            .andExpect(model().attribute("memberTotal", memberTotal));
+
+        mvc.perform(get("/households").param("mode", "residents"))
+            .andExpect(status().isOk())
+            .andExpect(model().attribute("householdTotal", householdTotal))
+            .andExpect(model().attribute("memberTotal", memberTotal));
     }
 
     @Test

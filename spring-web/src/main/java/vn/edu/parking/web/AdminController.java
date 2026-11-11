@@ -419,6 +419,8 @@ public class AdminController {
         model.addAttribute("pageSize", 10);
         model.addAttribute("householdPage", householdPage);
         model.addAttribute("memberPage", memberPage);
+        model.addAttribute("householdTotal", households.count());
+        model.addAttribute("memberTotal", members.count());
         model.addAttribute("householdResidents", householdResidents);
         model.addAttribute("residentPageNumber", residentPageNumber);
         model.addAttribute("selectedHousehold", selectedHousehold);
@@ -891,8 +893,7 @@ public class AdminController {
 
     @GetMapping("/cards")
     String cards(@RequestParam(required = false) Long vehicleId, Model model) {
-        model.addAttribute("cards", cards.findAll().stream()
-            .filter(card -> card.getPassType() != PassType.PER_VISIT).toList());
+        model.addAttribute("cards", cards.findAll());
         model.addAttribute("vehicles", vehicles.findAll());
         model.addAttribute("dailyPrices", prices.findAll().stream()
             .collect(Collectors.toMap(rule -> rule.getVehicleType().name(), PricingRule::getDailyPassPrice)));

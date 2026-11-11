@@ -96,6 +96,20 @@ class WebSessionLimitIntegrationTest {
     }
 
     @Test
+    void accountManagementShowsRecordedBrowserDeviceTypeAndIp() throws Exception {
+        MockHttpSession windows = login("100.64.9.21",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36");
+
+        mvc.perform(get("/account-management").session(windows)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Chrome · Windows")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Máy tính")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("100.64.9.21")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("Ghi nhận từ")));
+    }
+
+    @Test
     void redirectsAuthenticatedMobileSessionWhenChromeResubmitsOldLoginForm() throws Exception {
         MockHttpSession android = login("118.69.71.138",
             "Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile");

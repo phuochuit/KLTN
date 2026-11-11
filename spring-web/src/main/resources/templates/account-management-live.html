@@ -42,13 +42,17 @@
     <section class="card section-gap live-session-section">
         <div class="live-section-heading"><div><p class="live-channel-label">KÊNH WEB</p><h2 tabindex="-1">Phiên Web được ghi nhận</h2></div><span class="live-channel-mark live-channel-mark-web" aria-hidden="true">W</span></div>
         <p class="help">Nguồn là các phiên Spring Session còn được ghi nhận; hoạt động gần nhất không xác nhận người dùng đang xem trang.</p>
-        <p class="live-scroll-hint">Trên màn hình nhỏ, cuộn ngang trong bảng để xem thời gian và thao tác.</p>
+        <p class="live-scroll-hint">Trên màn hình nhỏ, cuộn ngang trong bảng để xem thiết bị, địa chỉ mạng, thời gian và thao tác.</p>
         <div class="table-scroll live-table-scroll" role="region" aria-label="Phiên Web được ghi nhận; cuộn ngang để xem đủ cột" tabindex="0"><table>
-            <caption class="sr-only">Phiên Web được hệ thống ghi nhận, hoạt động gần nhất và thao tác.</caption>
-            <thead><tr><th scope="col">Tài khoản</th><th scope="col">Hoạt động gần nhất</th><th scope="col">Thao tác</th></tr></thead>
+            <caption class="sr-only">Phiên Web được hệ thống ghi nhận, thiết bị, địa chỉ mạng, thời gian và thao tác.</caption>
+            <thead><tr><th scope="col">Tài khoản</th><th scope="col">Thiết bị</th><th scope="col">Loại</th><th scope="col">Địa chỉ IP</th><th scope="col">Ghi nhận từ</th><th scope="col">Hoạt động gần nhất</th><th scope="col">Thao tác</th></tr></thead>
             <tbody>
             <tr th:each="webLogin : ${activeWebSessions}">
                 <td><span class="badge badge-recorded">Được ghi nhận</span><strong class="live-session-account" th:text="${webLogin.username}"></strong></td>
+                <td th:text="${webLogin.device}">Chrome · Windows</td>
+                <td th:text="${#strings.isEmpty(webLogin.deviceKind) ? 'Chưa ghi nhận' : webLogin.deviceKind}">Máy tính</td>
+                <td th:text="${#strings.isEmpty(webLogin.ip) ? 'Chưa ghi nhận' : webLogin.ip}">127.0.0.1</td>
+                <td th:text="${webLogin.loggedInAt == null ? 'Chưa ghi nhận' : #temporals.format(webLogin.loggedInAt, 'dd/MM/yyyy HH:mm')}"></td>
                 <td th:text="${#temporals.format(webLogin.lastSeenAt, 'dd/MM/yyyy HH:mm')}"></td>
                 <td><form method="post" data-live-action-form data-live-action-region="live-sessions" th:attr="data-live-action-id=${webLogin.sessionId}" th:action="@{/account-management/sessions/web/revoke}"
                           data-confirm="Tài khoản này sẽ phải đăng nhập lại trên trình duyệt đang sử dụng. Bạn có muốn tiếp tục?"
@@ -58,7 +62,7 @@
                     <button class="btn btn-danger" type="submit" data-live-action th:attr="data-live-action-id=${webLogin.sessionId}">Kết thúc phiên</button>
                 </form></td>
             </tr>
-            <tr th:if="${#lists.isEmpty(activeWebSessions)}"><td colspan="4" class="muted">Không có phiên Web nào được ghi nhận.</td></tr>
+            <tr th:if="${#lists.isEmpty(activeWebSessions)}"><td colspan="7" class="muted">Không có phiên Web nào được ghi nhận.</td></tr>
             </tbody>
         </table></div>
     </section>

@@ -112,7 +112,8 @@
 .account-management-page .account-row-actions form,.account-management-page .account-row-menu-actions form { margin: 0; }
 .account-management-page .account-row-actions > .account-button-primary,.account-management-page .account-row-menu-trigger { min-height: 2.75rem; padding: .45rem .65rem; border-radius: .65rem; font-size: .8125rem; line-height: 1.2rem; }
 .account-management-page .account-row-menu-trigger { display: inline-flex; align-items: center; gap: .35rem; border: 1px solid #aab5ce; background: #fff; color: var(--account-primary); font-weight: 600; cursor: pointer; }
-.account-management-page .account-row-menu-trigger::after { content: '⌄'; color: var(--account-muted); font-size: .9rem; }
+.account-management-page .account-row-menu-trigger::after { content: ''; flex: none; width: .42rem; height: .42rem; border-right: 1.6px solid var(--account-muted); border-bottom: 1.6px solid var(--account-muted); transform: rotate(45deg); transition: transform 150ms ease; }
+.account-management-page .account-row-menu-trigger[aria-expanded="true"]::after { transform: rotate(225deg); }
 .account-management-page .account-row-menu-trigger[aria-expanded="true"] { border-color: #8797c6; background: #eef1ff; }
 .account-management-page .account-row-menu-actions[popover="auto"] { position: fixed; inset: auto; top: 0; left: 0; box-sizing: border-box; width: max-content; min-width: 12.5rem; max-width: min(18rem,calc(100vw - 1rem)); max-height: min(20rem,calc(100dvh - 1rem)); overflow: auto; margin: 0; padding: .5rem; border: 1px solid #d9dfed; border-radius: .75rem; background: #f7f8fc; color: var(--account-ink); box-shadow: 0 12px 32px rgb(38 53 100 / 20%); }
 .account-management-page .account-row-menu-actions[popover="auto"]:popover-open { display: grid; justify-items: stretch; gap: .5rem; }

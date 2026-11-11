@@ -121,7 +121,7 @@ public class SecurityConfig {
             }))
             .csrf(csrf -> csrf.ignoringRequestMatchers("/api/parking/**", "/h2-console/**"))
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
-        http.addFilterAfter(new WebAccountSessionValidationFilter(accounts), SecurityContextHolderFilter.class);
+        http.addFilterAfter(new WebAccountSessionValidationFilter(accounts, webDevices), SecurityContextHolderFilter.class);
         http.addFilterBefore(new WebLoginThrottleFilter(loginThrottle, audit), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

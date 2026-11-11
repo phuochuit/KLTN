@@ -16,7 +16,7 @@
     powershell -ExecutionPolicy Bypass -File deploy\smoke-test.ps1 -Password "Admin@123456"
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File deploy\smoke-test.ps1 -BaseUrl "https://autoparking.tail57e32c.ts.net" -Password "..."
+    powershell -ExecutionPolicy Bypass -File deploy\smoke-test.ps1 -BaseUrl "https://lumipark.tail57e32c.ts.net" -Password "..."
 
 .NOTES
     Mat khau co the truyen qua bien moi truong PARKING_ADMIN_PASSWORD

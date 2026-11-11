@@ -91,25 +91,35 @@
                   <th scope="col">Hiệu lực</th>
                   <th scope="col">Giá gói</th>
                   <th scope="col">Trạng thái</th>
-                  <th scope="col">Thao tác</th>
+                  <th scope="col">Quản lý</th>
                 </tr>
               </thead>
               <tbody>
-                <tr th:each="c:${cards}">
+                <tr th:each="c:${cards}"
+                    th:with="prepaid=${c.passType.name() == 'DAILY' or c.passType.name() == 'MONTHLY'},
+                             blocked=${c.status.name() == 'BLOCKED'},
+                             expired=${c.status.name() == 'EXPIRED' or (prepaid and c.validUntil != null and today.isAfter(c.validUntil))},
+                             notStarted=${prepaid and c.validFrom != null and today.isBefore(c.validFrom)},
+                             currentlyValid=${prepaid and c.isPrepaidPackageValid(today)}">
                   <td><strong class="card-code" th:text="${c.cardCode}">59A112345</strong><small class="card-code-note">Từ biển số chuẩn hóa</small></td>
                   <td class="card-plate" th:text="${c.vehicle?.plateNumber}">59A1-123.45</td>
                   <td class="card-owner" th:text="${c.vehicle?.effectiveOwnerName}">Nguyễn Văn An</td>
-                  <td><span class="card-pass-badge" th:classappend="${c.passType.name() == 'MONTHLY' ? 'is-monthly' : 'is-daily'}" th:text="${c.passType.displayName}">Gói 30 ngày</span></td>
+                  <td><span class="card-pass-badge" th:classappend="${c.passType.name() == 'MONTHLY' ? 'is-monthly' : (c.passType.name() == 'DAILY' ? 'is-daily' : 'is-per-visit')}" th:text="${c.passType.name() == 'PER_VISIT' ? 'Theo lượt' : c.passType.displayName}">Gói 30 ngày</span></td>
                   <td class="card-validity">
-                    <span th:if="${c.validFrom != null && c.validUntil != null}" th:text="${#temporals.format(c.validFrom,'dd/MM/yyyy') + ' – ' + #temporals.format(c.validUntil,'dd/MM/yyyy')}">01/11/2026 – 30/11/2026</span>
-                    <span th:if="${c.validFrom == null || c.validUntil == null}">Chưa ghi nhận kỳ</span>
-                    <small>Tính cả ngày cuối</small>
+                    <span th:if="${prepaid and c.validFrom != null and c.validUntil != null}" th:text="${#temporals.format(c.validFrom,'dd/MM/yyyy') + ' – ' + #temporals.format(c.validUntil,'dd/MM/yyyy')}">01/11/2026 – 30/11/2026</span>
+                    <span th:if="${prepaid and (c.validFrom == null or c.validUntil == null)}">Chưa ghi nhận kỳ</span>
+                    <span th:if="${!prepaid}">Không áp dụng</span>
+                    <small th:if="${prepaid}">Tính cả ngày cuối</small>
+                    <small th:if="${!prepaid}">Phí được tính theo từng lượt gửi xe</small>
                   </td>
                   <td class="card-price">
-                    <strong th:text="${#numbers.formatDecimal(c.subscriptionFee,0,'COMMA',0,'POINT') + ' đ'}">150.000 đ</strong>
+                    <strong th:if="${prepaid}" th:text="${#numbers.formatDecimal(c.subscriptionFee,0,'COMMA',0,'POINT') + ' đ'}">150.000 đ</strong>
+                    <span th:if="${!prepaid}">Tính theo lượt</span>
                   </td>
-                  <td><span class="card-status-badge" th:classappend="${c.status.name() == 'ACTIVE' ? 'is-active' : (c.status.name() == 'BLOCKED' ? 'is-blocked' : 'is-expired')}" th:text="${c.status.displayName}">Hoạt động</span></td>
-                  <td><a class="card-row-action" th:href="@{/cards(vehicleId=${c.vehicle.id})}">Chọn xe</a></td>
+                  <td><span class="card-status-badge"
+                            th:classappend="${blocked ? 'is-blocked' : (expired ? 'is-expired' : (currentlyValid ? 'is-active' : 'is-pending'))}"
+                            th:text="${blocked ? 'Đã khóa' : (expired ? 'Hết hạn' : (currentlyValid ? 'Hoạt động' : (notStarted ? 'Chưa hiệu lực' : (prepaid ? 'Chưa hiệu lực' : 'Theo lượt'))))}">Hoạt động</span></td>
+                  <td><a class="card-row-action" th:href="@{/cards(vehicleId=${c.vehicle.id})}">Chọn để cập nhật</a></td>
                 </tr>
                 <tr th:if="${#lists.isEmpty(cards)}">
                   <td class="empty-cell" colspan="8">Chưa có thẻ nào được ghi nhận. Chọn một xe ở phần thao tác bên dưới để bắt đầu.</td>

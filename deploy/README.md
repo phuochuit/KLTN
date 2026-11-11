@@ -2,7 +2,7 @@
 
 Tài liệu này dùng để dựng lại web quản trị bãi xe trên máy Windows, public qua Tailscale Funnel.
 
-- URL public: `https://autoparking.tail57e32c.ts.net`
+- URL public: `https://lumipark.tail57e32c.ts.net`
 - Web trong Docker: `127.0.0.1:8080`
 - ANPR chạy trên máy thật: `127.0.0.1:8001`
 - Desktop WinForms chạy trên máy thật: `http://localhost:8080`
@@ -129,7 +129,7 @@ powershell -ExecutionPolicy Bypass -File deploy\smoke-test.ps1
 ### 4.3. Trình duyệt
 
 - Local: `http://localhost:8080`
-- Public: `https://autoparking.tail57e32c.ts.net`
+- Public: `https://lumipark.tail57e32c.ts.net`
 
 Kiểm tra:
 

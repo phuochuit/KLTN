@@ -48,7 +48,8 @@
   .security-roles-page .role-state,.security-roles-page .role-system-tag,.security-roles-page .role-assignment { display:inline-flex; align-items:center; min-height:1.35rem; padding:.15rem .4rem; border:1px solid transparent; border-radius:999px; font-size:.63rem; font-weight:600; line-height:1.25; }
   .security-roles-page .role-state.is-enabled { border-color:#c4e2ce; background:#eaf7ee; color:#176052; }.security-roles-page .role-state.is-disabled { border-color:#d5dbe6; background:#f0f2f7; color:#465672; }
   .security-roles-page .role-system-tag { border-color:#d8c9f2; background:#f4efff; color:#593991; }.security-roles-page .role-assignment { border-color:#c8e7ee; background:#edf9fb; color:#275b69; }
-  .security-roles-page .role-choice-arrow { align-self:center; color:#8290b0; font-size:1.35rem; line-height:1; }
+  .security-roles-page .role-choice-arrow { align-self:center; flex:none; width:.45rem; height:.45rem; margin-right:.1rem; border-top:2px solid #8290b0; border-right:2px solid #8290b0; transform:rotate(45deg); }
+.security-roles-page .role-choice[aria-pressed="true"] .role-choice-arrow { border-color:#5268c4; }
   .security-roles-page .role-directory-empty { display:grid; justify-items:center; gap:.4rem; padding:2rem 1rem; border:1px dashed #b7c2dd; border-radius:1rem; background:rgb(255 255 255 / 50%); text-align:center; }
   .security-roles-page .role-empty-mark { display:grid; width:2.7rem; height:2.7rem; place-items:center; border-radius:.9rem; background:#edf1ff; }.security-roles-page .role-empty-mark img { width:1.3rem; height:1.3rem; }
   .security-roles-page .role-directory-empty strong { font-size:.86rem; }.security-roles-page .role-directory-empty p { margin:0; color:var(--d-muted); font-size:.76rem; line-height:1.55; }

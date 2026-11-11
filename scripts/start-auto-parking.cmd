@@ -24,7 +24,7 @@ REM ============================================================
 set "ROOT=D:\Code\KhoaLuan"
 set "DEPLOY=%ROOT%\deploy"
 set "LOCAL_URL=http://localhost:8080"
-set "PUBLIC_URL=https://autoparking.tail57e32c.ts.net"
+set "PUBLIC_URL=https://lumipark.tail57e32c.ts.net"
 set "START_DESKTOP=1"
 set "START_BROWSER=1"
 set "START_SYNC=1"

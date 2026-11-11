@@ -2,12 +2,15 @@ package vn.edu.parking;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.SoftAssertions.assertSoftly;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
@@ -80,6 +83,44 @@ class CardWriteTransactionIntegrationTest {
         Map<?, ?> monthlyPrices = (Map<?, ?>) result.getModelAndView().getModel().get("monthlyPrices");
         assertThat(monthlyPrices).isNotNull();
         assertThat(monthlyPrices.get("MOTORBIKE")).isEqualTo(BigDecimal.valueOf(150_000));
+    }
+
+    @Test
+    void cardsPageShowsPerVisitCardsAndComputesExpiredPackageStatusFromDates() throws Exception {
+        Vehicle perVisitVehicle = vehicle();
+        perVisitVehicle.setOwnerName("Synthetic per-visit owner");
+        vehicles.saveAndFlush(perVisitVehicle);
+        ParkingCard perVisit = new ParkingCard();
+        perVisit.setCardCode(perVisitVehicle.getPlateNumber());
+        perVisit.setVehicle(perVisitVehicle);
+        perVisit.setPassType(PassType.PER_VISIT);
+        perVisit.setStatus(CardStatus.ACTIVE);
+        cards.saveAndFlush(perVisit);
+
+        Vehicle expiredVehicle = vehicle();
+        expiredVehicle.setOwnerName("Synthetic expired owner");
+        vehicles.saveAndFlush(expiredVehicle);
+        ParkingCard expired = new ParkingCard();
+        expired.setCardCode(expiredVehicle.getPlateNumber());
+        expired.setVehicle(expiredVehicle);
+        expired.setPassType(PassType.MONTHLY);
+        expired.setStatus(CardStatus.ACTIVE);
+        expired.setValidFrom(LocalDate.now().minusDays(30));
+        expired.setValidUntil(LocalDate.now().minusDays(1));
+        expired.setSubscriptionFee(BigDecimal.valueOf(150_000));
+        cards.saveAndFlush(expired);
+
+        mvc.perform(get("/cards"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString(perVisit.getCardCode())))
+            .andExpect(content().string(containsString("Synthetic per-visit owner")))
+            .andExpect(content().string(containsString("Theo lượt")))
+            .andExpect(content().string(containsString(expired.getCardCode())))
+            .andExpect(content().string(containsString("Synthetic expired owner")))
+            .andExpect(content().string(containsString("Hết hạn")))
+            .andExpect(content().string(containsString(">Quản lý</th>")))
+            .andExpect(content().string(containsString("Chọn để cập nhật")))
+            .andExpect(content().string(not(containsString(">Thao tác</th>"))));
     }
 
     @Test

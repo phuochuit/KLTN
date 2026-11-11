@@ -12,10 +12,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import vn.edu.parking.repository.SystemAccountRepository;
 import vn.edu.parking.service.AccountPrincipal;
+import vn.edu.parking.service.WebSessionDevices;
 
 public final class WebAccountSessionValidationFilter extends OncePerRequestFilter {
     private final SystemAccountRepository accounts;
-    public WebAccountSessionValidationFilter(SystemAccountRepository accounts) { this.accounts = accounts; }
+    private final WebSessionDevices webDevices;
+    public WebAccountSessionValidationFilter(SystemAccountRepository accounts, WebSessionDevices webDevices) {
+        this.accounts = accounts;
+        this.webDevices = webDevices;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -36,6 +41,7 @@ public final class WebAccountSessionValidationFilter extends OncePerRequestFilte
                 && current.getRole() == principal.getRole()
                 && current.isMustChangePassword() == principal.mustChangePassword();
             if (!valid) invalidateSession(request);
+            else webDevices.observe(request);
         }
         chain.doFilter(request, response);
     }

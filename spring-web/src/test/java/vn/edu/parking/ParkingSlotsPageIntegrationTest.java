@@ -32,6 +32,8 @@ import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -48,6 +50,36 @@ class ParkingSlotsPageIntegrationTest {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) throws IOException {
         LoginTestIsolation.register(registry, "parking-slots-page-test");
+    }
+
+    @Test
+    void deactivationControlsLoadConfirmationDialogAndKeepProtectedFormFields() throws Exception {
+        mvc.perform(get("/slots"))
+            .andExpect(status().isOk())
+            .andExpect(content().string(containsString("/js/app-dialog.js")))
+            .andExpect(content().string(containsString("id=\"app-dialog\"")))
+            .andExpect(content().string(containsString("id=\"deactivateSlotsForm\"")))
+            .andExpect(content().string(containsString("container.querySelectorAll('input[name=\"slotIds\"]')")))
+            .andExpect(content().string(containsString("window.ParkingUi?.confirm")))
+            .andExpect(content().string(containsString("window.confirm(message)")));
+    }
+
+    @Test
+    void managementCanDeactivateAFreeSlotThroughTheProtectedPostAction() throws Exception {
+        ParkingSlot slot = new ParkingSlot();
+        slot.setSlotCode("QA-DEACTIVATE-" + UUID.randomUUID().toString().substring(0, 6));
+        slot.setFloor("QA Floor");
+        slot.setZoneName("QA Zone");
+        slot = slots.saveAndFlush(slot);
+
+        mvc.perform(post("/slots/manage/deactivate")
+                .with(csrf())
+                .param("slotIds", slot.getId().toString()))
+            .andExpect(status().is3xxRedirection())
+            .andExpect(redirectedUrl("/slots"))
+            .andExpect(flash().attribute("message", "Đã ngừng sử dụng 1 ô đỗ."));
+
+        assertTrue(!slots.findById(slot.getId()).orElseThrow().isActive());
     }
 
     @Test

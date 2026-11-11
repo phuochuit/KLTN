@@ -11,6 +11,7 @@
     <link rel="stylesheet" th:href="@{/css/dashboard-ui.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <link rel="stylesheet" th:href="@{/css/slots-lumi.css}">
+    <script defer th:src="@{/js/app-dialog.js}"></script>
     <style>
         .header-actions {
             display: flex;
@@ -519,7 +520,9 @@
                 <button type="button" class="btn btn-outline" onclick="toggleManageMode(false)">Thoát</button>
             </div>
         </div>
-        <form id="deactivateSlotsForm" method="post" th:action="@{/slots/manage/deactivate}" style="display:none;"></form>
+        <form id="deactivateSlotsForm" method="post" th:action="@{/slots/manage/deactivate}" style="display:none;">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        </form>
         <div class="slot-grid-interactive">
             <div th:each="s : ${slots}" class="slot-card"
                  th:classappend="${s.status.toLowerCase()}"
@@ -1382,7 +1385,7 @@
         }
 
         function setSelectedSlotInputs(container) {
-            container.innerHTML = '';
+            container.querySelectorAll('input[name="slotIds"]').forEach(input => input.remove());
             selectedSlotIds.forEach(id => {
                 const input = document.createElement('input');
                 input.type = 'hidden'; input.name = 'slotIds'; input.value = id;
@@ -1419,9 +1422,10 @@
 
         async function deactivateSelectedSlots() {
             if (selectedSlotIds.size === 0) return;
-            const accepted = await window.ParkingUi.confirm(
-                `Ngừng sử dụng ${selectedSlotIds.size} ô đã chọn? Các ô sẽ được lưu trữ và không còn xuất hiện trên sơ đồ.`,
-                'Xác nhận ngừng sử dụng');
+            const message = `Ngừng sử dụng ${selectedSlotIds.size} ô đã chọn? Các ô sẽ không còn nhận xe và không còn xuất hiện trên sơ đồ đang hoạt động.`;
+            const accepted = window.ParkingUi?.confirm
+                ? await window.ParkingUi.confirm(message, 'Xác nhận ngừng sử dụng')
+                : window.confirm(message);
             if (!accepted) return;
             const form = document.getElementById('deactivateSlotsForm');
             setSelectedSlotInputs(form);
@@ -1565,6 +1569,17 @@
             setInterval(refreshSlotMap, refreshIntervalMs);
         })();
     </script>
+    <dialog id="app-dialog" class="app-dialog" aria-labelledby="app-dialog-title" aria-describedby="app-dialog-message">
+        <div class="app-dialog-icon" aria-hidden="true">?</div>
+        <div class="app-dialog-content">
+            <h2 id="app-dialog-title">Xác nhận thao tác</h2>
+            <p id="app-dialog-message"></p>
+        </div>
+        <div class="app-dialog-actions">
+            <button id="app-dialog-cancel" type="button" class="btn btn-outline">Hủy</button>
+            <button id="app-dialog-confirm" type="button" class="btn btn-primary">Xác nhận</button>
+        </div>
+    </dialog>
     <dialog id="navigationDialog" class="navigation-dialog" aria-label="Điều hướng quản trị">
         <button type="button" id="closeNavigation" class="close-navigation">Đóng điều hướng ×</button>
         <div th:replace="~{dashboard-shell :: navigation}"></div>

@@ -29,6 +29,19 @@ public class WebSessionDevices {
             describe(request.getHeader("User-Agent"), clientIp(request)));
     }
 
+    /**
+     * Khôi phục metadata của phiên ở yêu cầu đầu tiên sau khi ứng dụng khởi động
+     * lại, nhưng không ghi đè thời điểm đã ghi nhận từ lúc đăng nhập.
+     */
+    public void observe(HttpServletRequest request) {
+        var session = request.getSession(false);
+        if (session == null) {
+            return;
+        }
+        devices.computeIfAbsent(session.getId(), ignored ->
+            describe(request.getHeader("User-Agent"), clientIp(request)));
+    }
+
     /** Giữ duy nhất phiên mới nhất nếu cùng tài khoản đăng nhập lại từ cùng IP. */
     public void expireOtherSessionsAtSameIp(HttpServletRequest request,
             Authentication authentication, SessionRegistry sessions) {
